@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Google News - Test Query</title>
+    <link>https://news.google.com</link>
+    <description>Latest news for test query</description>
+    <language>en-IN</language>
+    <lastBuildDate>Mon, 01 Jan 2024 12:00:00 GMT</lastBuildDate>
+    <atom:link href="https://news.google.com/rss/search?q=test&amp;hl=en-IN&amp;gl=IN&amp;ceid=IN:en" rel="self" type="application/rss+xml"/>
+    
+    <item>
+      <title><![CDATA[First Test Article Title]]></title>
+      <link>https://example.com/article1</link>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+      <source url="https://example.com">Example News</source>
+      <description><![CDATA[This is the first test article description with some <b>HTML</b> content.]]></description>
+      <guid isPermaLink="false">https://example.com/article1</guid>
+    </item>
+    
+    <item>
+      <title><![CDATA[Second Test Article Title]]></title>
+      <link>https://another-example.com/article2</link>
+      <pubDate>Mon, 01 Jan 2024 11:00:00 GMT</pubDate>
+      <source url="https://another-example.com">Another News</source>
+      <description><![CDATA[This is the second test article with <a href="#">links</a> and more content.]]></description>
+      <guid isPermaLink="false">https://another-example.com/article2</guid>
+    </item>
+    
+    <item>
+      <title><![CDATA[Third Test Article Title]]></title>
+      <link>https://third-example.com/article3</link>
+      <pubDate>Mon, 01 Jan 2024 12:00:00 GMT</pubDate>
+      <source url="https://third-example.com">Third News Source</source>
+      <description><![CDATA[This is the third test article with minimal content.]]></description>
+      <guid isPermaLink="false">https://third-example.com/article3</guid>
+    </item>
+    
+    <!-- Article with missing fields for testing -->
+    <item>
+      <title><![CDATA[Incomplete Article]]></title>
+      <link>https://incomplete.com/article4</link>
+      <!-- Missing pubDate and source for testing -->
+      <description><![CDATA[This article has missing fields for testing purposes.]]></description>
+      <guid isPermaLink="false">https://incomplete.com/article4</guid>
+    </item>
+    
+    <!-- Article with different field names -->
+    <item>
+      <title><![CDATA[Article with Summary Field]]></title>
+      <link>https://summary.com/article5</link>
+      <pubDate>Mon, 01 Jan 2024 13:00:00 GMT</pubDate>
+      <source url="https://summary.com">Summary News</source>
+      <summary><![CDATA[This article uses summary instead of description.]]></summary>
+      <guid isPermaLink="false">https://summary.com/article5</guid>
+    </item>
+  </channel>
+</rss>

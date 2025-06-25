@@ -1,0 +1,33 @@
+{
+  "networking": {
+    "timeout_seconds": 30,
+    "retry_attempts": 3,
+    "backoff_factor": 2.0,
+    "keyword_pause_seconds": 10,
+    "group_pause_minutes": 5,
+    "user_agent": "RSS-Collector/1.0 (+https://example.com/bot)"
+  },
+  "storage": {
+    "base_dir": "./feeds",
+    "cleanup_days": 30,
+    "create_jsonl": true,
+    "backup_enabled": false
+  },
+  "logging": {
+    "level": "INFO",
+    "log_dir": "./logs",
+    "max_log_files": 10,
+    "log_rotation": "daily"
+  },
+  "schedule": {
+    "times": ["05:00", "14:00"],
+    "timezone": "Asia/Kolkata",
+    "enabled": true
+  },
+  "features": {
+    "deduplication_enabled": true,
+    "content_hashing": true,
+    "statistics_enabled": true,
+    "proxy_support": true
+  }
+}

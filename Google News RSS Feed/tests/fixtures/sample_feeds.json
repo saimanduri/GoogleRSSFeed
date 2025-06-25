@@ -1,0 +1,22 @@
+{
+  "keywords": [
+    "test query",
+    "python programming",
+    "artificial intelligence",
+    "technology news"
+  ],
+  "keyword_groups": [
+    {
+      "name": "Programming",
+      "keywords": ["python", "javascript", "software development"]
+    },
+    {
+      "name": "AI/ML",
+      "keywords": ["machine learning", "artificial intelligence", "deep learning"]
+    },
+    {
+      "name": "Business",
+      "keywords": ["startup", "investment", "economy"]
+    }
+  ]
+}

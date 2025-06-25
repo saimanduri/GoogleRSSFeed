@@ -1,0 +1,36 @@
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\.env
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\GoogleNewsFileList.txt
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\Readme.md
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\requirements.txt
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\run.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\setup.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\config\feeds.json
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\config\settings.json
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\Complete RSS Collector Setup Guide.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\Dependencies Download Instructions.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\README.md.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\requirements_txt.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\RSS Pipeline Approach Document.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\docs\RSS Pipeline File Structure.pdf
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\feeds\.gitkeep
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\logs\.gitkeep
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\config_manager.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\main.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\rss_fetcher.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\rss_parser.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\scheduler.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\storage_manager.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\__init__.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\utils\helpers.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\utils\logging_utils.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\utils\proxy_setup.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\utils\proxy_utils.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\src\utils\__init__.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\test_config_manager.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\test_rss_fetcher.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\test_rss_parser.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\test_scheduler.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\test_storage_manager.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\__init__.py
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\fixtures\sample_feeds.json
+C:\Users\Sai Krishna\Downloads\Google News RSS Feed\Google News RSS Feed\tests\fixtures\sample_rss.xml

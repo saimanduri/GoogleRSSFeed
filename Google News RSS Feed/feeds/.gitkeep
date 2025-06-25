@@ -1,0 +1,2 @@
+# This file ensures the feeds directory is tracked by git
+# The directory will store JSON feed data in the format YYYY-MM-DD.json

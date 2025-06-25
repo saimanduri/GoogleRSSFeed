@@ -1,0 +1,69 @@
+{
+  "keywords": [
+    {
+      "name": "Technology News",
+      "terms": [
+        "artificial intelligence",
+        "machine learning",
+        "blockchain",
+        "cryptocurrency",
+        "cybersecurity",
+        "cloud computing"
+      ]
+    },
+    {
+      "name": "Business & Finance",
+      "terms": [
+        "stock market",
+        "economy",
+        "startup funding",
+        "IPO",
+        "merger acquisition",
+        "inflation"
+      ]
+    },
+    {
+      "name": "Science & Health",
+      "terms": [
+        "climate change",
+        "renewable energy",
+        "medical research",
+        "vaccine development",
+        "space exploration",
+        "environmental protection"
+      ]
+    },
+    {
+      "name": "India Specific",
+      "terms": [
+        "India economy",
+        "Mumbai news",
+        "Bangalore tech",
+        "Delhi politics",
+        "Indian startup",
+        "Modi government"
+      ]
+    },
+    {
+      "name": "Global News",
+      "terms": [
+        "international trade",
+        "geopolitics",
+        "UN climate summit",
+        "global supply chain",
+        "world economy",
+        "international relations"
+      ]
+    }
+  ],
+  "settings": {
+    "language": "en",
+    "country": "IN",
+    "max_articles_per_keyword": 50,
+    "content_filtering": {
+      "min_title_length": 10,
+      "exclude_domains": [],
+      "include_sources_only": false
+    }
+  }
+}
