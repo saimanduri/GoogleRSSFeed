@@ -1,0 +1,19 @@
+{
+  "name": "google-news-rss-pipeline",
+  "version": "1.0.0",
+  "description": "Offline-friendly Google News RSS ingestion pipeline for LLM integration",
+  "main": "index.js",
+  "scripts": {
+    "start": "python src/main.py --run-now",
+    "schedule": "python src/main.py --schedule",
+    "setup": "python setup_directories.py",
+    "test": "python -m pytest tests/ -v"
+  },
+  "dependencies": {
+    "python": "^3.10.0"
+  },
+  "devDependencies": {},
+  "keywords": ["rss", "news", "python", "pipeline"],
+  "author": "RSS Collector Team",
+  "license": "MIT"
+}
