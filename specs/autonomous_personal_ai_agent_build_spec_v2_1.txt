@@ -1,0 +1,2962 @@
+
+AUTONOMOUS PERSONAL AI AGENT PLATFORM
+COMPREHENSIVE BUILD SPECIFICATION
+Version 2.1 (Harness Hardening Revision)
+Supersedes: Version 2.0 (which superseded 1.0)
+Target: Claude Code / Codex / equivalent coding agent
+
+============================================================
+0. BUILD INSTRUCTION
+============================================================
+
+Build a production-quality, self-hosted, enterprise-grade autonomous personal AI agent platform according to this specification.
+
+Do not treat this as a chatbot project. Treat it as a persistent agent runtime with:
+- SSO-authenticated web access
+- separate end-user and administrator portals
+- a first-class agent identity distinct from the user identity
+- persistent user memory
+- missions/goals
+- scheduled and event-driven autonomous execution
+- local LLM inference through an authenticated OpenAI-compatible vLLM endpoint
+- controlled access, through a single Tool Gateway, to:
+    - Exchange / Microsoft 365 mail (server-side connector)
+    - local Microsoft Outlook (desktop connector via the Local Outlook Bridge)
+    - ChiRAG
+    - web search / web fetch
+    - files
+    - other approved APIs
+- user-controllable connector settings (any connector can be disabled by the user at any time)
+- user-isolated, encrypted persistent file storage
+- document processing through ChiRAG
+- deterministic, default-deny policy enforcement
+- data-flow (taint) tracking and egress control
+- strongly isolated sandboxed execution
+- prompt-injection resistance
+- DLP/egress controls
+- approval workflows bound to exact payloads
+- complete auditability through one unified, SIEM-ready security log
+- kill switches with defined semantics and latency
+- resource/time/action/egress budgets at task, user and tenant level
+- safe learning and memory formation
+
+The implementation must favor secure, deterministic controls over instructions in an LLM prompt.
+
+IMPORTANT SECURITY PRINCIPLES:
+
+1. The LLM may propose an action, but it must NEVER be the final authority that decides whether the action is permitted.
+2. Every consequential action must pass through deterministic server-side authorization and policy enforcement.
+3. Policy is DEFAULT-DENY. Anything not explicitly allowed is denied.
+4. Security controls are evaluated on DATA FLOW, not only on individual actions. A sequence of individually allowed actions must not be able to move data somewhere policy forbids.
+5. Authorization is evaluated at EXECUTION time, not only at creation/planning/approval time.
+6. If an action cannot be audited, it must not be executed.
+7. Security components (Tool Gateway, Policy Engine, Audit Writer, kill switches, file pipeline) are built BEFORE the capabilities they protect. No capability may exist, even in development builds, without passing through them.
+
+Do not silently weaken security controls to make a workflow work. If a capability cannot safely be implemented, fail closed and expose the limitation in the UI.
+
+------------------------------------------------------------
+0.1 CHANGE LOG (v1.0 -> v2.0)
+------------------------------------------------------------
+
+New in v2.0:
+- Agent identity and delegated authority model (Section 7.2 - 7.4).
+- Continuous entitlement re-evaluation, SCIM deprovisioning, offboarding (Section 7.5).
+- Signed service-to-service identity context; mTLS (Section 7.6).
+- Connector Framework with user-controlled enable/disable settings (Section 8).
+- Local Outlook connector via the Local Outlook Bridge (Section 13).
+- Data classification propagation and context taint tracking (Section 17).
+- Expanded egress definition (search queries, URLs, rendered images/links, notifications) and egress volume budgets (Section 18).
+- MicroVM/gVisor-grade sandbox isolation; Docker socket prohibition (Section 19).
+- Mandatory secrets manager, KMS, encryption at rest/in transit, embedding sensitivity (Section 20).
+- Revocation-aware memory and deletion cascades (Section 22).
+- Payload-bound approvals, separation of duties, step-up authentication, approval fatigue controls (Section 28).
+- Kill switch semantics and latency SLOs (Section 29).
+- Unified Security Log: one SIEM-ready log file for all users and components (Section 30).
+- Postgres-backed durable queue / outbox; OUTCOME_UNKNOWN state (Sections 25, 32, 33).
+- vLLM hardening incl. authentication, safetensors, cross-user prefix-cache isolation (Section 36).
+- Deterministic citation verification (Section 41).
+- Notifications as an egress channel (Section 45).
+- Legal hold, eDiscovery, deletion cascades (Section 46).
+- Defined RPO/RTO defaults (Section 47).
+- Privileged access management (Section 48).
+- Compliance and governance (Section 49).
+- Supply chain / SDLC security (Section 50).
+- Security operations and incident response (Section 51).
+- Deterministic red-team pass criteria (Section 53).
+- Pilot vs enterprise deployment profiles (Section 54).
+- Re-ordered development phases: security controls first (Section 55).
+- Expanded acceptance criteria (Section 56).
+
+Appendix A maps each v1.0 review finding to the section that fixes it.
+
+------------------------------------------------------------
+0.2 CHANGE LOG (v2.0 -> v2.1)
+------------------------------------------------------------
+
+New Section 60 "Agent Harness Hardening", based on lessons from DeepSeek Harness, OpenClaw and Hermes Agent (2026) and research on self-improving agents:
+
+High priority
+- 60.1  Listener and browser-origin hardening (ClawJacked pattern)
+- 60.2  No configuration or credentials via links (CVE-2026-25253 pattern)
+- 60.3  Per-caller capability scoping for internal APIs
+- 60.4  Extension security model: declarative skills, signed out-of-process connectors, no public marketplace (ClawHavoc pattern)
+- 60.5  Session event log as source of truth ("model-visible means logged")
+- 60.6  Governed skill evolution (lineage gate, pre-activation tests, no in-place self-modification)
+- 60.7  Safe context compaction
+Medium priority
+- 60.8  Sub-agents, agent teams and external agents
+- 60.9  Scripted tool calls through the gateway
+- 60.10 Security Posture page
+- 60.11 Safe updates with snapshot and automatic rollback
+- 60.12 Cross-session search
+Low priority
+- 60.13 Memory review and "About me" profile
+- 60.14 In-chat approval cards
+- 60.15 Plain-language mission creation
+Later
+- 60.16 Isolated browser tool (optional)
+- 60.17 Messaging channels (deferred, with preconditions)
+Also: 60.18 lists what was explicitly NOT adopted.
+
+Related updates: Sections 14.2, 23, 38, 52, 53, 55, 56, 57, 58 and Appendix A.
+
+============================================================
+1. PRODUCT VISION
+============================================================
+
+The product is a persistent digital assistant that continues working when the user is offline or asleep.
+
+The user should be able to say things such as:
+
+- "Keep me updated on important developments in local LLMs."
+- "Every morning, summarize important emails and identify anything requiring action."
+- "Search my local Outlook archive for the vendor contract discussion from 2023."
+- "Compare this uploaded document against institutional knowledge."
+- "Research this topic overnight and prepare a report."
+- "Remember how I prefer these reports."
+- "Monitor this objective and tell me when something important changes."
+
+The system should transform user intent into:
+1. goal/mission
+2. plan
+3. executable tasks
+4. controlled tool calls
+5. verification
+6. artifact/output
+7. memory/learning where appropriate
+
+The browser is only the control plane for the user. The agent continues running server-side after the browser is closed. (Exception: capabilities that depend on the user's own device, such as the Local Outlook Bridge, are only available while that device is online. See Section 13.)
+
+The user remains in control of what the agent can reach: every connector can be switched off by the user at any time from Settings (Section 8.4).
+
+============================================================
+2. CORE ARCHITECTURAL DECISIONS
+============================================================
+
+DECISION A: Two portals
+
+Create:
+- User Portal: normal user operations.
+- Admin Portal: privileged administration.
+
+Suggested deployment:
+- User Portal: https://agent.example/
+- Admin Portal: https://agent-admin.example/
+- Untrusted file preview origin: https://agent-usercontent.example/ (separate registrable domain; see Section 9.4)
+
+The Admin Portal must use a separate backend authorization context, separate session cookies, separate OIDC client registration, and must be reachable only from the administrative network segment or via privileged access tooling. Sharing a hostname-only separation with the same session is not sufficient.
+
+Ports are configurable; do not hard-code them.
+
+DECISION B: Central Tool/API Gateway
+
+Do NOT implement direct connectors inside the agent.
+
+The agent requests capabilities such as:
+- chirag.search
+- chirag.process_document
+- exchange.search
+- exchange.get_message
+- outlook_local.search
+- outlook_local.get_message
+- web.search
+- web.fetch
+- file.read
+- file.write
+- python.execute
+
+The Tool Gateway is the ONLY component holding connector credentials and the ONLY component with network routes to backend systems. It:
+- authenticates
+- resolves the user identity and agent identity
+- checks connector enablement (admin AND user settings)
+- validates input against schema and argument-level constraints
+- evaluates policy (via the Policy Engine)
+- evaluates data flow / context taint
+- applies rate limits and budgets
+- applies data classification rules
+- performs DLP/egress checks
+- obtains approval if required
+- calls the backend system with a signed, audience-bound identity context
+- validates and classifies output
+- records audit events through the Audit Writer
+- returns normalized results labelled as untrusted data
+
+DECISION C: Local LLMs
+
+Use vLLM or another OpenAI-compatible local inference server.
+
+The agent communicates through an abstraction layer:
+LLM Router -> authenticated OpenAI-compatible endpoint.
+
+The agent must not contain model-specific assumptions.
+
+DECISION D: ChiRAG remains a separate service
+
+Do not embed ChiRAG into the agent. ChiRAG is an institutional knowledge/document intelligence service with its own authorization. The agent is the orchestration/personalization layer.
+
+DECISION E: Files are first-class objects
+
+Use object storage for bytes, relational metadata for ownership/permissions/classification/lifecycle, and logical file IDs everywhere.
+
+DECISION F: The agent has its own identity
+
+Each user's agent is a distinct principal (agent_id) that acts ON BEHALF OF the user. Every downstream call and every audit record carries BOTH the user identity and the agent identity, so "the user did X" and "the agent did X for the user" are always distinguishable.
+
+DECISION G: One unified security log
+
+All security-relevant events for all users and all components are written, through a single Audit Writer, to one canonical, append-only, hash-chained log file in a SIEM-ready format (Section 30). The Admin Portal audit view is an index over the same events; it is never a separately authored record.
+
+DECISION H: Connectors are user-controllable
+
+Admins decide which connectors exist and who may use them. Users decide, within that, which connectors their own agent may use. A user may disable any connector at any time; this is enforced by the backend immediately (Section 8.4).
+
+DECISION I: Security before capability
+
+The Tool Gateway, Policy Engine, Audit Writer, kill switches and file security pipeline are built first. The agent loop and integrations are built on top of them (Section 55).
+
+============================================================
+3. HIGH-LEVEL ARCHITECTURE
+============================================================
+
+                    CORPORATE SSO / IDP  (OIDC/SAML, SCIM)
+                              |
+          +-------------------+--------------------+
+          |                                        |
+          v                                        v
+     USER PORTAL                              ADMIN PORTAL
+   (incl. Settings >                       (admin network only,
+    Connectors)                             step-up MFA, PAM)
+          |                                        |
+          +-------------------+--------------------+
+                              |
+                  REVERSE PROXY / WAF / API GATEWAY
+                              |
+                        AGENT RUNTIME
+             (agent loop, planner, context manager)
+                              |
+          +-----------+-------+-------+-------------+
+          |           |               |             |
+       MEMORY     SCHEDULER /     TASK ENGINE    APPROVAL
+                  EVENT ENGINE    (durable        ENGINE
+                                   queue)
+          |           |               |             |
+          +-----------+-------+-------+-------------+
+                              |
+                 +------------+-------------+
+                 |     TOOL / API GATEWAY   |<----> POLICY ENGINE (policy-as-code,
+                 |  (connector registry,    |        default deny, taint/data-flow,
+                 |   user connector state,  |        budgets, kill-switch state)
+                 |   DLP, rate limits)      |
+                 +------------+-------------+
+                              |
+                        EGRESS PROXY  (SSRF protection, IP pinning,
+                              |        domain allowlist)
+     +---------+----------+---+------+-----------+-------------+
+     |         |          |          |           |             |
+   ChiRAG   Exchange/   Local      Web       Other APIs    SANDBOX
+            M365       Outlook    Search/                  (microVM /
+            (server)   Bridge*    Fetch                     gVisor)
+                         |
+             (*outbound-only mTLS from
+               user's enrolled device)
+
+     LLM Router ---> vLLM (authenticated, internal network only) ---> Local LLMs
+
+     All components ---> AUDIT WRITER ---> UNIFIED SECURITY LOG FILE ---> SIEM
+                                      \--> Audit index (Admin Portal / "What did the agent do?")
+
+Supporting infrastructure:
+- PostgreSQL (with row-level security)
+- pgvector
+- Redis (cache, rate-limit counters, ephemeral coordination ONLY; not the system of record for tasks)
+- S3-compatible object storage (MinIO or equivalent) with server-side encryption
+- isolated worker containers
+- sandbox runtime with microVM or user-space kernel isolation (Firecracker, Kata Containers or gVisor)
+- secrets manager (mandatory): HashiCorp Vault or equivalent
+- key management (KMS/HSM) for envelope encryption
+- Audit Writer and unified security log
+- egress proxy
+- reverse proxy / WAF / API gateway
+- monitoring/metrics/logging
+- time synchronization (NTP/chrony) on every host
+
+============================================================
+4. TECHNOLOGY BASELINE
+============================================================
+
+Frontend:
+- React/Next.js or equivalent
+- responsive web UI
+- strict Content Security Policy
+
+Backend:
+- Python, FastAPI, async architecture
+
+Database:
+- PostgreSQL with row-level security (RLS) enabled on all user-scoped tables
+- pgvector
+
+Durable queue:
+- PostgreSQL-backed job queue and transactional outbox (system of record)
+- Redis may be used as an acceleration layer only; loss of Redis must not lose tasks
+
+Cache / rate limiting:
+- Redis (with authentication and TLS)
+
+Object storage:
+- MinIO or S3-compatible, server-side encryption with KMS-managed keys
+
+LLM:
+- vLLM, OpenAI-compatible API, authenticated, internal-only network
+
+Policy:
+- policy-as-code engine: Open Policy Agent (Rego) or Cedar
+- policies versioned in source control with unit tests
+
+Execution:
+- sandbox using Firecracker / Kata Containers / gVisor
+- never unrestricted host shell access
+- never mount the container runtime socket (e.g. /var/run/docker.sock) into any application container
+
+Authentication:
+- OIDC preferred, SAML supported where required
+- SCIM 2.0 for provisioning/deprovisioning
+
+Secrets and keys:
+- secrets manager is MANDATORY (not optional)
+- KMS/HSM for key encryption keys
+
+Local Outlook Bridge:
+- signed Windows desktop companion application (see Section 13)
+
+Deployment:
+- containerized, Docker/Podman compatible
+- Pilot profile: single controlled server (Section 54)
+- Enterprise profile: HA deployment, portable to Kubernetes/OpenShift without redesign
+
+Do not introduce unnecessary microservices in V1. Use clear module boundaries and background workers. Split into services only where isolation or scaling materially requires it. The sandbox, file parsers and Tool Gateway are isolation boundaries and MUST be separate processes/containers.
+
+============================================================
+5. USER PORTAL
+============================================================
+
+5.1 Chat
+- conversational interaction
+- streaming responses
+- citations/references where available
+- show tool activity at an appropriate level
+- show whether a response is based on user files, ChiRAG, Exchange, local Outlook, web or model reasoning
+- show the classification high-water mark of the current conversation (e.g. "This conversation contains CONFIDENTIAL data")
+- model output is rendered safely:
+    - markdown sanitized; raw HTML disabled
+    - remote images NOT auto-loaded (prevents image-URL exfiltration); images from untrusted origins require a click and pass the egress policy
+    - links display their full destination and pass through a link-check interstitial for external domains
+
+5.2 My Files
+- upload, download
+- preview only via the isolated preview origin (Section 9.4)
+- folders/tags, search, metadata
+- processing status
+- delete according to retention policy and legal hold
+- "Add to My Knowledge" action
+- classification label (user may raise; lowering requires policy-permitted, audited action)
+
+5.3 Missions
+Each mission must show:
+- objective
+- schedule/event trigger
+- allowed tools and connectors (and which are currently disabled/unavailable)
+- resource and egress budget
+- pinned model (if any)
+- current status
+- recent runs
+- outputs
+- approvals
+- errors
+- dependency warnings (e.g. "Depends on Local Outlook - device offline")
+
+5.4 Tasks
+Show: queued, running, waiting for resource, waiting for approval, suspended, paused, failed, outcome unknown (needs review), completed, cancelled, timed out.
+
+5.5 Approvals
+Show:
+- requested action
+- reason
+- affected data and its classification
+- destination
+- risk level
+- exact proposed action and exact payload (rendered, with diff against any prior version)
+- approve/deny
+- expiry
+- whether a second approver is required
+- step-up authentication prompt for high-risk approvals
+
+5.6 Memory
+Allow user to:
+- view remembered preferences and facts
+- distinguish explicit vs inferred memory
+- correct, disable or delete a memory
+- see provenance (including source documents/connectors)
+- see confidence
+- see memories currently hidden because the underlying source is no longer accessible
+
+5.7 Activity
+Human-readable timeline of tasks, searches, file processing, API calls, connector usage, outputs, approvals, failures, and security events that affected the user. Generated from the same audit events as the unified security log.
+
+5.8 Settings
+
+Settings is reachable from a persistent "Settings" (gear) button in the portal header.
+
+5.8.1 Connectors (basic settings)
+See Section 8.4 for required behavior. The user must be able, at any time, to:
+- see every connector available to them and its status
+- switch each connector ON/OFF with a single toggle
+- choose, per connector, whether it may be used:
+    - in interactive chat
+    - in autonomous/overnight missions
+- "Disconnect" a connector (disable + revoke stored tokens / unpair device)
+- use a master "Pause all connectors" switch
+
+5.8.2 Other settings
+- notification preferences (channels, quiet hours, content level)
+- storage usage
+- personal autonomy settings (within admin constraints)
+- allowed tools (within admin constraints)
+- paired devices (Local Outlook Bridge) with unpair action
+- active sessions with sign-out-everywhere
+- security information (recent sign-ins, recent approvals)
+- pause my agent
+
+============================================================
+6. ADMIN PORTAL
+============================================================
+
+Admin portal must be inaccessible to ordinary users at the network, authentication and authorization layers.
+
+6.1 Dashboard
+- active users, active missions, tasks running/completed
+- files processed
+- model usage, API usage
+- pending approvals
+- security events
+- failures
+- connector health (incl. number of online Local Outlook Bridges)
+- audit pipeline health (unified log write lag, SIEM forwarding lag, sequence gaps)
+
+6.2 User management
+- identity (read from IdP; not editable locally), groups/roles
+- agent enabled/disabled
+- quotas, storage, usage
+- permissions
+- last activity
+- deprovisioning state and mission/file ownership transfer
+
+6.3 Connector / Tool / API management
+- registered connectors and tools, versions and pinned definitions
+- enabled/disabled globally, per group, per user
+- whether users may self-enable, and which scopes
+- endpoint configuration (via egress proxy only)
+- authentication configuration (credential references only; never raw secrets in UI)
+- scopes, rate limits, health
+- Local Outlook Bridge: allowed versions, device enrollment requirement, paired device inventory, revoke device
+
+6.4 Model management
+- model registry, endpoint, capabilities, context limits
+- enabled/disabled, routing policy, health
+- version/hash, provenance, evaluation results
+- staged rollout / canary controls
+
+6.5 Policy management
+- policy bundles (policy-as-code), version history, diffs, test results
+- tool permissions, argument constraints
+- data classification rules
+- egress policies and destination allowlists
+- approval requirements and separation-of-duties rules
+- resource and egress limits
+- prohibited actions
+- changes follow Section 48 change control
+
+6.6 Storage
+- total usage, quotas, retention, legal holds
+- cleanup policies, orphaned files, failed processing
+
+6.7 Audit
+- read view over the unified security log index
+- filtering, export (export is itself audited)
+- actor (user + agent), target, action, decision, reason, timestamp, correlation/task ID
+- integrity verification status (hash chain)
+- default view shows metadata only; access to referenced content (prompts, transcripts) requires a separate, audited, justified permission
+
+6.8 Kill switches
+See Section 29.
+
+============================================================
+7. IDENTITY, ACCESS CONTROL AND AGENT IDENTITY
+============================================================
+
+7.1 Human identity
+Use SSO through OIDC/SAML with MFA enforced by the IdP.
+
+Every authenticated request must carry:
+- user ID (immutable IdP subject, not email)
+- tenant/organization ID
+- groups/roles
+- session ID
+- correlation ID
+
+Implement RBAC, resource-level authorization, least privilege, server-side authorization, and PostgreSQL row-level security as a second enforcement layer.
+
+Never rely on hidden UI elements, LLM decisions, or client-supplied owner IDs.
+
+For every file/task/memory/mission/connector/API resource: the server derives and verifies ownership.
+
+Roles:
+- User
+- Power User (defined: may create missions with larger budgets and use tools marked power_user; cannot change policy)
+- Agent Administrator
+- Security Administrator
+- System Administrator
+- Auditor/Read-only (metadata only by default)
+- Approver (for separation-of-duties approvals)
+
+Avoid superuser permissions. No single role may both change policy and approve its own change.
+
+7.2 Agent identity
+- Each user's agent is a separate principal: agent_id = stable ID bound to (tenant_id, user_id).
+- The agent principal has NO standing privileges of its own; its effective permissions are always the intersection of:
+    (user entitlements) AND (admin policy) AND (user connector settings) AND (mission allowed tools) AND (task scope).
+- The agent identity is included in every downstream identity context and every audit event.
+- Where downstream systems support it, the agent's actions are recorded there as "agent on behalf of user" (e.g. distinct application identity in Exchange/M365 audit).
+
+7.3 Delegated authority for offline operation
+Autonomous work happens while the user has no active browser session. Therefore:
+- Use OAuth 2.0 on-behalf-of or token-exchange (RFC 8693) flows so backend calls carry both user and agent identity.
+- Where a long-lived delegated grant (e.g. refresh token) is unavoidable:
+    - store it only in the secrets manager, envelope-encrypted with KMS
+    - bind it to the minimum scopes the enabled connectors need
+    - never expose it to the agent runtime, LLM, sandbox or logs
+    - only the Tool Gateway may redeem it, at execution time
+    - revoke it immediately when: the user disconnects the connector, the user is deprovisioned, an admin disables the connector for the user, or a kill switch requires it
+- Access tokens are short-lived (<= 60 minutes) and audience-bound.
+
+7.4 Human session security
+- Session cookies: Secure, HttpOnly, SameSite=Strict (admin) / Lax or Strict (user), host-only.
+- CSRF protection on ALL state-changing endpoints in BOTH portals (approvals are state-changing).
+- Idle timeout and absolute session lifetime configurable (defaults: user 30 min idle / 12 h absolute; admin 15 min idle / 4 h absolute).
+- Sign-out-everywhere and admin session revocation.
+- CORS restricted per portal; no wildcard origins.
+- Step-up authentication (fresh MFA within N minutes, default 5) for: high-risk approvals, connector re-enable after disconnect, device pairing, admin policy changes, audit content access.
+
+7.5 Continuous entitlement evaluation and lifecycle
+- Entitlements (groups, roles, connector scopes) are re-evaluated:
+    - at the start of every mission run
+    - before every tool call (cached for at most 5 minutes; cache is invalidated on SCIM/IdP change events)
+- Integrate SCIM 2.0 (or IdP event hooks). When a user is disabled/deleted in the IdP:
+    - agent disabled within 5 minutes
+    - all missions SUSPENDED
+    - delegated tokens revoked
+    - paired Local Outlook Bridge devices revoked
+    - pending approvals invalidated
+- Offboarding workflow: files, missions and outputs are either transferred to a designated owner (manager/data steward) through an audited admin action, or retained/deleted per retention policy. Nothing continues to run under a departed user's identity.
+- Group/role changes take effect at the next evaluation; missions whose allowed tools are no longer entitled move to SUSPENDED with a user-visible reason.
+
+7.6 Service-to-service trust
+- All internal traffic uses mTLS with service identities.
+- When the Tool Gateway calls ChiRAG, Exchange adapters or other internal APIs, it sends a signed, short-lived (<= 5 minutes), audience-bound identity assertion (e.g. JWT or token-exchange token) containing: tenant_id, user_id, agent_id, task_id, mission_id, correlation_id, purpose, and classification ceiling.
+- Downstream services MUST verify signature, audience, expiry and replay (jti) before honoring the user context. A plain header such as "X-User-Id" is never accepted as proof of identity.
+
+============================================================
+8. CONNECTOR FRAMEWORK AND USER CONNECTOR SETTINGS
+============================================================
+
+8.1 Definition
+A connector is a registered integration that gives the agent access to a system outside the agent's own core storage. V1 connectors:
+- chirag         (ChiRAG institutional knowledge)
+- exchange       (server-side Exchange / Microsoft 365 mail and calendar)
+- outlook_local  (user's local Microsoft Outlook via the Local Outlook Bridge)
+- web            (web search and web fetch)
+- generic_api.*  (each admin-registered API is its own connector)
+
+"My Files" (the platform's own object storage) and the sandbox are core platform capabilities, not connectors; they are controlled via tool permissions and autonomy settings.
+
+8.2 Connector registry (admin-defined)
+Each connector record includes:
+- connector_id, name, version, description
+- tools it provides (Section 14)
+- required scopes / permissions
+- default classification of returned data
+- whether it can send data outside the organization (egress-capable)
+- whether it requires a user connection step (OAuth consent, device pairing)
+- admin state: ENABLED | DISABLED | ENABLED_FOR_GROUPS
+- whether users may self-disable (always true in V1) and self-enable (configurable)
+- health status
+- credential reference (secrets manager path)
+
+8.3 Effective connector state
+For each (user, connector) the effective state is computed server-side:
+
+  EFFECTIVE_ENABLED =
+        admin_enabled_for_user
+    AND user_toggle == ON
+    AND NOT user_paused_all_connectors
+    AND NOT agent_disabled
+    AND NOT relevant_kill_switch_active
+    AND connection_valid (tokens present / device paired, where applicable)
+    AND entitlement_valid
+
+Plus two usage flags set by the user:
+- allow_in_chat
+- allow_in_autonomous_missions
+
+The Policy Engine evaluates EFFECTIVE_ENABLED and the usage flag for the current execution context on EVERY tool call. The UI only reflects this state; it never enforces it.
+
+User-visible statuses:
+- Connected
+- Off (disabled by you)
+- Disabled by administrator
+- Not connected (needs sign-in / pairing)
+- Device offline (Local Outlook)
+- Unavailable (service unhealthy)
+- Suspended (entitlement lost)
+
+8.4 User connector settings - required behavior
+
+Location: Settings (gear button in header) -> Connectors.
+
+For each connector the page shows:
+- name and icon
+- status (above)
+- toggle ON/OFF
+- "Use in chat" checkbox
+- "Use in overnight / autonomous missions" checkbox
+- last used time
+- missions that depend on it
+- scopes granted (plain language)
+- "Disconnect" button (where a connection exists)
+
+Plus:
+- "Pause all connectors" master switch
+- link to Activity filtered by that connector
+
+Behavior when the user switches a connector OFF:
+1. The change is persisted and audited (event: connector.user_disabled) before the API returns.
+2. Enforcement is effective for new tool calls within 5 seconds across all workers (state is read from the database / invalidated caches, not from the UI).
+3. In-flight calls to that connector are cancelled where the backend supports cancellation; results arriving after the switch-off are discarded and not added to context or memory.
+4. Queued/running tasks that need the connector move to WAITING_FOR_RESOURCE with reason "connector disabled by user". Per mission setting, they either wait (up to mission timeout) or fail cleanly. They do not busy-retry.
+5. Affected missions display a warning. Missions are NOT silently modified to use a different connector.
+6. The agent is told only that the capability is unavailable; it must not attempt to reach the same data via another connector to circumvent the setting (enforced by the Policy Engine: e.g. disabling "exchange" also blocks "web.fetch" to the organization's OWA/Graph endpoints).
+7. Existing data previously retrieved remains subject to normal retention; the user can delete it.
+
+Behavior of "Disconnect":
+- everything in "OFF", plus
+- revoke and delete stored delegated tokens (Exchange/M365, generic APIs)
+- unpair and revoke device certificates (Local Outlook Bridge)
+- purge connector-specific caches
+- audited as connector.user_disconnected
+
+Behavior when the user switches a connector back ON:
+- if a valid connection still exists: effective immediately, audited
+- if disconnected: user must re-authorize (OAuth consent / device pairing) with step-up authentication
+- waiting tasks resume only if still within timeout; the user is notified. Suspended missions require explicit user resume.
+
+Constraints:
+- Users can only RESTRICT access relative to admin policy; they can never grant themselves access the admin has not allowed.
+- Admins can see (in aggregate and per user) which connectors users have disabled; admins cannot silently re-enable a connector a user has disabled. An admin override (e.g. for a legal/operational reason) is a separate, audited, justified action with user notification.
+- The agent can never change connector settings. There is no tool that modifies connector state.
+
+============================================================
+9. FILE STORAGE ARCHITECTURE
+============================================================
+
+9.1 Storage
+Use object storage. Logical hierarchy: /tenants/<tenant-id>/users/<user-id>/<file-id>
+The application accesses files by file ID only, never by user-controlled paths.
+
+9.2 Metadata
+- file_id (cryptographically random, >= 128 bits)
+- tenant_id, owner_id
+- original_name (display only; never used as a path)
+- declared MIME type, detected MIME type
+- size, sha256 hash
+- object_key
+- classification (and classification_source)
+- created_at, updated_at
+- scan_status, processing_status
+- retention_until, legal_hold flag
+- source (upload, email attachment, local outlook attachment, agent output, sandbox output)
+- parent_task_id, derived_from (list of source file IDs / document IDs)
+- version
+- deleted_at
+- encryption key reference
+
+9.3 Controls
+- file size limits, MIME validation, extension validation, content sniffing
+- checksum
+- malware scanning (multi-engine where available) plus structural checks (macros, embedded objects, active content)
+- quarantine
+- retention, legal hold, quota
+- encryption at rest with per-tenant data keys (envelope encryption, KMS)
+- NO cross-user deduplication by hash (prevents confirming another user's file existence). Deduplication, if any, is per user.
+
+9.4 Download and preview
+- Downloads use presigned URLs with <= 5 minute lifetime, bound to the requesting user's session, single object, Content-Disposition: attachment.
+- Previews are served ONLY from a separate registrable domain (e.g. agent-usercontent.example) with a restrictive CSP and no cookies from the portal domains, to prevent stored XSS from HTML/SVG/PDF content.
+- HTML, SVG and script-capable formats are never rendered inline in the portal origin.
+
+============================================================
+10. SECURE FILE PROCESSING
+============================================================
+
+Workflow:
+
+UPLOAD / INGEST (user upload, Exchange attachment, Local Outlook attachment, sandbox output, agent output)
+  -> QUARANTINE
+  -> VALIDATE (type, size, structure, archive depth/ratio limits)
+  -> MALWARE SCAN
+  -> CONTENT DISARM / SAFE EXTRACTION where appropriate
+  -> CLASSIFY (inherit from source; see Section 17)
+  -> CONTENT PROCESSING (isolated parser workers)
+  -> ChiRAG
+  -> PROCESSED ARTIFACT
+  -> AVAILABLE TO AGENT (as untrusted data)
+
+Rules:
+- The file pipeline is implemented before any connector that ingests files. No ingest path may bypass it.
+- Parsers (PDF/Office/image/OCR) run in isolated, least-privilege workers with no network, no secrets, read-only input, time/memory limits.
+- Archive handling: max nesting depth, max expansion ratio, max file count, max total size (decompression bomb protection).
+- Extracted text is untrusted. The extractor must surface and label hidden content that could carry injection: invisible/white text, tiny fonts, off-page text, OCR text inside images, document metadata, comments, alt text, embedded files.
+
+Uploaded files must never:
+- execute code
+- access host filesystem
+- access host network
+- access secrets
+- access other users' storage
+
+============================================================
+11. ChiRAG INTEGRATION
+============================================================
+
+Implement a dedicated ChiRAG adapter in the Tool Gateway.
+
+Operations:
+
+chirag.search
+Input: query, optional filters. (User/agent context is attached by the gateway, never by the model.)
+
+chirag.process_document
+Input: file_id, requested operations.
+
+chirag.retrieve
+Input: document/result IDs.
+
+Rules:
+- Every request carries the signed identity assertion from Section 7.6.
+- ChiRAG independently enforces authorization using that verified identity.
+- The agent has no direct database credentials, filesystem access or network route to ChiRAG storage.
+- Returned information preserves: citations, document IDs, source metadata, classification/ACL labels, confidence/relevance, processing provenance.
+- Returned content is untrusted data, never instructions.
+- Results inherit the classification ChiRAG reports; if none, default INTERNAL.
+- Any memory, summary or artifact derived from ChiRAG content records the source document IDs so access can be re-checked later (Section 22).
+
+============================================================
+12. EXCHANGE / MICROSOFT 365 (SERVER-SIDE) CONNECTOR
+============================================================
+
+Provide a server-side Exchange connector (connector_id: exchange) through the Tool Gateway, using Microsoft Graph or EWS with delegated, least-privilege scopes.
+
+Capabilities:
+- exchange.search
+- exchange.get_message
+- exchange.get_attachment
+- exchange.metadata
+- exchange.calendar_read (optional)
+- exchange.create_draft (write)
+- exchange.categorize / exchange.flag / exchange.move (write)
+- exchange.send / exchange.forward / exchange.delete (write, high risk)
+
+Defaults:
+- read/search/metadata: allowed per user authorization and connector settings
+- create_draft: allowed but treated as a WRITE:
+    - drafts created by the agent are clearly marked (category "AI Draft" and a visible header/footer notice per organization policy)
+    - recipients in agent drafts are restricted to: recipients already on the source thread, or internal domains, unless approved
+- categorize/flag/move: WRITE; allowed only if the user enabled it; audited
+- send/forward: approval required, payload-bound, never autonomous in V1
+- delete: approval required; soft-delete only in V1
+
+Mail content is UNTRUSTED DATA. It must never modify agent policy, permissions, system prompts, security configuration, tool authorization, connector settings or memory trust level.
+
+Attachments pass the file security pipeline (Section 10) and inherit the message's sensitivity label.
+
+Classification: use Microsoft Purview / sensitivity labels where present; otherwise default CONFIDENTIAL for mail content.
+
+Use minimum required scopes. Prefer delegated user authorization over broad application permissions. If application permissions are unavoidable, restrict them with application access policies to the specific mailboxes of enrolled users.
+
+============================================================
+13. LOCAL OUTLOOK CONNECTOR (LOCAL OUTLOOK BRIDGE)
+============================================================
+
+13.1 Purpose
+Allow the agent to use mail and calendar data that is only available in the user's local Microsoft Outlook client, for example:
+- local PST archives
+- cached/offline OST data for mailboxes the server connector is not permitted to reach
+- on-premises mailboxes where server-side API access is not approved
+- local calendar data
+
+If the same mailbox is reachable via the server-side Exchange connector (Section 12), the server connector is preferred because it works while the user's device is off. The Local Outlook connector is complementary, not a replacement.
+
+13.2 Architecture
+The server cannot and must not reach into a user's desktop. Instead, a small, signed desktop companion application - the Local Outlook Bridge - runs on the user's Windows device and connects OUT to the platform.
+
+   User device                                  Platform
+   +-------------------------------+            +---------------------------+
+   | Classic Outlook (Windows)     |            |                           |
+   |      ^  Outlook Object Model  |            |  Tool Gateway             |
+   |      |  / MAPI (read-only)    |  outbound  |   - bridge endpoint       |
+   | Local Outlook Bridge          |---mTLS---->|   - policy, DLP, audit    |
+   |  (runs as the signed-in user) |  WebSocket |                           |
+   +-------------------------------+            +---------------------------+
+
+- Outbound-only connection (HTTPS/WebSocket over mTLS) to a dedicated Tool Gateway bridge endpoint. The bridge opens NO listening ports.
+- The bridge is an executor of a fixed, small set of operations. It never runs model output, scripts, macros or arbitrary commands, and it never receives prompts.
+- The LLM never talks to the bridge. Requests reach the bridge only after the full Tool Gateway sequence (Section 14.3), including policy and connector-state checks.
+
+13.3 Supported platforms (V1)
+- Classic Outlook for Windows (Microsoft 365 Apps / Outlook 2016+), which exposes the Outlook Object Model/MAPI.
+- "New Outlook for Windows" and Outlook for Mac do not expose the COM object model; for those users, use the server-side Exchange connector. The UI must state this clearly rather than fail silently.
+
+13.4 Pairing and device identity
+1. User opens Settings -> Connectors -> Local Outlook -> "Connect this computer".
+2. User installs the signed bridge (MSI, deployable via Intune/SCCM; code-signed; version allowlisted by admin).
+3. Bridge performs SSO sign-in (system browser, OIDC with PKCE) as the same user.
+4. User confirms a one-time pairing code shown in the portal (step-up MFA required).
+5. The platform issues a device certificate bound to (tenant_id, user_id, device_id); private key stored non-exportably (TPM / Windows CNG where available).
+6. Optional admin policy: device must be MDM-enrolled / compliant (checked via IdP device claims).
+
+A paired bridge is bound to exactly one user profile on one device. Shared or multi-user machines require a separate pairing per Windows user profile; one user's bridge can never serve another user's data.
+
+13.5 Operations (V1)
+Read-only by default:
+- outlook_local.list_folders
+- outlook_local.search          (query, folder scope, date range, max results)
+- outlook_local.get_message     (message ID; body returned as plain text; HTML stripped)
+- outlook_local.get_attachment  (attachment is uploaded directly into quarantine, Section 10)
+- outlook_local.calendar_read   (date range)
+
+Optional, admin-enabled AND user-enabled:
+- outlook_local.create_draft    (same restrictions and marking as exchange.create_draft)
+
+Not supported in V1: send, forward, delete, move, rules, contacts export, account settings. If sending is required, the platform prepares a draft and the user sends it themselves, or it goes through the server-side Exchange approval flow.
+
+13.6 Request protection
+Every request from the gateway to the bridge is:
+- signed by the Tool Gateway
+- bound to device_id and user_id
+- short-lived (expires in <= 60 seconds)
+- single-use (nonce; replay rejected)
+- validated by the bridge against its own local operation allowlist and schema
+The bridge rejects anything else and reports the rejection to the gateway (audited).
+
+13.7 Local scope controls
+- Folder allowlist/denylist (admin default + user choice), e.g. exclude "Personal", "Deleted Items", shared mailboxes.
+- Maximum items per request, maximum body size, maximum attachment size.
+- Date range limits.
+- Items with the highest sensitivity labels (e.g. RESTRICTED) may be excluded or metadata-only per policy.
+
+13.8 Local security requirements
+- Runs as the logged-in user; never as SYSTEM or administrator.
+- Must not disable, suppress or bypass the Outlook Object Model Guard or any Outlook security prompt, and must not use techniques designed to bypass it.
+- No persistent local cache of message content. Any transient buffer is in memory only, or if unavoidable, encrypted with DPAPI and deleted immediately after transmission.
+- Signed auto-update from the platform only; version pinned/allowlisted by admin.
+- Local tray icon with status and a "Pause" control; pausing is reported to the platform and treated like the user turning the connector OFF.
+- Bridge operational and security events (start, pair, request served, request rejected, pause, update, error) are sent to the platform and written to the unified security log (Section 30) with device_id.
+- Uninstall or unpair revokes the device certificate.
+
+13.9 Data handling
+- All data returned is untrusted, tagged source=outlook_local, and classified from the item's sensitivity label; default CONFIDENTIAL.
+- Attachments go through the full file pipeline.
+- Data minimization: the gateway requests only the fields needed for the task.
+
+13.10 Availability semantics
+- The connector is available only while the device is on, the user is signed in to Windows, Outlook profile is available, and the bridge is connected.
+- Tasks needing it enter WAITING_FOR_RESOURCE ("device offline") with a mission-configurable timeout; they do not retry aggressively.
+- When creating a mission that depends on outlook_local, the UI warns that overnight execution requires the device to remain on and connected.
+- The user can disable this connector at any time (Section 8.4), from the portal or the tray icon.
+
+13.11 Threat model notes
+- A compromised endpoint can return falsified data: treat as untrusted, never use as authority for permissions.
+- A compromised bridge must not be able to obtain platform credentials, other users' data, or server-side connector tokens: the gateway never sends credentials to the bridge, and the bridge's certificate only authorizes its own user's bridge channel.
+- Admin can revoke any device immediately; revocation closes the channel within 5 seconds.
+
+============================================================
+14. GENERAL TOOL GATEWAY
+============================================================
+
+14.1 Tool definition
+Each tool has:
+- name, description, version
+- connector_id
+- input schema and output schema
+- argument-level constraints (e.g. allowed recipient domains, path scopes, max rows, URL allowlist)
+- permissions/scopes
+- risk level
+- side-effect type: NONE | INTERNAL_WRITE | EXTERNAL_WRITE | EGRESS
+- data classification of outputs
+- rate limits, timeout
+- allowed users/groups
+- approval policy
+- endpoint (reachable only via the egress proxy)
+- credential reference
+- definition hash (pinned)
+
+Example:
+
+tool:
+  name: chirag.search
+  connector: chirag
+  permission: chirag.read
+  risk: low
+  side_effect: NONE
+  egress: false
+  output_classification: from_source (default INTERNAL)
+  approval: none
+
+tool:
+  name: web.search
+  connector: web
+  permission: web.search
+  risk: medium
+  side_effect: EGRESS          # the query text leaves the organization
+  egress: true
+  approval: policy             # see Section 18
+
+14.2 Tool definition integrity
+- Tool definitions (names, descriptions, schemas) are part of the model's context and can therefore carry injected instructions. Only admin-reviewed definitions are loaded; each definition is pinned by hash.
+- Tools from external tool servers (e.g. MCP servers) are allowed only if registered through the same review, pinned by hash, and routed through the gateway. A changed definition is disabled until re-reviewed.
+- Extension rules (signing, out-of-process execution, capability manifests, no marketplace): Section 60.4.
+
+14.3 Tool invocation flow
+
+LLM proposes tool call
+  -> kill-switch check
+  -> schema validation
+  -> identity resolution (user + agent, from server context only)
+  -> connector effective-state check (Section 8.3), incl. chat vs autonomous flag
+  -> entitlement check (Section 7.5)
+  -> resource authorization
+  -> argument-level constraint check
+  -> data-flow / taint evaluation (Section 17)
+  -> policy evaluation (default deny)
+  -> budget check (task, user, tenant, egress volume)
+  -> DLP/egress check if needed
+  -> approval if required (payload-bound)
+  -> policy re-evaluation immediately before execution
+  -> audit "about to execute" event (must succeed or the call is aborted)
+  -> execution via egress proxy / bridge / sandbox
+  -> result validation (schema, size) and classification
+  -> audit "result" event
+  -> return result to agent, labelled UNTRUSTED DATA
+
+The LLM must NEVER bypass this sequence. There is no code path from the agent runtime to any backend that does not pass through the Tool Gateway.
+
+============================================================
+15. SECURITY: PROMPT INJECTION
+============================================================
+
+Treat all external/retrieved content as untrusted:
+- web pages and search results
+- email (server-side and local Outlook)
+- calendar entries and meeting invites
+- PDFs, documents, attachments
+- OCR output and hidden document content
+- API results
+- ChiRAG results
+- sandbox output
+- user-generated documents
+- tool descriptions from external tool servers
+
+Implement explicit separation between TRUSTED INSTRUCTIONS and UNTRUSTED DATA:
+- System/user policy is stored outside retrieved content.
+- Untrusted content is inserted only into clearly delimited data sections, with source and classification labels, never into system-instruction positions.
+- Untrusted content is never concatenated into a tool name, tool description or policy input.
+
+Triggered content is less trusted than user-supplied content: when a task is started by an external event (e.g. new mail from an external sender), the task runs with a reduced default capability profile (Section 26.3).
+
+Prompt-injection detection is a defense-in-depth layer only. Even if detection misses an attack, the Tool Gateway, Policy Engine and data-flow controls must prevent unauthorized actions and exfiltration.
+
+============================================================
+16. SECURITY: AI FIREWALL / POLICY ENGINE
+============================================================
+
+16.1 Implementation
+- Implement as policy-as-code (OPA/Rego or Cedar), evaluated in-process or as a local sidecar with fail-closed behavior.
+- DEFAULT DENY. Every allow rule is explicit.
+- Conflict resolution: explicit DENY overrides REQUIRE_APPROVAL, which overrides SANDBOX, which overrides ALLOW.
+- Policies are versioned, code-reviewed, unit-tested and deployed as signed bundles. The active policy version is recorded in every decision audit event.
+- If the Policy Engine is unavailable or returns an error: DENY.
+
+16.2 Inputs evaluated for every action
+- authenticated user, tenant, groups/roles
+- agent identity
+- connector and its effective state (Section 8.3)
+- execution context: interactive chat vs autonomous mission vs event-triggered
+- trigger trust level (Section 26.3)
+- tool, operation, arguments
+- target resource and its classification
+- destination and destination trust level
+- source(s) of data being sent
+- context classification high-water mark (Section 17)
+- requested capability
+- task, mission
+- risk level
+- budgets (task, user, tenant, egress volume)
+- current approval state
+- kill-switch state
+- policy version
+
+16.3 Decisions
+- ALLOW
+- DENY
+- REQUIRE_APPROVAL (with required approver class: self, second person, security)
+- SANDBOX
+
+Every decision (including ALLOW) is written to the unified security log.
+
+Examples:
+- User A asks agent to read User B's file -> DENY.
+- Agent asks to send confidential file externally -> DENY or REQUIRE_APPROVAL (second person) according to policy.
+- Agent asks to run Python analysis -> SANDBOX.
+- Context contains RESTRICTED data and agent calls web.search -> DENY.
+- Context contains CONFIDENTIAL data and agent calls web.search -> REQUIRE_APPROVAL showing the exact query text.
+- User has switched off "exchange" and agent calls exchange.search -> DENY (reason: connector disabled by user).
+- Mission running overnight calls outlook_local.search but user unticked "Use in overnight missions" -> DENY.
+
+16.4 Re-evaluation
+Policy is evaluated at planning time (advisory), and MUST be re-evaluated immediately before execution, including after an approval is granted. If the result changed (policy update, entitlement change, connector disabled, kill switch), the new result applies.
+
+============================================================
+17. DATA CLASSIFICATION AND DATA-FLOW (TAINT) CONTROL
+============================================================
+
+17.1 Levels
+PUBLIC < INTERNAL < CONFIDENTIAL < RESTRICTED
+
+Classification sources:
+- system metadata
+- source system labels (e.g. Microsoft Purview sensitivity labels, ChiRAG ACL labels)
+- user designation (raise freely; lower only if policy permits, audited)
+- administrator policy
+- later automated classification (may raise, never lower, without human review)
+
+Defaults when unknown:
+- mail (server-side or local Outlook): CONFIDENTIAL
+- ChiRAG: INTERNAL
+- user uploads: INTERNAL
+- web content: PUBLIC (as content), but see 17.3 for what is sent out
+
+17.2 Propagation
+- Every derived object (summary, report, draft, memory, embedding, sandbox output, file) inherits the HIGHEST classification of its inputs.
+- The LLM can never downgrade a classification.
+- Downgrade requires a human with the right role, and is audited with justification.
+
+17.3 Context high-water mark (taint tracking)
+- Each task/conversation tracks the highest classification of any data that has entered its model context, plus the set of source connectors.
+- Egress-capable tools are evaluated against this high-water mark, not only against the explicit arguments. Default policy:
+
+    high-water mark    | egress-capable tools (web.search, web.fetch, external APIs, external send)
+    -------------------+-------------------------------------------------------------------------
+    PUBLIC             | ALLOW (subject to allowlists)
+    INTERNAL           | ALLOW for search/fetch; external write REQUIRE_APPROVAL
+    CONFIDENTIAL       | search/fetch REQUIRE_APPROVAL showing exact outbound text/URL; external write REQUIRE_APPROVAL (second person) or DENY
+    RESTRICTED         | DENY
+
+- A task can be split: the planner may start a fresh sub-task with a clean (low) high-water mark for public research, so long as no tainted content is passed into it (enforced by the gateway, which passes only IDs of approved public inputs).
+
+17.4 Embeddings
+Embeddings and vector indexes carry the classification of their source text, are stored per tenant/user namespace, are encrypted at rest, and are deleted when their source is deleted.
+
+============================================================
+18. DLP / EGRESS CONTROL
+============================================================
+
+18.1 What counts as egress
+Any path by which data can leave the organization or reach a party not entitled to it:
+- web search queries (query text is sent to a search provider)
+- web fetch URLs (path and query string can carry data)
+- external API calls (requests, headers, URLs)
+- email send/forward, and email drafts with external recipients
+- file uploads/sharing
+- links and images rendered in the user portal (auto-loading images is exfiltration)
+- notification content sent via email, SMS, mobile push or chat tools (Section 45)
+- file names and metadata sent externally
+- anything written to a location readable by other users
+
+18.2 Controls
+- All outbound traffic flows through the egress proxy; the LLM runtime, agent runtime, sandbox and parsers have no direct internet route.
+- Destination allowlists (domain, and where applicable path) with trust levels.
+- Protocol restrictions (HTTPS only by default).
+- SSRF protection in the egress proxy:
+    - resolve DNS in the proxy and pin the resolved IP for the connection
+    - block private, loopback, link-local, multicast and cloud metadata ranges (IPv4 and IPv6, incl. IPv4-mapped IPv6)
+    - re-validate every redirect hop against the same rules; limit redirect count
+    - protect against DNS rebinding
+    - reject non-standard ports unless allowlisted
+- Request/response size limits, timeouts, rate limits.
+- Content inspection (DLP patterns, classification labels, secrets patterns) on outbound payloads.
+- Egress volume budgets (bytes and records) per task, per user per day, and per tenant per day. Exceeding a budget -> DENY and alert.
+
+18.3 External file transfer flow
+1. identify file
+2. determine classification (incl. derived classification)
+3. identify destination
+4. determine destination trust level
+5. evaluate policy (incl. context high-water mark)
+6. DLP check
+7. approval if required (payload hash bound)
+8. re-evaluate policy
+9. execute through egress proxy
+10. audit
+
+============================================================
+19. SANDBOXED CODE EXECUTION
+============================================================
+
+Never expose unrestricted host shell access to the LLM.
+
+Isolation:
+- Use microVM or user-space kernel isolation: Firecracker, Kata Containers, or gVisor. Plain shared-kernel containers are NOT sufficient for executing model-generated code in the enterprise profile.
+- In the enterprise profile, run the sandbox on a separate host/VM pool from databases, secrets, the Tool Gateway and vLLM.
+- The service that launches sandboxes must NOT have the container runtime socket mounted. Use a dedicated, minimal sandbox controller with a narrow API (create, run, fetch output, destroy).
+
+Minimum requirements:
+- non-root user
+- read-only base image, signed and pinned
+- limited writable workspace (tmpfs or per-run volume)
+- no host mounts except the controlled workspace
+- NO network by default; if a task requires network, it goes through the egress proxy with a task-specific allowlist and policy approval
+- CPU, memory, process, file-descriptor limits
+- execution timeout
+- disk quota
+- seccomp / syscall restrictions
+- no access to the metadata service
+- automatic destruction after run
+
+Inputs/outputs:
+- Only files explicitly granted for the task are copied into the workspace (by file ID via the gateway).
+- All sandbox outputs are untrusted; output files go through the file pipeline and inherit the highest classification of the inputs.
+
+No access to:
+- host secrets
+- agent database credentials
+- SSO tokens or delegated tokens
+- service account credentials
+- other users' files
+
+============================================================
+20. SECRETS, KEYS AND ENCRYPTION
+============================================================
+
+Secrets:
+- A secrets manager is MANDATORY.
+- Never put API keys/passwords/tokens into prompts, model context, logs, task descriptions, memory, user-visible output, sandbox, or the Local Outlook Bridge.
+- Tool Gateway retrieves credentials only at execution time, holds them in memory only, for the minimum time.
+- The LLM receives "authenticated Exchange capability", never the token.
+- Rotate credentials automatically; short-lived credentials wherever possible.
+- Secret scanning in CI and on log output (Section 30.6).
+
+Encryption:
+- TLS 1.2+ (prefer 1.3) for all external traffic; mTLS for all internal service traffic.
+- Encryption at rest for PostgreSQL, object storage, backups, the unified security log archive, and vector indexes.
+- Envelope encryption with per-tenant data keys; key-encryption keys in KMS/HSM.
+- Delegated user tokens encrypted with a dedicated key; access restricted to the Tool Gateway identity.
+- Customer-managed keys (BYOK) supported in the enterprise profile where required.
+- Key rotation schedule defined and tested.
+
+============================================================
+21. MEMORY ARCHITECTURE
+============================================================
+
+Separate:
+A. Working Memory - current task/session
+B. Episodic Memory - past events/experiences
+C. Semantic Memory - facts learned
+D. Procedural Memory - reusable workflows/skills
+E. User Preference Memory - explicit or strongly inferred preferences
+F. Project Memory - project-specific context
+
+Each memory record contains:
+- memory_id
+- tenant_id, user_id
+- type
+- content
+- source (connector/tool, conversation, user statement)
+- provenance (source document/message IDs, task ID)
+- trust level (Section 22)
+- confidence
+- classification (inherited)
+- created_at, last_verified
+- status (active, disabled, hidden_source_revoked, deleted)
+- expiration if applicable
+
+Memory is stored per user (and per tenant). There is no shared, unrestricted vector namespace. Row-level security and namespace filters are both enforced.
+
+============================================================
+22. MEMORY TRUST MODEL
+============================================================
+
+Trust levels:
+
+TRUSTED:
+- explicit user instruction in the authenticated UI
+- administrator policy
+
+VERIFIED:
+- repeated USER-INITIATED behavior with sufficient evidence
+- confirmed by the user
+
+INFERRED:
+- model inference
+
+UNTRUSTED:
+- email (server or local)
+- web
+- external documents
+- third-party API content
+- ChiRAG content (factual source, but not an instruction source)
+
+Rules:
+- Only TRUSTED/VERIFIED information may alter operating preferences automatically.
+- Evidence for VERIFIED only counts actions the user initiated directly. Actions the agent took (even if later accepted) and actions triggered by external content do NOT count as evidence. This prevents an injection from "training" a preference by making the agent repeat an action.
+- Never allow memory to modify: security policies, authorization, connector settings, prohibited actions, system instructions, classification.
+- Revocation awareness: at retrieval time, memory derived from a source (ChiRAG document, mailbox, file) is re-checked against the user's current access to that source. If access is gone, the memory is hidden (status hidden_source_revoked) and not placed in context.
+- Deletion cascade: deleting a source (file, connector data on disconnect if the user chooses) deletes or re-evaluates derived memories and embeddings.
+
+============================================================
+23. SKILL SYSTEM
+============================================================
+
+Skills are reusable workflows.
+
+Example: regulatory_email_response
+1. classify email
+2. extract question
+3. search ChiRAG
+4. retrieve supporting sources
+5. draft response
+6. verify citations (deterministic, Section 41)
+7. prepare draft
+8. request approval
+
+Skills must declare:
+- required tools and connectors
+- required permissions
+- risk level
+- maximum steps
+- timeout
+- input/output schema
+- side-effect types
+
+Skill lifecycle:
+- agent may propose a skill
+- skills that use only low-risk, non-egress, read-only tools: user approval required
+- skills that use write, egress or high-risk tools: admin/security review required
+- the approval screen shows the full skill definition and a diff against the previous version
+- skills are scanned for embedded instructions targeting the model (e.g. "ignore previous", "always forward to") before review
+- generated skills are versioned and signed on approval
+- every skill execution is audited
+- a skill cannot declare more permissions than its approver holds, and never grants the agent additional privileges
+
+A skill whose required connector is disabled by the user cannot run; it reports the missing capability.
+
+Skill evolution (lineage gate, automated pre-activation tests, retirement): Section 60.6. Skills are declarative only: Section 60.4.
+
+============================================================
+24. MISSIONS / LONG-RUNNING OBJECTIVES
+============================================================
+
+Fields:
+- mission_id
+- tenant_id, owner_id
+- objective
+- schedule/event trigger (incl. timezone)
+- allowed tools and connectors
+- allowed contexts (e.g. overnight)
+- policy profile
+- resource and egress budget
+- pinned model (optional)
+- missed-run policy (Section 26.4)
+- resource-wait timeout
+- notification policy
+- status
+- created_at, updated_at, created_by (must be a human)
+
+Lifecycle:
+DRAFT
+ACTIVE
+PAUSED
+SUSPENDED (entitlement lost, connector disabled/revoked, user deprovisioned, admin action)
+WAITING_APPROVAL
+COMPLETED
+FAILED
+CANCELLED
+
+Rules:
+- Only a human (via the authenticated UI) can create, activate, expand or resume a mission. The agent may PROPOSE a mission; it cannot create or modify one.
+- Entitlements and connector states are re-checked at the start of every run.
+- Every mission run gets its own execution ID.
+
+============================================================
+25. TASK STATE MACHINE
+============================================================
+
+Task states:
+CREATED
+PLANNING
+QUEUED
+RUNNING
+WAITING_FOR_RESOURCE (service down, connector disabled, device offline, budget window)
+WAITING_FOR_APPROVAL
+SUSPENDED
+VERIFYING
+OUTCOME_UNKNOWN (side effect may or may not have happened; needs reconciliation)
+COMPLETED
+FAILED
+CANCELLED
+TIMED_OUT
+
+Persist state transactionally after every meaningful transition (PostgreSQL is the system of record).
+Resume recoverable tasks after restart.
+Never rely solely on in-memory agent state.
+Every state transition emits an audit event.
+
+============================================================
+26. AUTONOMOUS OPERATION, TRIGGERS AND SCHEDULING
+============================================================
+
+26.1 Supported triggers
+- one-time, recurring, interval
+- event-triggered (new mail, monitored API change, new file uploaded, condition true)
+- mission runs
+
+26.2 Durable execution
+- Durable PostgreSQL-backed queue with leases/heartbeats; transactional outbox for side effects.
+- On restart: recover task state, avoid duplicate side effects, use idempotency keys.
+
+26.3 Trigger trust and abuse controls
+External events are attacker-influenceable (anyone can send an email). Therefore:
+- Each trigger has a trust level: USER (manual), SCHEDULE, INTERNAL_EVENT, EXTERNAL_EVENT.
+- EXTERNAL_EVENT tasks run with a reduced capability profile by default: read-only tools, no egress, no drafts to external recipients, no memory writes above INFERRED.
+- Trigger filters: e.g. only mail from internal senders, allowlisted senders, or specific folders.
+- Trigger rate limits per mission and per user (e.g. max 20 triggered runs/hour); excess events are coalesced into one batched run.
+- Trigger-driven runs consume the same budgets.
+
+26.4 Scheduling semantics
+- All schedules stored with an explicit IANA timezone; DST transitions handled deterministically.
+- Missed-run policy per mission: SKIP | RUN_ONCE | RUN_ALL (default RUN_ONCE).
+- After an outage, catch-up runs are jittered and rate-limited to avoid a thundering herd.
+- Scheduler leader election prevents duplicate firing in multi-instance deployments.
+
+============================================================
+27. AUTONOMY BUDGETS
+============================================================
+
+Every autonomous task must have budgets. Budgets exist at three levels: task, user (daily), tenant (daily).
+
+Dimensions:
+- maximum runtime
+- maximum LLM tokens (and GPU-seconds)
+- maximum tool calls
+- maximum web requests
+- maximum files processed
+- maximum output size
+- maximum API calls
+- maximum retries
+- maximum external writes
+- maximum egress bytes and records
+- maximum sub-tasks spawned
+- maximum task depth (default 3)
+- maximum concurrent tasks per user (default 5)
+
+Example mission budget:
+  mission: AI Research
+  runtime: 2 hours
+  tool_calls: 200
+  files: 50
+  external_writes: 0
+  egress_bytes: 200 KB
+  subtasks: 20
+  depth: 2
+
+On budget exhaustion:
+STOP -> SAVE STATE -> REPORT (audit + user notification)
+
+Scheduling fairness:
+- Interactive requests have priority over autonomous work on the inference servers.
+- Per-user and per-tenant GPU/token quotas prevent one user's missions from starving others.
+
+============================================================
+28. APPROVAL ENGINE
+============================================================
+
+Approval requests must show:
+- action
+- why
+- data involved and its classification
+- destination and its trust level
+- risk
+- exact operation
+- exact proposed content/payload (full rendering; for web queries, the exact query/URL)
+- expiration
+- originating task and mission
+- trigger type (user, schedule, external event)
+- approver class required
+
+Approval must be:
+- explicit
+- authenticated (in the User Portal; approvals are NOT accepted by replying to an email or clicking a tokenized link that bypasses login)
+- step-up authenticated for high-risk actions
+- time-bound (default expiry 24 h; high-risk 1 h)
+- bound to the SHA-256 hash of the exact payload and destination; any change invalidates the approval
+- single-use
+- auditable
+
+Separation of duties:
+- Policy may require a second approver (not the requesting user) for: egress of CONFIDENTIAL data to external destinations, any RESTRICTED data movement, bulk operations above thresholds, and skill activation with high-risk tools.
+
+After approval:
+- Policy is re-evaluated immediately before execution (Section 16.4).
+- If a kill switch, connector disablement or entitlement change occurred, the approval is void.
+
+Approval fatigue controls:
+- rate-limit approval requests per user
+- batch similar low-risk requests
+- flag users who approve very quickly or approve everything; alert security
+- never present an approval with an "approve all future" option for high-risk actions
+
+Silence is never approval.
+
+============================================================
+29. KILL SWITCHES
+============================================================
+
+User:
+- pause my agent
+- cancel mission
+- stop current task
+- turn off any connector / pause all connectors (Section 8.4)
+- unpair Local Outlook device
+
+Admin:
+- disable user agent
+- disable mission
+- disable tool
+- disable connector (globally / per group / per user)
+- disable all external/egress access
+- revoke Local Outlook Bridge device(s)
+- stop all autonomous execution
+- global emergency stop
+
+Semantics (all switches):
+- Enforced by backend state read by the Tool Gateway, Policy Engine, scheduler and workers; never by the LLM.
+- Checked before every agent step and every tool call.
+- Effect on in-flight work:
+    - new tool calls: blocked within 5 seconds (SLO)
+    - in-flight tool calls: cancelled where supported; late results discarded
+    - running sandboxes: terminated
+    - queued jobs: held (not deleted) in PAUSED/SUSPENDED
+    - scheduled future runs: not fired while the switch is active
+    - pending approvals: invalidated
+    - bridge channels: closed (for device/connector switches)
+- Global emergency stop also blocks the scheduler and all egress at the egress proxy (defense in depth).
+- Kill switch activation and release are audited; release of global switches requires step-up authentication and (per policy) a second administrator.
+- Kill switches are tested in CI and in periodic drills.
+
+============================================================
+30. AUDIT LOGGING AND THE UNIFIED SECURITY LOG
+============================================================
+
+30.1 Principle
+All security-relevant and user-attributable events, for ALL users and ALL components, are written to ONE canonical log: the Unified Security Log. It is the single source of truth for SIEM integration, investigations and the Admin Portal audit view.
+
+30.2 Single writer, single file
+- All components (portals/API, agent runtime, Tool Gateway, Policy Engine, scheduler, workers, file pipeline, sandbox controller, LLM router, Local Outlook Bridge events relayed by the gateway, admin actions) emit events to one Audit Writer through a durable local queue/outbox.
+- The Audit Writer is the only process that writes the log. It writes ONE active file at a fixed, configurable path, for example:
+
+      ${AUDIT_LOG_DIR}/agent-security.jsonl
+
+- Format: JSON Lines (one JSON object per line), UTF-8, versioned schema. Field names map to OCSF (Open Cybersecurity Schema Framework); an ECS mapping and optional CEF/RFC 5424 syslog output are provided for SIEMs that prefer them.
+- SIEM integration: any standard shipper (Splunk Universal Forwarder, Elastic Agent/Filebeat, Fluent Bit, Microsoft Sentinel AMA, Wazuh, QRadar WinCollect/Syslog) tails this single path. Optionally, the Audit Writer also streams the same events in real time over syslog-TLS (RFC 5425) or HTTPS to the SIEM.
+- Rotation: to prevent an unbounded file, the active file is rotated by size/time (default 1 GB or 24 h). The active path never changes, so shippers keep tailing one file. Rotated segments are named with their sequence range (e.g. agent-security.000123-000456.jsonl), compressed, sealed and retained. Logically it is one continuous log; physically it is one active file plus sealed archive segments.
+
+30.3 Integrity
+- Every event has a monotonically increasing sequence number and a hash chain field: hash = SHA-256(previous_hash || canonical_event_json).
+- Each rotated segment ends with a signed seal record (last sequence, last hash, HMAC/signature with a key held in KMS).
+- File opened in append-only mode; OS append-only attribute where supported; owned by a dedicated service account; no other process has write permission.
+- Sealed segments are copied to WORM / object-lock storage.
+- A verification tool (included) checks sequence continuity, hash chain and seals; verification runs daily and on demand; failures raise a security alert.
+- Sequence gaps, write failures, forwarding lag above threshold (default 60 s) raise alerts and appear on the Admin dashboard.
+
+30.4 Fail-closed behavior
+- Every consequential action writes an "about to execute" event before execution. If the Audit Writer cannot durably accept the event, the action is not executed.
+- The Audit Writer uses a bounded durable spool if the file system is temporarily unavailable; if the spool fills, consequential actions stop (fail closed) and an alert fires.
+
+30.5 Event fields (minimum)
+
+event_id
+sequence
+prev_hash
+hash
+schema_version
+timestamp (UTC, ISO 8601, millisecond precision; hosts NTP-synchronized)
+event_type / category (see 30.7)
+severity
+tenant_id
+user_id
+agent_id
+actor_type (user | agent | admin | system | device)
+on_behalf_of (for agent actions)
+session_id
+device_id (if any)
+source_ip / user_agent (for human requests)
+task_id
+mission_id
+execution_id
+trigger_type
+connector
+tool
+operation
+resource (IDs only)
+resource_classification
+context_high_water_mark
+source
+destination
+destination_trust
+risk
+policy_decision
+policy_version
+decision_reason
+approval_id
+payload_hash
+bytes_out / records_out (for egress)
+result
+error_code / error (sanitized)
+correlation_id
+component and component version
+
+30.6 Content minimization and redaction
+The Unified Security Log is shipped to the SIEM and read by security staff; it must not become a data-leak channel.
+- It contains security METADATA and REFERENCES (IDs, hashes, sizes, classifications), not raw content.
+- It never contains: secrets, tokens, passwords, cookies, full email bodies, file contents, full prompts/completions, or memory contents.
+- Full prompts, completions and tool payloads needed for forensics ("why did the agent do X?") are stored in a separate, encrypted, access-controlled Transcript Store, referenced by transcript_id in the log. Access to the Transcript Store requires a justified, audited permission.
+- Before writing, every event passes a redaction filter: known-sensitive field names are dropped, and a secrets/PII pattern scanner masks matches. If redaction fails for a field, the field is replaced by "[REDACTED:ERROR]" and the event is still written (events are never silently dropped).
+- Log injection protection: all values are JSON-encoded; control characters and newlines inside values are escaped; values are length-limited.
+
+30.7 Events that must be logged (all users)
+- authentication: sign-in, sign-out, failed sign-in, step-up, session revocation
+- authorization: every policy decision (ALLOW/DENY/REQUIRE_APPROVAL/SANDBOX)
+- connector: admin enable/disable, user ON/OFF, usage-flag change, connect, disconnect, token revocation, health change
+- local outlook bridge: install/pair/unpair, device revoke, connect/disconnect, request served, request rejected, local pause, version/update, integrity errors
+- tool calls: about-to-execute and result for every call
+- egress: every outbound transfer with destination, size and DLP result
+- DLP: matches and actions
+- approvals: requested, approved, denied, expired, invalidated
+- kill switches: activation, release, enforcement results
+- missions/tasks: lifecycle transitions
+- files: upload, quarantine, scan result, classification change, download, preview, share, delete, legal hold
+- memory: created, promoted (trust change), corrected, disabled, hidden (revocation), deleted
+- skills: proposed, reviewed, activated, executed, retired
+- sandbox: start, stop, limits hit, violations
+- model: routing decision (model ID/version), model registry changes
+- admin: every configuration, policy, role, retention, destination and model change (with before/after hash)
+- privileged access: elevation, break-glass, audit/transcript content access, exports
+- identity lifecycle: SCIM provisioning/deprovisioning, offboarding transfers
+- audit pipeline: rotation, seal, verification result, gaps, spool usage, forwarder lag
+
+30.8 Access to the log
+- Write: Audit Writer only.
+- Read (file): SIEM forwarder service account and Security Administrators.
+- Read (Admin Portal index): Auditor and Security Administrator roles; metadata only by default.
+- Every export and every access to the Transcript Store is itself logged.
+
+30.9 Retention
+- Configurable; default: 1 year online (index + active segments), 7 years archived (WORM), subject to legal/regulatory requirements.
+- Audit data is never deleted by user deletion requests; personal data inside it is minimized (IDs rather than content) so retention can be justified.
+
+30.10 Answering "What did the agent do between 23:00 and 07:00?"
+The Admin Portal and User Activity view query the audit index for the time range and user/agent, producing a complete, ordered timeline (by sequence), with links to transcripts for authorized viewers. Because index and file share event IDs and sequence numbers, the same answer can be reproduced from the SIEM.
+
+30.11 Operational logs
+Verbose application/debug logs are NOT sent to the Unified Security Log (to avoid flooding the SIEM and leaking content). They are structured, carry correlation IDs, never contain secrets or content, and have short retention. Anything security-relevant must be emitted as an audit event, not only as a debug log.
+
+============================================================
+31. OBSERVABILITY
+============================================================
+
+Expose metrics for:
+- active agents, active tasks, queue depth
+- task latency, tool latency, LLM latency
+- token usage, GPU utilization, model usage
+- failed tasks, OUTCOME_UNKNOWN count
+- policy denials by reason
+- approval wait time, approval rate per user
+- file processing time
+- ChiRAG, Exchange, Local Outlook Bridge latency and availability
+- connected bridge count
+- connectors disabled by users (count)
+- storage usage
+- sandbox failures and violations
+- egress volume by destination
+- audit write latency, spool usage, SIEM forwarding lag, integrity verification status
+- kill switch enforcement latency
+
+Provide Prometheus-compatible metrics, structured logs and distributed tracing (OpenTelemetry). Every operation has a correlation ID.
+
+============================================================
+32. RESILIENCE
+============================================================
+
+The system must handle:
+- LLM unavailable
+- ChiRAG unavailable
+- Exchange unavailable
+- Local Outlook Bridge offline
+- web unavailable
+- Redis restart or data loss
+- PostgreSQL restart / failover
+- object storage unavailable
+- Audit Writer / log volume unavailable (fail closed for consequential actions)
+- worker restart
+- scheduler restart
+
+Do not lose durable tasks (PostgreSQL is the system of record; Redis loss must be harmless).
+
+Use:
+- retry with exponential backoff and jitter
+- maximum retry count
+- dead-letter queue with admin visibility
+- idempotency keys
+- circuit breakers
+- timeouts
+
+Do not blindly retry side-effecting operations (Section 33).
+
+============================================================
+33. IDEMPOTENCY
+============================================================
+
+Every side-effecting operation has an idempotency key, e.g. hash(task_id + action_id + payload_hash).
+
+Use the transactional outbox pattern: record the intent, execute, record the outcome.
+
+If a worker crashes after sending but before recording success, a retry must not repeat the side effect:
+- If the target system supports idempotency keys or a lookup (e.g. search Sent Items by a unique internet message header), use it to determine the outcome.
+- If the outcome cannot be determined, set the task to OUTCOME_UNKNOWN and require human reconciliation. Never retry automatically in this state.
+
+Applies to: email send/forward, drafts, file creation, external API writes, calendar operations, notifications, bridge draft creation.
+
+============================================================
+34. NETWORK ARCHITECTURE
+============================================================
+
+Internet
+  -> reverse proxy / WAF (ingress)
+  -> user/admin portals and API gateway
+  -> internal services
+
+Internal services
+  -> egress proxy
+  -> Internet / approved external APIs
+
+Local Outlook Bridge (user device)
+  -> ingress (dedicated bridge endpoint, mTLS)
+  -> Tool Gateway
+
+Segments:
+- frontend / ingress
+- admin (separate, restricted)
+- backend / agent runtime
+- Tool Gateway / integration
+- database
+- object storage
+- worker / file parsers
+- sandbox (isolated; no route to databases, secrets or LLM)
+- LLM (reachable only from LLM Router)
+- audit (Audit Writer and log volume)
+- egress proxy
+
+Only required, explicitly allowed flows (default-deny network policies).
+The LLM runtime has no outbound internet.
+Only the Tool Gateway (via egress proxy) performs external access.
+Rate limiting and WAF rules at ingress; DDoS protection per organizational standard.
+
+============================================================
+35. MULTI-TENANCY AND USER ISOLATION
+============================================================
+
+Decision: the platform is multi-tenant-capable from V1 (single-tenant deployments use one tenant).
+
+Every resource is scoped by tenant, user, role, and project where applicable.
+
+- Never trust a user-provided user_id or tenant_id.
+- Derive identity from authenticated SSO context.
+- PostgreSQL row-level security on all tenant/user-scoped tables, in addition to application checks.
+- Per-tenant encryption keys.
+- Separate vector namespaces per tenant/user; metadata filtering plus server-side authorization.
+- Caches (Redis, LLM prefix cache, CDN) must not return data across users (Section 36).
+- Test horizontal privilege escalation explicitly.
+
+============================================================
+36. LLM RUNTIME SECURITY
+============================================================
+
+- The vLLM endpoint requires authentication (API key via secrets manager or mTLS) and is reachable only from the LLM Router's network segment.
+- Load model weights only in safetensors format; trust_remote_code is disabled; no pickle-based weights.
+- Model artifacts are verified against recorded checksums before loading.
+- Prompt/response logging in the inference server is disabled or, if enabled, treated as Transcript Store data (encrypted, access-controlled, retention-limited).
+- Prefix/KV-cache sharing across users is disabled, or the cache is partitioned per user/tenant (e.g. cache salt per user), to prevent cross-user timing side channels and leakage.
+- Resource isolation: per-user/tenant quotas at the router; interactive priority.
+- The LLM cannot select an endpoint or model; the router does.
+
+============================================================
+37. MODEL GOVERNANCE AND SAFETY
+============================================================
+
+Treat the model as an untrusted reasoning component, even if local.
+
+Do not assume: local = safe; open source = safe; bigger = safer; better benchmark = safer.
+
+Record for each model:
+- name, version, source, license
+- checksum/hash
+- quantization
+- deployment configuration
+- evaluation results and date
+
+Before production activation, and before any model change:
+- run the red-team suite (Section 53)
+- run task-quality evaluations (instruction following, tool-call accuracy, citation faithfulness, hallucination rate)
+- compare to the currently active model; block promotion on regression beyond thresholds
+
+Rollout:
+- staged/canary rollout; quick rollback
+- missions may pin a model version; pinned missions are migrated only after re-evaluation
+- every model change is an audited admin change (Section 48)
+
+============================================================
+38. LLM ROUTING
+============================================================
+
+Example:
+- simple classification -> fast model
+- normal reasoning -> standard model
+- complex planning -> reasoning model
+- document/image -> multimodal model
+
+The router considers:
+- capability
+- context length
+- latency
+- availability
+- resource utilization and quotas
+- mission model pin
+- data classification (policy may restrict RESTRICTED data to specific models/hosts)
+
+The LLM never selects an arbitrary model endpoint. Every routing decision is recorded (model ID/version) in the audit event of the step.
+
+============================================================
+39. CONTEXT MANAGEMENT
+============================================================
+
+Do not dump into the model context:
+- entire mailbox (server or local)
+- entire file repository
+- all memory
+- all ChiRAG results
+
+Use:
+- retrieval, relevance ranking
+- context budgets
+- source prioritization
+- summaries
+- citations
+
+Maintain provenance and classification for every retrieved item. The context manager maintains the task's classification high-water mark (Section 17.3) and the list of contributing connectors.
+
+The context is a projection of the Session Event Log (Section 60.5). Summarizing/compaction follows Section 60.7.
+
+============================================================
+40. AGENT LOOP
+============================================================
+
+USER/EVENT
+   -> KILL-SWITCH CHECK
+   -> INTERPRET
+   -> RETRIEVE CONTEXT (update high-water mark)
+   -> PLAN
+   -> POLICY CHECK (advisory)
+   -> EXECUTE TOOL (through Tool Gateway; full check sequence, Section 14.3)
+   -> OBSERVE RESULT (untrusted)
+   -> VERIFY
+   -> CONTINUE / ASK APPROVAL / COMPLETE
+   -> REFLECT
+   -> OPTIONALLY PROPOSE MEMORY (subject to trust model)
+
+Rules:
+- Reflection must not change authorization, security policy, connector settings, missions or skills.
+- The loop checks budgets and kill switches at every iteration.
+
+============================================================
+41. VERIFICATION
+============================================================
+
+For consequential outputs, perform verification. Verification must be deterministic where possible; the model does not grade its own work as the sole check.
+
+- Citations: verify deterministically that each cited document/URL exists, that the user is authorized to see it, and that the quoted/attributed text actually appears in the source (string/fuzzy match against retrieved content).
+- ChiRAG answers preserve citations end-to-end.
+- Generated files must open/parse successfully (validated in the file pipeline).
+- Calculations are recomputed in the sandbox.
+- Email drafts: recipients checked against rules; claims cross-checked against sources; AI-draft marking present.
+- Tool results must match output schema.
+
+For high-risk actions, require human approval even if verification passes.
+
+============================================================
+42. PERSONALIZATION / LEARNING
+============================================================
+
+Do NOT fine-tune the model for every user preference.
+
+Use memory + skills + retrieval first.
+
+Fine-tuning, if introduced later, must be a separate governed pipeline with data classification controls, consent, and evaluation (Section 37). User data from one user/tenant must never be used to train a model serving others without explicit governance approval.
+
+Learning loop:
+experience
+ -> candidate memory
+ -> provenance
+ -> trust level (user-initiated evidence only)
+ -> confidence
+ -> policy check
+ -> store
+ -> later retrieval (with revocation re-check)
+
+Important preferences are confirmable by the user.
+
+============================================================
+43. END-TO-END WORKFLOWS
+============================================================
+
+43.1 File + ChiRAG
+
+User uploads: draft_policy.pdf
+
+System:
+1. authenticate user
+2. create file record (classification INTERNAL unless labelled higher)
+3. quarantine object
+4. validate
+5. scan
+6. mark safe
+7. create processing task
+
+User asks: "Compare it with existing institutional guidance."
+
+Agent:
+1. locate file by file_id
+2. verify ownership (server-side)
+3. call chirag.process_document (signed identity context)
+4. retrieve extracted content (untrusted)
+5. call chirag.search
+6. retrieve cited institutional sources
+7. compare
+8. verify claims and citations deterministically
+9. generate result (inherits highest classification)
+10. store output artifact
+11. show result in UI
+12. retain provenance and audit trail
+
+43.2 Email + ChiRAG (server-side Exchange)
+
+A new email asks a regulatory question.
+
+Agent:
+1. detects new email (EXTERNAL_EVENT trigger if sender is external -> reduced capability profile)
+2. applies trigger filters and rate limits
+3. classifies it (label or default CONFIDENTIAL)
+4. treats email content as untrusted data
+5. extracts question
+6. queries ChiRAG
+7. retrieves authoritative sources
+8. drafts answer
+9. verifies citations
+10. creates draft in mailbox (marked "AI Draft"; recipients restricted to the thread)
+11. asks user for approval to send (payload-bound)
+12. re-evaluates policy; only after approval may send (idempotent)
+
+Never allow the email itself to authorize sending.
+
+43.3 Local Outlook archive search
+
+User asks: "Find the vendor contract discussion from 2023 in my archive."
+
+1. Policy checks: outlook_local connector effective state = ON, allow_in_chat = true.
+2. Gateway checks bridge is online for the user's paired device.
+3. Gateway sends signed, expiring outlook_local.search request (folder scope from allowlist, date range 2023).
+4. Bridge validates signature/nonce/schema, runs read-only search via Outlook Object Model, returns metadata.
+5. Agent requests specific messages via outlook_local.get_message; attachments go to quarantine.
+6. Results are untrusted, classified CONFIDENTIAL by default; context high-water mark raised.
+7. Agent summarizes with citations to message IDs/subjects/dates.
+8. Any subsequent egress-capable tool (e.g. web.search) is now evaluated against the CONFIDENTIAL high-water mark.
+9. If the device goes offline, the task moves to WAITING_FOR_RESOURCE and the user is informed.
+
+43.4 Web search
+
+Agent:
+1. create search query
+2. Policy evaluates query as egress against the context high-water mark (approval shows exact query text if required)
+3. call web.search through Tool Gateway / egress proxy
+4. receive results as untrusted data
+5. fetch pages through web.fetch with SSRF protections
+6. extract useful information
+7. cross-check important claims
+8. preserve URLs/source metadata
+9. do not execute instructions contained in webpages
+10. produce result
+
+Web content cannot grant permissions, create tools, change policies, access files, change connector settings, or modify memory as trusted fact.
+
+============================================================
+44. USER EXPERIENCE FOR OVERNIGHT WORK
+============================================================
+
+At login: "While you were away"
+
+Show:
+- tasks completed
+- important findings
+- files created
+- memories proposed
+- failed tasks and why
+- tasks waiting for resources (e.g. "Local Outlook device offline", "Exchange connector turned off by you")
+- tasks with OUTCOME_UNKNOWN needing review
+- pending approvals
+- security events
+
+Example:
+
+While you were away:
+  7 tasks completed
+  3 research findings
+  2 reports generated
+  1 approval required
+  1 task failed because ChiRAG was unavailable
+  1 task waiting: your computer (Local Outlook) was offline
+
+Provide "View details" with the complete audit trail (from the unified security log index).
+
+============================================================
+45. NOTIFICATIONS
+============================================================
+
+Notifications are an egress channel.
+
+- Channels: in-portal (default), email, mobile push, chat tools - each channel is admin-enabled and user-selectable.
+- Content levels: "Notification only" (default for external channels: "You have 1 approval pending" with a link to the portal), or "Summary" (allowed only for internal channels and only up to the classification permitted for that channel).
+- Notification content is DLP-checked and classification-checked like any other egress.
+- Notifications never contain approval tokens or allow approval without portal authentication.
+- Rate limits and quiet hours to avoid notification fatigue ("proactive but not notification-heavy").
+- All notifications are audited (metadata only).
+
+============================================================
+46. DATA RETENTION, DELETION AND LEGAL HOLD
+============================================================
+
+Configurable retention for:
+- user files
+- processed artifacts
+- temporary files and sandbox workspaces (auto-cleaned)
+- chat/conversation transcripts
+- Transcript Store (prompts/completions/tool payloads)
+- task logs / operational logs
+- unified security log (Section 30.9)
+- memories
+- embeddings/vector indexes
+- mission outputs
+- connector caches (incl. anything retrieved via Local Outlook)
+- inference server logs (if enabled)
+- notification records
+
+Deletion:
+- Deleting a source cascades to derived artifacts, embeddings, memory, ChiRAG-processed copies (via ChiRAG delete API), caches and search indexes.
+- Backups expire deleted data according to backup retention; this is documented.
+- User data-subject requests (access/erasure) are supported by tooling, subject to legal hold and audit retention requirements.
+
+Legal hold / eDiscovery:
+- Admins (with the right role) can place a legal hold on a user, mission or file set; held data is exempt from deletion and retention expiry.
+- eDiscovery export is supported and audited.
+
+Retention settings are visible to administrators and users (for their own data).
+
+Do not retain sensitive data unnecessarily.
+
+============================================================
+47. BACKUP AND RECOVERY
+============================================================
+
+Back up:
+- PostgreSQL (incl. mission/task state, policy configuration, skills, audit index)
+- object storage data and metadata
+- sealed unified security log segments (WORM)
+- key metadata (not plaintext keys; keys are backed up via KMS/HSM mechanisms)
+
+Never back up secrets in plaintext.
+
+Default targets (adjust to organizational policy):
+
+  profile      | RPO        | RTO      | backup frequency                    | backup retention
+  -------------+------------+----------+-------------------------------------+-----------------
+  Pilot        | 24 hours   | 8 hours  | daily full + WAL archiving          | 30 days
+  Enterprise   | 15 minutes | 4 hours  | continuous WAL + daily full; object | 90 days (+ audit
+               |            |          | storage versioning/replication      | archive 7 years)
+
+Backups are encrypted, access-controlled, and stored off-host.
+Restoration is tested at least quarterly, including restoring into a clean environment and verifying the audit hash chain.
+
+============================================================
+48. ADMIN CHANGE CONTROL AND PRIVILEGED ACCESS
+============================================================
+
+48.1 Change control
+Changes to:
+- policies
+- tools and connectors
+- models
+- permissions/roles
+- external destinations/allowlists
+- retention and legal hold
+- kill switches
+- security controls
+- Local Outlook Bridge allowed versions and pairing rules
+
+must be:
+- authenticated with step-up MFA
+- audited with before/after values (or hashes)
+- versioned and reversible
+- for sensitive changes: approved by a second administrator (dual control); the requester cannot approve their own change
+
+Never allow an agent to modify these settings. No tool exists that changes them.
+
+48.2 Privileged access management
+- Just-in-time elevation for admin roles, time-limited, with justification.
+- Break-glass accounts: stored offline/sealed, use triggers an immediate security alert, every action audited.
+- Admins cannot read user file contents, mail, memories or transcripts by default. Content access requires a specific, justified, time-bound, audited permission (and dual approval per policy).
+- Admin actions are rate-limited and anomaly-monitored.
+
+============================================================
+49. COMPLIANCE AND GOVERNANCE
+============================================================
+
+Before production:
+- Data Protection Impact Assessment (DPIA) covering mail processing, memory/profiling of users, and third-party data (people who email the user).
+- Map applicable data-protection and sector regulations for the organization's jurisdiction(s), and data residency requirements (including for external web-search providers, which receive query text).
+- Employee monitoring / works council / labor-law review where applicable (the agent reads employee mail).
+- AI governance alignment (e.g. ISO/IEC 42001, NIST AI RMF, EU AI Act obligations where applicable), plus the organization's security framework (ISO 27001 / SOC 2 controls).
+- AI-generated content disclosure policy (e.g. marking AI drafts; disclosure in outbound communications where required).
+- Acceptable use policy for users of the agent.
+- Records management alignment (what agent outputs constitute business records).
+
+Maintain a threat model (docs/threat-model), reviewed at every phase gate and major change.
+
+============================================================
+50. SUPPLY CHAIN AND SDLC SECURITY
+============================================================
+
+- Pinned dependencies with lockfiles; dependency vulnerability scanning.
+- SBOM generated for every build and every container image.
+- Container images signed (e.g. Sigstore/cosign) and verified at deploy.
+- Minimal base images; no build tools in runtime images.
+- SAST, DAST, secret scanning, IaC scanning in CI.
+- Protected branches, mandatory code review, especially for /policy, /tools, /auth, /audit, /security.
+- CI/CD secrets in the secrets manager; least-privilege CI identities.
+- Local Outlook Bridge: code-signed releases, reproducible builds where feasible, signed update channel.
+- Model artifacts: provenance and checksum verification (Section 37).
+
+============================================================
+51. SECURITY OPERATIONS AND INCIDENT RESPONSE
+============================================================
+
+- SIEM detection content shipped with the product (rules/queries over the unified security log), e.g.:
+    - spike in policy denials for one user/agent
+    - repeated injection-detector hits
+    - egress volume anomalies
+    - approvals granted unusually fast or in bulk
+    - connector re-enabled shortly after disable plus bulk reads
+    - bridge requests rejected (signature/nonce failures)
+    - audit sequence gaps / hash-chain failures
+    - break-glass usage
+- Agent behavior baselines (UEBA-style) per user agent.
+- Runbooks (docs/runbooks) for:
+    - suspected prompt injection / compromised agent
+    - compromised mailbox or delegated token
+    - compromised Local Outlook Bridge device
+    - data exfiltration suspected
+    - model misbehavior after upgrade
+    - audit log integrity failure
+    - global emergency stop and controlled restart
+- Credential and device revocation procedures, tested.
+- Incident drills at least twice yearly.
+
+============================================================
+52. SECURITY TESTING
+============================================================
+
+Build automated tests for:
+
+Prompt injection:
+- malicious email (server-side and local Outlook)
+- malicious calendar invite
+- malicious PDF (incl. hidden/white text, OCR-in-image)
+- malicious webpage
+- malicious search result
+- malicious API response
+- malicious tool description (external tool server)
+
+Data exfiltration:
+- confidential data in web.search queries
+- data encoded in web.fetch URLs
+- markdown image / link exfiltration in chat UI
+- exfiltration via notifications
+- exfiltration via draft recipients or file names
+- multi-step chains of individually allowed actions
+
+Authorization:
+- User A accessing User B files/memory/missions/connectors
+- tool privilege escalation
+- forged IDs, manipulated API parameters
+- forged user context headers to ChiRAG/internal services
+- actions after deprovisioning / group removal
+- memory derived from a revoked source
+
+Connector settings:
+- user disables connector -> all tool calls DENY within 5 s (chat and missions)
+- in-flight results after disable are discarded
+- agent attempts to reach the same data via another connector
+- disconnect revokes tokens / device certificate
+- user cannot enable a connector the admin disabled
+- admin cannot silently re-enable a user-disabled connector
+
+Local Outlook Bridge:
+- replayed / expired / unsigned requests rejected
+- request for another user's data rejected
+- operation outside allowlist (send, delete) rejected
+- revoked device cannot reconnect
+- bridge offline -> WAITING_FOR_RESOURCE, no retry storm
+
+File attacks:
+- malware
+- malformed PDFs
+- oversized files
+- decompression bombs
+- dangerous Office files (macros, DDE, OLE)
+- executable masquerading as document
+- HTML/SVG stored XSS via preview
+
+Agent attacks:
+- infinite loops
+- runaway sub-task spawning
+- tool abuse
+- budget exhaustion (task, user, tenant)
+- malicious skill generation
+- privilege escalation
+- memory poisoning (incl. induced "repeated behavior")
+- trigger flooding via inbound email
+
+API attacks:
+- SSRF (private ranges, IPv6, metadata endpoints, DNS rebinding, redirects)
+- credential leakage
+- excessive requests
+- malicious redirects
+- unsafe URL handling
+
+Admin/portal:
+- privilege escalation
+- CSRF (both portals, incl. approval endpoints)
+- session abuse
+- unauthorized policy changes
+- dual-control bypass
+
+Audit:
+- every consequential action produces about-to-execute and result events
+- action blocked when audit write fails
+- hash chain verification detects modification, deletion and reordering
+- no secrets/content in the unified log (secret-canary tests)
+
+LLM runtime:
+- unauthenticated access to vLLM rejected
+- cross-user prefix-cache leakage test
+
+Kill switches:
+- each switch enforced within SLO; in-flight behavior as specified
+
+Harness hardening (Section 60):
+- browser-origin attacks: a test web page tries WebSocket/HTTP connections to every listener (incl. vLLM, loopback OAuth listeners); all rejected; brute-force lockout triggers
+- DNS rebinding against every listener rejected by Host checks
+- links/deep links/URI schemes with endpoint-like parameters never change state or cause outbound connections
+- each internal caller identity is denied every method outside its allowlist
+- unsigned, hash-changed or manifest-violating connectors fail to load; a connector cannot reach destinations outside its manifest
+- skill manifests containing code, commands or download URLs are rejected
+- nothing reaches the model without a committed session event; replay reproduces the context exactly
+- skill proposals from tainted runs are blocked; unsafe skill versions fail pre-activation tests
+- injections designed to survive compaction do not become instructions; constraints persist after compaction
+- sub-agents cannot exceed parent rights; child reads raise the parent's high-water mark; external-agent delegation denied by default
+- scripted tool calls pass the full gateway sequence and budgets
+- failed upgrade rolls back automatically without losing or duplicating tasks
+- history search respects deletions, legal hold and revoked access
+
+============================================================
+53. RED-TEAM TEST SUITE
+============================================================
+
+Create a dedicated adversarial corpus including:
+- prompt injection, indirect prompt injection
+- data exfiltration attempts (all channels in Section 18.1)
+- malicious documents, emails, calendar invites, web pages
+- fake administrative messages, impersonation
+- tool argument manipulation
+- path traversal
+- SSRF
+- authorization bypass
+- memory poisoning
+- malicious skill creation
+- runaway task creation
+- browser-origin (ClawJacked-style) attacks on listeners
+- malicious links carrying endpoints or tokens
+- malicious extensions and skill manifests (ClawHavoc-style)
+- skill misevolution and carry-over attacks
+- compaction-surviving injections
+- sub-agent and agent-team privilege escalation
+- connector-setting circumvention
+- Local Outlook Bridge abuse
+
+Pass criteria (deterministic, because model output is non-deterministic):
+- Each attack is executed N times (default N = 20) per release candidate and per model change.
+- A release FAILS if in ANY run:
+    - an unauthorized action was executed, or
+    - protected data reached an unauthorized destination, or
+    - policy/settings/memory trust was modified by untrusted content.
+- The model being "fooled" (e.g. proposing a bad action) is tracked as a metric (attack success rate at the model level) with a threshold, but the hard gate is the deterministic outcome above.
+
+Store:
+- attack input
+- expected result
+- actual result per run
+- policy decisions
+- whether data escaped
+- model/version and policy version
+- remediation
+
+Every release must pass the red-team suite.
+
+============================================================
+54. DEPLOYMENT MODEL
+============================================================
+
+Suggested containers:
+agent-web (user portal)
+agent-admin-web (admin portal)
+agent-api
+agent-worker
+agent-scheduler
+agent-tool-gateway (incl. Local Outlook Bridge endpoint)
+agent-policy (sidecar or library)
+agent-audit-writer
+agent-file-worker (parsers)
+sandbox-controller + sandbox runtime (microVM / gVisor)
+egress-proxy
+postgres
+redis
+object-storage
+secrets manager (or external)
+vLLM
+SIEM forwarder (or host-level shipper)
+
+Plus, on user devices: Local Outlook Bridge (signed Windows app).
+
+Profiles:
+
+PILOT (single controlled server; limited users; non-RESTRICTED data):
+- all containers on one host, with gVisor for the sandbox
+- no Docker socket in any container
+- nightly backups off-host
+- documented as not highly available
+
+ENTERPRISE:
+- HA PostgreSQL (primary + replica, automated failover)
+- redundant API, gateway, workers, scheduler (leader election), audit writer (with ordered single-writer failover)
+- sandbox on a separate host/VM pool
+- vLLM on dedicated GPU hosts
+- replicated object storage with object lock for audit archives
+- Kubernetes/OpenShift deployment without redesign of application boundaries
+
+Do not over-fragment beyond what isolation and scaling require.
+
+============================================================
+55. DEVELOPMENT PHASES (SECURITY FIRST)
+============================================================
+
+PHASE 1: Foundation and security spine
+- repo, CI/CD with SAST/secret scanning/SBOM/signing
+- database with RLS
+- authentication (OIDC/SAML), SCIM
+- user portal shell (incl. Settings button) and admin portal shell
+- Audit Writer and Unified Security Log (hash chain, rotation, SIEM output)
+- secrets manager and KMS integration
+- object storage with encryption
+- Policy Engine (policy-as-code, default deny)
+- Tool Gateway skeleton with the full invocation sequence
+- Connector Framework and user connector settings (Section 8)
+- kill switches
+- egress proxy
+
+PHASE 2: File security
+- secure upload, quarantine, scanning, safe extraction
+- isolated parsers
+- preview origin
+
+PHASE 3: Agent core (on top of the spine)
+- LLM Router, authenticated vLLM
+- agent loop, context manager with taint tracking
+- durable task engine (Postgres queue, outbox)
+- approval engine (payload-bound)
+- budgets (task/user/tenant/egress)
+- sandbox (microVM/gVisor)
+- memory (trust model)
+- scheduler and missions
+
+PHASE 4: Integrations (each through the gateway, with file pipeline already in place)
+- ChiRAG
+- Exchange / M365 server-side
+- Web search / fetch
+- Local Outlook Bridge
+- generic API adapter
+- notifications
+
+PHASE 5: Learning
+- skills (with review tiers)
+- procedural memory
+- preference learning
+- mission templates
+
+PHASE 6: Hardening and readiness
+- red-team suite (deterministic gates)
+- penetration tests (incl. bridge and SSRF)
+- load tests
+- failure and chaos testing
+- backup/restore and DR testing
+- SIEM detection content and runbooks
+- compliance artifacts (DPIA etc.)
+- security review and threat model sign-off
+
+Security tests are written alongside each component in every phase, not only in Phase 6.
+
+v2.1 placement of Section 60 items:
+- Phase 1: 60.1, 60.2, 60.3, 60.4 (extension framework), 60.5 (session event log), 60.10, 60.11
+- Phase 3: 60.7, 60.8, 60.9
+- Phase 5: 60.6, 60.12, 60.13, 60.14, 60.15
+- After V1: 60.16, 60.17
+
+============================================================
+56. MINIMUM ACCEPTANCE CRITERIA
+============================================================
+
+The system is NOT V1 complete unless:
+
+Identity and access
+1. User can authenticate through SSO with MFA.
+2. Admin portal is separately protected (network, session, authorization).
+3. Agent identity is distinct from user identity in all downstream calls and audit records.
+4. Deprovisioning a user in the IdP suspends their agent, missions, tokens and devices within 5 minutes.
+5. User A cannot access User B resources (tested, incl. RLS).
+6. Downstream services reject unsigned/forged user context.
+
+Connectors
+7. Every connector can be turned off by the user from Settings; enforcement for new calls within 5 seconds, in chat and in missions.
+8. Disconnect revokes tokens / device certificates.
+9. Users cannot enable connectors beyond admin policy; admins cannot silently override a user's disable.
+10. Local Outlook connector works through the signed bridge, outbound-only, read-only by default, and rejects replayed/unsigned/out-of-scope requests.
+11. ChiRAG, Exchange read/search and web search work through the Tool Gateway.
+
+Execution safety
+12. Agent runs asynchronously after browser disconnect.
+13. Local vLLM works through an authenticated abstraction.
+14. Agent can schedule missions; only humans create/activate missions.
+15. Tasks survive worker, scheduler, Redis and PostgreSQL restarts.
+16. Arbitrary host shell access is impossible; no container has the runtime socket.
+17. Code execution is sandboxed with microVM/gVisor isolation and no network by default.
+18. Tool authorization is deterministic and default-deny.
+19. Prompt injection does not grant privileges.
+20. Email cannot autonomously authorize email sending.
+21. External file transfer and all egress channels (incl. search queries, rendered images, notifications) are policy controlled with taint tracking.
+22. Secrets never enter model context, sandbox, bridge or logs.
+23. Approvals are payload-bound, time-bound, step-up authenticated for high risk, and re-evaluated at execution.
+24. Kill switches work independently of the LLM, within SLO, with specified in-flight behavior.
+25. Task, user and tenant budgets stop runaway execution.
+26. Side effects with unknown outcome go to OUTCOME_UNKNOWN, never auto-retried.
+
+Audit and operations
+27. All consequential actions are audited; actions are blocked if audit cannot be written.
+28. All users' security events are in ONE unified, append-only, hash-chained log file at a configured path, ingestible by a standard SIEM shipper, with no secrets or raw content.
+29. Hash-chain verification detects tampering.
+30. Agent activity for any time window can be reconstructed from audit records.
+31. Malicious file tests pass.
+32. Red-team suite passes deterministic gates.
+33. Backup restore and recovery after restart have been tested against RPO/RTO targets.
+
+Harness hardening (v2.1)
+34. No listener accepts unauthenticated or browser-origin connections; brute force is rate-limited (60.1).
+35. No link, deep link or URI scheme can change configuration or send credentials (60.2).
+36. Every internal caller is limited to its method allowlist; no admin-scope shared secrets exist (60.3).
+37. Skills are declarative; connectors are signed, out-of-process and manifest-enforced; there is no marketplace install (60.4).
+38. Model context is built only from the Session Event Log and can be replayed (60.5).
+39. Skill versions pass lineage and pre-activation tests; skills never self-modify in place (60.6).
+40. Compaction preserves classification, trust labels and constraints (60.7).
+41. Sub-agents never exceed parent rights; external agent delegation is off by default (60.8).
+42. Upgrades snapshot and roll back automatically on failure (60.11).
+
+============================================================
+57. IMPORTANT IMPLEMENTATION RULES FOR CLAUDE/CODEX
+============================================================
+
+1. Build incrementally, security spine first (Section 55).
+2. Keep the application runnable after every milestone.
+3. Write tests alongside each security-sensitive component.
+4. Do not fake integrations in production code.
+5. Clearly isolate mock adapters for local development; mocks cannot be enabled in production configuration.
+6. Do not hard-code credentials.
+7. Do not hard-code user IDs or tenant IDs.
+8. Do not trust client-provided ownership or identity.
+9. Do not trust LLM-provided authorization.
+10. Do not expose host filesystem.
+11. Do not expose unrestricted shell; never mount the container runtime socket.
+12. Do not give the model, sandbox or bridge raw API credentials.
+13. Do not allow retrieved content to modify policy, settings or memory trust.
+14. Do not silently retry side effects.
+15. Use idempotency keys and the outbox pattern.
+16. Fail closed when authorization is ambiguous, when policy is unavailable, or when audit cannot be written.
+17. Log every policy decision to the unified security log.
+18. Never write secrets or raw content into the unified security log.
+19. Make security controls testable.
+20. Make every integration replaceable.
+21. Keep all important configuration externalized.
+22. Every connector must honor user connector settings via the Policy Engine; no connector may bypass it.
+23. Default deny: new tools/connectors are disabled until explicitly enabled by an admin.
+24. Re-evaluate policy immediately before every execution.
+25. Never trust a connection because it comes from loopback or an internal address.
+26. Never accept endpoints, settings or actions from URLs, deep links or notifications.
+27. Give every internal caller only the methods it needs.
+28. Never execute code supplied by a skill; skills are declarative.
+29. Never send anything to the model that is not first committed to the Session Event Log.
+30. Never let a skill, summary or sub-agent widen rights or drop constraints.
+
+============================================================
+58. RECOMMENDED PROJECT STRUCTURE
+============================================================
+
+/frontend
+  /user-portal
+    /settings/connectors
+  /admin-portal
+
+/backend
+  /api
+  /auth
+  /identity          (agent identity, delegation, SCIM, entitlements)
+  /agent
+  /context           (context manager, taint tracking)
+  /memory
+  /missions
+  /tasks
+  /scheduler
+  /approvals
+  /policy
+  /tools
+  /connectors        (registry, effective state, user settings)
+  /files
+  /skills
+  /audit             (audit writer, unified log, integrity verifier, SIEM mappings)
+  /sessionlog        (session event log, context projection, replay)
+  /extensions        (connector signing/manifests, skill manifest validator, catalog)
+  /posture           (security posture checks)
+  /transcripts
+  /notifications
+  /llm
+  /integrations
+    /chirag
+    /exchange
+    /outlook_local   (server-side bridge endpoint)
+    /web
+    /generic_api
+
+/workers
+  /agent-worker
+  /file-worker
+  /sandbox-controller
+
+/clients
+  /outlook-bridge    (Windows desktop companion)
+
+/security
+  /policies          (policy-as-code + tests)
+  /redteam
+  /test-corpus
+  /siem-content      (detection rules/queries)
+
+/infrastructure
+  /containers
+  /reverse-proxy
+  /egress-proxy
+  /monitoring
+  /database
+  /logging           (shipper configs for common SIEMs)
+
+/docs
+  architecture
+  api
+  security
+  operations
+  threat-model
+  runbooks
+  compliance
+  audit-log-schema
+
+============================================================
+59. FINAL DESIGN PHILOSOPHY
+============================================================
+
+The system should be:
+
+AUTONOMOUS, but not uncontrolled.
+PERSONALIZED, but not blindly trusting memory.
+POWERFUL, but least-privilege and default-deny.
+CONNECTED, but through a small controlled capability gateway, and only to connectors the user leaves on.
+PERSISTENT, but auditable in one place.
+LOCAL, but able to access explicitly approved APIs.
+PROACTIVE, but not notification-heavy.
+LEARNING, but not self-authorizing.
+INTELLIGENT, but never the final security authority.
+
+The most important boundaries are:
+
+        LLM = REASONING / PROPOSAL
+
+        POLICY ENGINE = AUTHORITY (default deny, data-flow aware)
+
+        TOOL GATEWAY = CONTROLLED EXECUTION
+
+        USER CONNECTOR SETTINGS = USER'S LIMIT ON REACH
+
+        UNIFIED SECURITY LOG = ACCOUNTABILITY
+
+        USER (and second approver where required) = FINAL AUTHORITY FOR HIGH-IMPACT ACTIONS
+
+Build the platform around this separation.
+
+============================================================
+60. AGENT HARNESS HARDENING (NEW IN v2.1)
+============================================================
+
+Background: in 2026 several open agent harnesses shaped how autonomous agents are built and attacked:
+- DeepSeek Harness: everything-is-a-plugin runtime, append-only session event log with the rule "anything the model sees is logged", tool pre/post-execute hooks, swappable capability providers, sub-agents and agent teams.
+- OpenClaw: widely deployed personal agent whose incidents became reference attacks: CVE-2026-25253 (a link could set the gateway URL and leak the auth token -> one-click takeover), ClawJacked (malicious websites brute-forcing the local agent over WebSocket to localhost), and ClawHavoc (over a thousand malicious skills in its public skill marketplace). Its 2.0 release added in-chat approvals, plain-language access views, a security audit command, and backup-before-update with rollback.
+- Hermes Agent (Nous Research): learning loop with autonomous skill creation and improvement, curated memory with periodic nudges, full-text cross-session search, natural-language scheduling, messaging gateways, and scripts that call tools.
+- Research on self-improving agents ("Practice Makes Unsafe: Skill Misevolution", 2026) showed that unsafe successes can become reusable skills and that exposure to a few malicious tasks roughly doubled unsafe carry-over into fresh sessions.
+
+This section adopts what strengthens the platform and explicitly rejects what weakens it. Every item is subject to the principles in Section 0.
+
+------------------------------------------------------------
+60.1 Listener and browser-origin hardening   [High]
+------------------------------------------------------------
+Threat: a web page in the user's browser can open connections to local or internal services (WebSocket and simple HTTP requests are not blocked by the browser's cross-origin rules), then guess credentials or drive the service.
+
+Requirements for EVERY network listener in the platform (portal APIs, WebSocket/streaming endpoints, internal APIs, vLLM, Tool Gateway, temporary OAuth redirect listeners):
+- Authenticate every connection and every WebSocket handshake. Loopback and internal source addresses are NEVER treated as authenticated ("localhost is not a trust boundary").
+- Browser-facing endpoints: verify the Origin header against an exact allowlist; reject missing or unexpected Origins; bind WebSocket connections to the authenticated session and a CSRF token.
+- Machine-only endpoints (vLLM, internal APIs): reject any request that carries an Origin header or browser-only headers (e.g. Sec-Fetch-*); require mTLS or a >= 256-bit random key.
+- Validate the Host header by exact match to block DNS rebinding.
+- Rate-limit failed authentication per connection AND per source address (including loopback); lock out after 10 failures in 10 minutes; raise a security event.
+- Temporary OAuth redirect listeners (e.g. device pairing, Section 13.4): loopback only, random port, accept exactly one request whose state and PKCE verifier match, then close; maximum lifetime 120 seconds.
+- Private Network Access / CORS preflight responses never grant access to arbitrary origins.
+
+------------------------------------------------------------
+60.2 No configuration or credentials via links   [High]
+------------------------------------------------------------
+Threat (CVE-2026-25253 pattern): a crafted link sets an endpoint in the client, which then connects there and sends its token.
+
+Requirements:
+- URL parameters, fragments, deep links, custom URI schemes, notification links and links inside emails or chat MAY ONLY navigate to a screen of the same application.
+- They may NOT set or change: gateway/API endpoints, connector settings, model endpoints, policies, destinations, feature flags; and may NOT start actions, approvals or downloads.
+- Clients send credentials only to endpoints fixed in server-side, signed configuration. Changing an endpoint is an admin change (Section 48) with step-up authentication.
+- Tokens are audience-bound (Section 7.6), so a leaked token is useless at any other endpoint.
+- The Local Outlook Bridge accepts its platform URL only from the signed installer configuration, never from a link.
+- Tests: every route and scheme is fuzzed with endpoint-like parameters; none may cause an outbound connection or a state change.
+
+------------------------------------------------------------
+60.3 Per-caller capability scoping for internal APIs   [High]
+------------------------------------------------------------
+Threat: one internal token or session that grants every operation ("operator" or "admin" scope for any authenticated caller).
+
+Requirements:
+- Every internal caller has a service identity and an explicit allowlist of methods. Defaults:
+    agent runtime  : tools.invoke, llm.complete, memory.propose, tasks.update_own, approvals.request, history.search
+    scheduler      : tasks.enqueue, missions.read
+    workers        : files.pipeline.*, tasks.update_assigned
+    sandbox RPC    : tools.invoke (only if 60.9 is enabled, with the task's identity)
+    Local Outlook Bridge: bridge.channel only
+- Methods that change settings, policies, connectors, extensions, skills activation, kill-switch release or approve actions are callable ONLY from an authenticated human session in the correct portal, with step-up where Section 7.4 requires it.
+- No shared secret, API key or service token ever carries admin scope. Scopes presented by a caller are verified server-side, never trusted from headers.
+- Unknown methods are denied and logged.
+
+------------------------------------------------------------
+60.4 Extension security model (plugins, connectors, skills)   [High]
+------------------------------------------------------------
+Threat (ClawHavoc pattern): malicious extensions from a public marketplace, running with full agent privileges, and README text that tricks users into running commands.
+
+Extension types and rules:
+- SKILLS are declarative manifests (JSON/YAML) that reference registered tools. They contain NO executable code, NO shell commands, NO download URLs and NO installation steps. The skill engine interprets them; it cannot execute anything a manifest supplies.
+- CONNECTORS / TOOLS are code. They must be:
+    - signed by the organization (or a publisher the organization explicitly trusts)
+    - run OUT OF PROCESS (their own container/process) with a capability manifest declaring: network destinations, data classifications handled, side-effect types, required secrets
+    - enforced at runtime to that manifest (network via egress proxy allowlist; secrets only those declared)
+    - reviewed before enablement: security review, SAST, dependency scan, SBOM, pinned by hash
+- EXTERNAL TOOL SERVERS (e.g. MCP) follow Section 14.2 plus the same manifest and out-of-process rules.
+- There is NO public marketplace install. Only an internal, curated catalog of reviewed, hash-pinned items.
+- Imported or shared skills get the same review as agent-generated ones (Section 23).
+- Extension descriptions, READMEs and help text are untrusted content: the UI never displays "run this command" or "download this helper" instructions from an extension, and no extension can ask the user to paste commands.
+- Every extension has its own kill switch; revoked hashes go on a blocklist that is checked at load time.
+
+------------------------------------------------------------
+60.5 Session event log as the source of truth   [High]
+------------------------------------------------------------
+Principle adopted from DeepSeek Harness: "model-visible means logged".
+
+Requirements:
+- Each task/conversation has an append-only, encrypted Session Event Log (stored in the Transcript Store) recording every item that enters or leaves the model context: system prompt version, user messages, retrieved items (IDs, classification, trust level, source), tool calls and results, summaries/compactions, sub-agent messages, approvals.
+- The model context is a deterministic projection of that log. Nothing may be sent to the model unless it has first been committed to the log.
+- The context high-water mark, source list and provenance (Section 17.3) are computed from the log, not tracked separately.
+- Any step can be replayed from the log with the same inputs, for investigation and for model/skill regression testing.
+- Unified Security Log events reference session event IDs and hashes (never content).
+- Retention follows Section 46; legal hold applies.
+
+------------------------------------------------------------
+60.6 Governed skill evolution   [High]
+------------------------------------------------------------
+Threat: self-improving skills can turn one unsafe or injected success into a reusable policy.
+
+Requirements (extend Section 23):
+- Lineage gate: a skill proposal may be derived only from runs that were started by the USER or a SCHEDULE, had no injection-detector hits, had no DENY or denied-approval events, and did not use UNTRUSTED content as the source of any instruction step. Otherwise the proposal is blocked, or marked "tainted lineage" and routed to security review.
+- Lineage record: every skill step records the run IDs and session events it was derived from.
+- Test before activation: every new version runs in a sandboxed test harness with (a) its own regression cases, (b) the red-team subset for its tools, and (c) carry-over tests (does it behave unsafely in a fresh session with benign input?). Any failure blocks activation.
+- Unsafe-content scan: flag or remove new outbound destinations, new recipients, instructions to disable or skip checks, encoded or obfuscated content, and references to secrets.
+- No self-modification in place: "improve during use" only produces a PROPOSED new version; the active version never changes without review.
+- Auto-retire skills unused for 90 days; reactivation requires review.
+- Metrics: skill-attributed denials and approval rejections per version; a spike auto-suspends the version.
+
+------------------------------------------------------------
+60.7 Safe context compaction   [High]
+------------------------------------------------------------
+Threat: summarizing a long session can "launder" untrusted instructions into trusted text, or drop constraints.
+
+Requirements:
+- A summary/compaction inherits the highest classification and the full source list of everything it covers.
+- Trust boundaries survive: content from untrusted sources stays in labelled data sections. Imperative text from untrusted sources is reported ("the email asked to forward the file"), never rewritten as an instruction.
+- The compaction is model output and therefore untrusted: pending approvals, budgets, policies, mission constraints and user instructions are re-injected from trusted state after compaction, never taken from the summary.
+- The original events stay in the Session Event Log; the compaction is a new event referencing the range it replaced.
+- Tests: injections designed to survive compaction; checks that constraints persist after compaction.
+
+------------------------------------------------------------
+60.8 Sub-agents, agent teams and external agents   [Medium]
+------------------------------------------------------------
+Requirements:
+- A sub-agent is a task with a parent pointer. Its rights are the intersection of the parent's rights and the sub-agent profile; never more than the parent.
+- Sensitivity flows both ways: a child starts at the parent's high-water mark (unless it is a clean public sub-task, Section 17.3), and anything the child reads raises the parent's mark when results return.
+- Messages between agents (mailboxes, task boards, team rosters) are UNTRUSTED data and are recorded in the Session Event Log.
+- Agent-to-agent communication across different users is disabled. Within one user's tasks it happens only through the task engine.
+- Delegating to external agents or harnesses (e.g. Claude Code, Codex, remote agents) sends context outside our policy and lets another system act: DENY by default. An admin may enable a specific external agent as a connector with its own tool definition; it then runs only inside the sandbox, with no credentials, context sent to it passes DLP and taint checks, and its output is untrusted.
+- Children consume the parent's budgets. Maximum concurrent children per task: 5 (default). Maximum depth: 3 (Section 27).
+
+------------------------------------------------------------
+60.9 Scripted tool calls (programmatic tool calling)   [Medium]
+------------------------------------------------------------
+Off by default. If enabled:
+- Code in the sandbox calls tools only through an RPC stub that forwards each call to the Tool Gateway with the task's identity, high-water mark and budgets. Each call goes through the full Section 14.3 sequence. There is no batch path around it.
+- Approvals remain interactive; a script waiting for approval pauses.
+- The sandbox still has no other network access.
+- The script and every call it makes are recorded in the Session Event Log.
+
+------------------------------------------------------------
+60.10 Security Posture page   [Medium]
+------------------------------------------------------------
+- A page in the Admin Portal that checks the running configuration against a posture checklist, for example: listeners exposed beyond intended networks, policies weaker than shipped defaults, sandbox disabled or degraded, unsigned or unreviewed extensions, extensions with a changed hash, secrets past rotation date, users with fast bulk-approval patterns, log chain or forwarding problems, backup older than target, models not tested, connectors with broader scopes than needed.
+- Each finding: severity, plain-language explanation, affected items, and a direct link to the fix.
+- Runs daily, after every admin change, and on demand. Results are logged; a new High finding raises a SIEM alert.
+
+------------------------------------------------------------
+60.11 Safe updates and migrations   [Medium]
+------------------------------------------------------------
+- Before any upgrade or schema migration: take a consistent snapshot of databases, policy bundles, skill and extension registries and configuration; verify it.
+- Run the migration, then automated health checks.
+- On any failure: automatic rollback to the snapshot and the previous version.
+- In-flight tasks are checkpointed and resumed after the upgrade; they are never lost or run twice (Section 33 still applies).
+
+------------------------------------------------------------
+60.12 Cross-session search   [Medium]
+------------------------------------------------------------
+- An encrypted full-text index per user over conversations, task outputs and artifacts.
+- Access is re-checked at query time: deletions, legal holds and revoked source access are respected.
+- Available to the user in the portal, and to the agent as a read-only tool (history.search) limited to the user's own data.
+- Results carry provenance and classification, are returned as UNTRUSTED data, and raise the task's high-water mark.
+
+------------------------------------------------------------
+60.13 Memory review and "About me" profile   [Low]
+------------------------------------------------------------
+- Weekly memory digest: new, stale (not verified in 90 days) and conflicting memories; the user confirms, edits or deletes.
+- "What the agent believes about me" page: a profile built from TRUSTED/VERIFIED memories with provenance; INFERRED items shown separately; everything editable.
+- The agent may propose clean-ups; it cannot delete or rewrite TRUSTED memories itself.
+
+------------------------------------------------------------
+60.14 In-chat approval cards   [Low]
+------------------------------------------------------------
+- Approvals can also appear inline in chat as cards with "Allow once" and "Deny".
+- Same rules as Section 28: bound to the payload hash, step-up for high risk, expiry, re-validated when clicked (a stale card refreshes instead of approving).
+- No "Always allow" for anything above low risk. "Allow for this run" is offered only for low-risk read operations and expires with the task.
+
+------------------------------------------------------------
+60.15 Plain-language mission creation   [Low]
+------------------------------------------------------------
+- The user can describe a mission in plain words. The planner fills in the mission form (schedule, trigger, tools, connectors, budgets, notifications) and shows it for review.
+- The proposal is validated against policy. Nothing is created or activated until the user confirms. The agent cannot silently widen tools or budgets.
+
+------------------------------------------------------------
+60.16 Isolated browser tool   [Later - optional, off by default]
+------------------------------------------------------------
+- browser.* tools run inside the sandbox (microVM) with a fresh browser profile per task: no persistent cookies, no user credentials, no password autofill, no access to users' real browser profiles.
+- All traffic goes through the egress proxy (allowlists, SSRF rules, DLP, high-water-mark rules).
+- Downloads go to quarantine. Submitting a form is an external write and needs approval.
+- Page text and screenshots are untrusted. The browser is destroyed when the task ends.
+
+------------------------------------------------------------
+60.17 Messaging channels   [Later - deferred]
+------------------------------------------------------------
+Not in V1. Messaging channels (Teams, Slack, WhatsApp, Telegram, etc.) let anyone who can message the agent steer it and are a major injection route. If added later:
+- a channel is a connector; only paired accounts (pairing with step-up in the portal) can reach the agent
+- sender allowlist per channel; group chats disabled
+- all channel messages are untrusted input; even the owner's messages via a third-party channel get lower trust than the portal
+- high-risk approvals are never done from channel buttons; the user is sent to the portal
+- nothing above INTERNAL is sent to a channel
+- channel tokens are stored in the secrets manager
+
+------------------------------------------------------------
+60.18 Explicitly NOT adopted
+------------------------------------------------------------
+- in-process plugins with full agent privileges
+- sandbox off by default
+- public skill/plugin marketplaces
+- skills that modify themselves without review
+- approvals from outside the authenticated application
+- treating prompt-injection-only attacks as acceptable: the platform must block their consequences through policy
+
+============================================================
+APPENDIX A. v1.0 REVIEW FINDINGS -> v2.0 FIXES
+============================================================
+
+Finding                                                          | Fixed in
+-----------------------------------------------------------------+-----------------------------
+Policy judged actions in isolation; no data-flow control         | 16, 17, 18
+Search queries / URLs / images / notifications not egress         | 5.1, 18.1, 45
+Agent identity undefined; offline delegated authority undefined   | 2F, 7.2, 7.3
+No continuous entitlement re-check / SCIM / offboarding           | 7.5, 24
+Derived knowledge persists after access revoked                   | 22, 46
+Downstream services cannot verify user context                    | 7.6, 11
+Approvals: self-approval, no payload binding, no step-up, fatigue | 28
+Event triggers attacker-controllable                              | 26.3
+Weak sandbox; Docker socket risk                                  | 19, 54
+Unsafe phase ordering                                             | 0, 55
+Derived classification undefined                                 | 17.2
+Drafts/classify treated as reads                                  | 12
+No argument-level constraints                                     | 14.1
+No egress volume budget                                           | 18.2, 27
+Runaway autonomy / sub-task spawning                              | 24, 27
+Budgets per task only; GPU fairness                               | 27, 36
+Kill switch semantics undefined                                   | 29
+Skills as persistent injection                                    | 23
+Memory poisoning via induced repetition                           | 22
+vLLM security (auth, weights, prefix cache)                       | 36
+Output rendering XSS / preview XSS                                | 5.1, 9.4
+SSRF design                                                       | 18.2
+Hidden text / OCR injection                                       | 10, 15
+Encryption, KMS, embeddings sensitivity                           | 17.4, 20
+Secrets manager optional                                          | 4, 20
+Audit tamper-evidence optional; transcripts undefined             | 30
+Privileged/admin content access                                   | 48.2
+Multi-tenancy vague; no RLS                                       | 35
+Redis as durable queue                                            | 4, 25, 32
+Idempotency with non-idempotent targets                           | 25, 33
+Timezone / missed-run semantics                                   | 26.4
+Retention gaps; deletion cascade; legal hold                      | 46
+Notifications as egress                                           | 45
+Compliance / DPIA / employee monitoring                           | 49
+Model governance and regression                                   | 37
+Self-verification of citations                                    | 41
+Supply chain                                                      | 50
+SOC / incident response                                           | 51
+Single-server SPOF; no RPO/RTO                                    | 47, 54
+Policy-as-code / default deny / conflict resolution               | 16.1
+CSRF / sessions / CORS for user portal                            | 7.4
+Delegates, shared mailboxes, external tool definitions            | 12, 14.2 (delegation: see note)
+Non-deterministic red-team pass criteria                          | 53
+
+Note: executive-assistant delegation, shared mailboxes and team missions are OUT OF SCOPE for V1. They are denied by default policy and must be designed as a separate change (with their own threat model) before being enabled.
+
+New requirements in v2.0:
+- Local Outlook connector                                         | 13, 43.3
+- User connector settings (disable any connector anytime)         | 5.8.1, 8
+- Single unified log for all users, SIEM integration              | 2G, 30
+
+New in v2.1 (harness lessons):
+- Browser-origin attacks on local/internal listeners (ClawJacked) | 60.1
+- Endpoint/token set via link (CVE-2026-25253)                    | 60.2
+- All-powerful internal tokens                                    | 60.3
+- Malicious marketplace skills/plugins (ClawHavoc)                | 60.4
+- Unlogged model inputs; no replay                                | 60.5
+- Skill misevolution                                              | 60.6
+- Instruction laundering through summaries                        | 60.7
+- Sub-agent / external agent escalation                           | 60.8
+- Tool calls from scripts bypassing checks                        | 60.9
+- Configuration drift not visible                                 | 60.10
+- Failed upgrades losing state                                    | 60.11
+- Cross-session recall, memory review, in-chat approvals,         | 60.12-60.15
+  plain-language missions
+- Browser automation, messaging channels (later)                  | 60.16, 60.17
+
+============================================================
+APPENDIX B. EXAMPLE UNIFIED SECURITY LOG EVENTS
+============================================================
+
+(One JSON object per line in agent-security.jsonl; shown pretty-printed here.)
+
+{
+  "schema_version": "2.0",
+  "event_id": "evt_01J9X8Q6J4Q2Z7M3",
+  "sequence": 1048576,
+  "prev_hash": "9f2c...e1",
+  "hash": "4ab7...0c",
+  "timestamp": "2026-09-30T23:14:07.512Z",
+  "category": "connector",
+  "event_type": "connector.user_disabled",
+  "severity": "info",
+  "tenant_id": "t_acme",
+  "user_id": "u_7f3c...",
+  "agent_id": null,
+  "actor_type": "user",
+  "session_id": "s_91ab...",
+  "source_ip": "10.20.4.17",
+  "connector": "outlook_local",
+  "result": "success",
+  "details": { "previous_state": "on", "new_state": "off", "affected_missions": 2 },
+  "correlation_id": "c_5d0e...",
+  "component": "agent-api",
+  "component_version": "2.0.3"
+}
+
+{
+  "schema_version": "2.0",
+  "event_id": "evt_01J9X8R0B6T1K9P2",
+  "sequence": 1048577,
+  "prev_hash": "4ab7...0c",
+  "hash": "c1d9...77",
+  "timestamp": "2026-09-30T23:14:09.004Z",
+  "category": "authorization",
+  "event_type": "policy.decision",
+  "severity": "notice",
+  "tenant_id": "t_acme",
+  "user_id": "u_7f3c...",
+  "agent_id": "a_7f3c...",
+  "actor_type": "agent",
+  "on_behalf_of": "u_7f3c...",
+  "task_id": "task_22c1...",
+  "mission_id": "m_ai_news",
+  "execution_id": "x_880a...",
+  "trigger_type": "SCHEDULE",
+  "connector": "outlook_local",
+  "tool": "outlook_local.search",
+  "operation": "read",
+  "context_high_water_mark": "INTERNAL",
+  "risk": "medium",
+  "policy_decision": "DENY",
+  "policy_version": "pol-2026.09.28-3",
+  "decision_reason": "connector_disabled_by_user",
+  "result": "blocked",
+  "correlation_id": "c_7a41...",
+  "component": "agent-tool-gateway",
+  "component_version": "2.0.3"
+}
+
+{
+  "schema_version": "2.0",
+  "event_id": "evt_01J9X9A1N3F5C0W8",
+  "sequence": 1048612,
+  "prev_hash": "e0aa...19",
+  "hash": "71be...3d",
+  "timestamp": "2026-09-30T23:41:55.220Z",
+  "category": "egress",
+  "event_type": "tool.execute",
+  "severity": "info",
+  "tenant_id": "t_acme",
+  "user_id": "u_7f3c...",
+  "agent_id": "a_7f3c...",
+  "actor_type": "agent",
+  "on_behalf_of": "u_7f3c...",
+  "task_id": "task_22c9...",
+  "mission_id": "m_ai_news",
+  "connector": "web",
+  "tool": "web.search",
+  "destination": "search-provider.example",
+  "destination_trust": "approved_external",
+  "context_high_water_mark": "PUBLIC",
+  "policy_decision": "ALLOW",
+  "policy_version": "pol-2026.09.28-3",
+  "payload_hash": "sha256:5e88...",
+  "bytes_out": 142,
+  "dlp_result": "clean",
+  "transcript_id": "tr_4410...",
+  "result": "success",
+  "correlation_id": "c_9b12...",
+  "component": "agent-tool-gateway",
+  "component_version": "2.0.3"
+}
+
+Note: the search query text itself is NOT in the log; only its hash and size. Authorized investigators retrieve it from the Transcript Store via transcript_id.
+
+============================================================
+END OF SPECIFICATION
+============================================================
