@@ -43,10 +43,11 @@ def main() -> int:
     for name, code in PROBES.items():
         r = subprocess.run([sys.executable, "-X", "faulthandler", "-c", code], capture_output=True, text=True, timeout=120)
         ok = r.returncode == 0
-        bad += not ok
+        expected_fail = "expected to FAIL" in name
+        bad += (not ok) and not expected_fail
         out = (r.stdout.strip() or r.stderr.strip().splitlines()[-1] if (r.stdout or r.stderr) else "")
-        print(f"[{'OK' if ok else 'FAIL'}] {name}: {out[:300]}")
-        if not ok:
+        print(f"[{'OK' if ok else ('EXPECTED-FAIL' if expected_fail else 'FAIL')}] {name}: {out[:300]}")
+        if not ok and not expected_fail:
             print("   stderr:", r.stderr.strip()[-1500:])
     return 1 if bad else 0
 

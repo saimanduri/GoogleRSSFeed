@@ -1,4 +1,4 @@
-# Windows CI for  (mirror of .github/workflows/windows-ci.yml with paths prefixed).
+# Windows CI (used when personal-agent/ is its own repository; the parent repo runs the same jobs with paths prefixed).
 # python : lint, environment check, full test suite incl. Windows-only tests + red-team gate, end-to-end selftest
 # ui     : TypeScript check, Vite build, Tauri (Rust) build of pa-ui.exe
 # bundle : PyInstaller executables + pa-ui.exe -> downloadable "PersonalAgent-windows-bundle" artifact
