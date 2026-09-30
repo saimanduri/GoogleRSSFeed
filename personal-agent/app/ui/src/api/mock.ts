@@ -13,6 +13,8 @@ const id = (p: string) => `${p}_${Date.now().toString(16)}${(seq++).toString(16)
 const S: any = {
   state: "SETUP_REQUIRED",
   username: "",
+  display_name: "",
+  assistant_name: "Personal Agent",
   chats: [] as any[],
   messages: {} as Record<string, any[]>,
   runs: [] as any[],
@@ -53,7 +55,7 @@ const SCHEMA = {
 };
 
 function status() {
-  const base: any = { state: S.state, username: S.username, dev_mode: true, password_wait: 0, pin_available: S.state === "UI_LOCKED", recovery_wait: 0 };
+  const base: any = { state: S.state, username: S.username, display_name: S.display_name || S.username, assistant_name: S.assistant_name, dev_mode: true, password_wait: 0, pin_available: S.state === "UI_LOCKED", recovery_wait: 0 };
   if (S.state === "UNLOCKED")
     Object.assign(base, {
       tasks_running: S.runs.filter((r: any) => r.status === "RUNNING").length,
@@ -117,7 +119,8 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "setup.preflight": return { windows: false, platform: "browser", version: "Browser preview", tpm: { usable: false, detail: "mock" }, tpm_ok: true, bitlocker: "unknown", sandbox: "UNAVAILABLE", data_folder: "%LOCALAPPDATA%\\PersonalAgent", cloud_synced: false, disk_free_gb: 120, gpu: ["Mock GPU"], dev_mode: true };
     case "setup.check_password": { const pw = p.password as string; const score = Math.min(4, Math.floor(pw.length / 4)); return { strength: { score, label: ["very weak", "weak", "fair", "good", "strong"][score], feedback: [] }, errors: pw.length < 12 ? ["Password must be at least 12 characters"] : [] }; }
     case "setup.check_pin": return { errors: /^(\d)\1+$/.test(p.pin) || p.pin === "123456" ? ["PIN is too common"] : p.pin.length < 6 ? ["PIN must be 6-12 characters"] : [] };
-    case "setup.create": S.state = "UNLOCKED"; S.username = p.username; return { recovery_key: "7K2QD-9XM4R-A1B2C-D3E4F-G5H6J-K7M8N-P9Q0R-S1T2V", confirm_groups: [1, 5], protector: "software" };
+    case "account.set_profile": S.display_name = p.display_name; S.assistant_name = p.assistant_name; emit("session.changed", status()); return { display_name: S.display_name, assistant_name: S.assistant_name };
+    case "setup.create": S.state = "UNLOCKED"; S.username = p.username; S.display_name = p.display_name || p.username; S.assistant_name = p.assistant_name || "Personal Agent"; return { recovery_key: "7K2QD-9XM4R-A1B2C-D3E4F-G5H6J-K7M8N-P9Q0R-S1T2V", confirm_groups: [1, 5], protector: "software" };
     case "setup.confirm_recovery": return { ok: true };
     case "auth.sign_in": if (p.password.length < 4) throw { code: "auth_failed", message: "wrong username or password" }; S.state = "UNLOCKED"; S.username = p.username; return status();
     case "auth.quick_unlock": S.state = "UNLOCKED"; return status();
@@ -205,7 +208,7 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "backup.status": return { folder: "", last: null, files: [], scheduled_enabled: false, warn: true };
     case "privacy.data_map": return [];
     case "diagnostics.health": return { gateway: { ok: true, uptime_s: 100 }, core: { ok: true }, model: {}, sandbox: { strength: "UNAVAILABLE" }, metrics: {} };
-    case "about": return { name: "Personal Agent - Desktop Edition", version: "0.1.0", build: "mock", licences: [] };
+    case "about": return { name: "Personal Agent - Desktop Edition", version: "0.1.1", build: "mock", licences: [] };
     case "updates.status": return { current: "0.1.0", auto_check: true, available: null, note: "mock" };
     case "account.signin_history": return [];
     case "voice.transcribe": return { text: "remind me to call the dentist tomorrow at 9" };

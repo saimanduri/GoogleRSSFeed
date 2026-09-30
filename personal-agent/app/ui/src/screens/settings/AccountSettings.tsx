@@ -4,15 +4,45 @@ import { Badge, Button, Card, Field, Modal, Tabs, Time } from "../../components/
 import { RecoveryKeyStep } from "../Onboarding";
 
 export function AccountSettings({ generic, tab: initialTab }: { generic: ReactNode; tab?: string }) {
-  const [tab, setTab] = useState<"security" | "credentials" | "posture" | "history">((initialTab as any) ?? "security");
+  const [tab, setTab] = useState<"profile" | "security" | "credentials" | "posture" | "history">((initialTab as any) ?? "profile");
   return (
     <>
-      <Tabs tabs={[["security", "Locking & sessions"], ["credentials", "Password, PIN & recovery"], ["posture", "Security posture"], ["history", "Sign-in history"]]} value={tab} onChange={setTab} />
+      <Tabs tabs={[["profile", "Profile"], ["security", "Locking & sessions"],["credentials", "Password, PIN & recovery"], ["posture", "Security posture"], ["history", "Sign-in history"]]} value={tab} onChange={setTab} />
+      {tab === "profile" && <Profile />}
       {tab === "security" && generic}
       {tab === "credentials" && <Credentials />}
       {tab === "posture" && <Posture />}
       {tab === "history" && <History />}
     </>
+  );
+}
+
+function Profile() {
+  const { call, toast, status, refresh } = useApp();
+  const [me, setMe] = useState<string>(status?.display_name ?? "");
+  const [ai, setAi] = useState<string>(status?.assistant_name ?? "");
+  const [busy, setBusy] = useState(false);
+  const changed = me.trim() !== (status?.display_name ?? "") || ai.trim() !== (status?.assistant_name ?? "");
+  const save = async () => {
+    setBusy(true);
+    try {
+      await call("account.set_profile", { display_name: me.trim(), assistant_name: ai.trim() });
+      await refresh();
+      toast("Profile saved", "ok");
+    } catch (e: any) { toast(errText(e), "danger"); } finally { setBusy(false); }
+  };
+  return (
+    <Card title="Profile" actions={<Button small kind="primary" busy={busy} disabled={!changed || !me.trim() || !ai.trim()} onClick={save}>Save</Button>}>
+      <div className="col">
+        <Field label="Your name" help="Shown when you sign in and used by the assistant to address you.">
+          <input className="input" value={me} maxLength={40} onChange={(e) => setMe(e.target.value)} />
+        </Field>
+        <Field label="Assistant name" help="What you call your assistant. It answers to this name in chat.">
+          <input className="input" value={ai} maxLength={40} onChange={(e) => setAi(e.target.value)} />
+        </Field>
+        <div className="muted small">Stored in the vault header (tamper-protected) so the sign-in screen can greet you before unlock. Not a secret - do not put passwords here.</div>
+      </div>
+    </Card>
   );
 }
 

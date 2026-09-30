@@ -126,3 +126,12 @@ def validate_pin(pin: str, allow_letters: bool = False, password: str | None = N
     if password is not None and pin == password:
         errors.append("PIN must differ from the password")
     return errors
+
+
+def validate_profile_name(name: str, what: str) -> list[str]:
+    n = name.strip()
+    if not (1 <= len(n) <= 40):
+        return [f"{what} must be 1-40 characters"]
+    if any(ord(c) < 32 or c in "<>{}\\`" for c in n):
+        return [f"{what} contains characters that are not allowed"]
+    return []

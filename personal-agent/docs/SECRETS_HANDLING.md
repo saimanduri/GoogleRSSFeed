@@ -23,6 +23,7 @@ VMK  (256-bit random, generated at setup, never stored in plaintext)
 | `reset.protector` | PIN-authorised key descriptor holding Enc(S_tpm) |
 | `reset.W_reset` | AES-256-GCM(KEK_reset, VMK), KEK_reset = HKDF(S_tpm ‖ Argon2id(recovery key, salt_rk)) |
 | `rk_check` | HMAC(K_hdr, recovery key) - lets "Set new PIN" verify the recovery key without the old PIN |
+| `username`, `display_name`, `assistant_name` | Not secret. Readable before unlock so the sign-in screen can greet you; covered by the MAC, changed only while unlocked (`account.set_profile`) |
 | `mac` | HMAC(K_hdr, header) - checked after every unlock; any edit → refuse |
 
 There is **no** wrapped copy of the VMK that the PIN alone can open.

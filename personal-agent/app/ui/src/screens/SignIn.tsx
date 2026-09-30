@@ -54,8 +54,8 @@ export function SignIn() {
       <div className="auth-card">
         <div className="row" style={{ marginBottom: 18 }}>
           <div className="brand-logo" style={{ width: 42, height: 42, borderRadius: 12 }}><Icon name={locked ? "lock" : "shield"} size={22} /></div>
-          <div><h1 style={{ margin: 0 }}>{locked ? "Locked" : "Welcome back"}</h1>
-            <div className="muted small">{locked ? "The agent keeps working in the background." : "Sign in to unlock your encrypted vault."}</div></div>
+          <div><h1 style={{ margin: 0 }}>{locked ? `${status.assistant_name ?? "Personal Agent"} is locked` : `Welcome back${status.display_name ? ", " + status.display_name : ""}`}</h1>
+            <div className="muted small">{locked ? "It keeps working in the background." : `Sign in to unlock ${status.assistant_name ?? "your assistant"}.`}</div></div>
         </div>
         <div className="col">
           {mode === "password" && !locked && (

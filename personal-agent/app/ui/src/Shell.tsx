@@ -37,6 +37,8 @@ export function Shell() {
     return () => window.removeEventListener("keydown", k);
   }, [call]);
 
+  useEffect(() => { document.title = status?.assistant_name ?? "Personal Agent"; }, [status?.assistant_name]);
+
   useEffect(() => {
     const hk = status?.ui?.["emergency.hotkey"];
     if (hk) void native("set_stop_hotkey", { accelerator: String(hk).toLowerCase().replace(/\s/g, "") }).catch(() => undefined);
@@ -72,7 +74,7 @@ export function Shell() {
     <div className={`shell ${collapsed ? "collapsed" : ""}`}>
       <header className="topbar">
         <Button kind="ghost" icon="menu" title="Collapse navigation" onClick={() => setCollapsed(!collapsed)} />
-        <div className="brand"><div className="brand-logo"><Icon name="shield" size={15} /></div>Personal Agent</div>
+        <div className="brand"><div className="brand-logo"><Icon name="shield" size={15} /></div><span className="ellipsis">{status?.assistant_name ?? "Personal Agent"}</span></div>
         {status?.dev_mode && <span className="badge warn" title="Developer mode - never use with real data">DEV MODE</span>}
         <div className="spacer" />
         <button className="status-pill" onClick={() => go(ks?.any ? "settings" : "tasks", ks?.any ? { section: "emergency" } : undefined)} style={{ cursor: "pointer" }}>
@@ -96,8 +98,8 @@ export function Shell() {
         <button className={`nav-item ${route.screen === "settings" ? "active" : ""}`} onClick={() => go("settings")} title="Settings">
           <span className="icon"><Icon name="settings" /></span><span className="nav-label">Settings</span>
         </button>
-        <div className="nav-user"><div className="avatar">{(status?.username ?? "?").slice(0, 1).toUpperCase()}</div>
-          <span className="ellipsis">user: {status?.username} <span className="dot" style={{ display: "inline-block", marginLeft: 4 }} /></span></div>
+        <div className="nav-user"><div className="avatar">{(status?.display_name ?? status?.username ?? "?").slice(0, 1).toUpperCase()}</div>
+          <span className="ellipsis" title={`username: ${status?.username}`}>{status?.display_name ?? status?.username} <span className="dot" style={{ display: "inline-block", marginLeft: 4 }} /></span></div>
       </nav>
       <main className="main">{page}</main>
       {palette && <CommandPalette onClose={() => setPalette(false)} onStop={() => stopAll()} />}

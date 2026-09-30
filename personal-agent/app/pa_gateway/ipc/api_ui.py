@@ -71,7 +71,8 @@ def setup_check_pin(gw, p: P, c: ClientInfo) -> Any:
 
 @rpc("setup.create", state="any")
 def setup_create(gw, p: P, c: ClientInfo) -> Any:
-    return gw.setup(p.str("username", max_len=64), p.str("password", max_len=256), p.str("pin", max_len=12), p.bool("allow_letters"))
+    return gw.setup(p.str("username", max_len=64), p.str("password", max_len=256), p.str("pin", max_len=12), p.bool("allow_letters"),
+                    p.str("display_name", False, 40), p.str("assistant_name", False, 40))
 
 
 @rpc("setup.confirm_recovery", state="unlocked")
@@ -145,6 +146,11 @@ def ui_open_link(gw, p: P, c: ClientInfo) -> Any:
 def account_change_password(gw, p: P, c: ClientInfo) -> Any:
     gw.change_password(p.str("current", max_len=256), p.str("new", max_len=256))
     return {"ok": True}
+
+
+@rpc("account.set_profile")
+def account_set_profile(gw, p: P, c: ClientInfo) -> Any:
+    return gw.set_profile(p.str("display_name", max_len=40), p.str("assistant_name", max_len=40))
 
 
 @rpc("account.change_username")

@@ -30,6 +30,7 @@ from .protector import KeyProtector, protector_for
 from .secretmem import SecretBytes
 
 HEADER_VERSION = 1
+DEFAULT_ASSISTANT_NAME = "Personal Agent"
 AAD_PW = b"pa/vault/W_pw/v1"
 AAD_RESET = b"pa/vault/W_reset/v1"
 SUBKEYS = ("K_db", "K_files", "K_log", "K_secret", "K_ipc", "K_hdr", "K_dlp", "K_skill", "K_backup_local")
@@ -129,13 +130,15 @@ class Vault:
         self.header = VaultHeader(header_path)
 
     # ------------------------------------------------------------------ setup
-    def create(self, username: str, password: str, pin: str, protector: KeyProtector) -> tuple[UnlockedKeys, str]:
+    def create(self, username: str, password: str, pin: str, protector: KeyProtector,
+               display_name: str = "", assistant_name: str = "") -> tuple[UnlockedKeys, str]:
         if self.header.exists():
             raise VaultError("vault already exists")
         vmk = random_key()
         keys = UnlockedKeys.from_vmk(vmk)
         rk = recovery.generate()
-        self.header.data = {"version": HEADER_VERSION, "username": username, "created": int(time.time())}
+        self.header.data = {"version": HEADER_VERSION, "username": username, "created": int(time.time()),
+                            "display_name": display_name, "assistant_name": assistant_name}
         self._wrap_password(vmk, password)
         self._wrap_reset(vmk, pin, rk, protector)
         self.header.data["rk_check"] = self._rk_check(keys, rk)
@@ -244,6 +247,19 @@ class Vault:
             raise WrongRecovery("recovery key format is invalid") from e
         if not consteq(b64d(expected), b64d(got)):
             raise WrongRecovery("recovery key rejected")
+
+    @property
+    def profile(self) -> dict[str, str]:
+        """Your name and the assistant's name. Not secret (shown on the sign-in screen, like the username),
+        but covered by the header MAC so they cannot be changed without the vault key."""
+        d = self.header.data
+        return {"display_name": d.get("display_name") or d.get("username", ""),
+                "assistant_name": d.get("assistant_name") or DEFAULT_ASSISTANT_NAME}
+
+    def set_profile(self, keys: UnlockedKeys, display_name: str, assistant_name: str) -> None:
+        self.header.data["display_name"] = display_name
+        self.header.data["assistant_name"] = assistant_name
+        self.header.save(keys)
 
     def rename(self, keys: UnlockedKeys, username: str) -> None:
         self.header.data["username"] = username

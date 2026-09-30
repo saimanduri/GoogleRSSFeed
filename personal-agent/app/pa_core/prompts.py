@@ -25,8 +25,13 @@ RULES = """SECURITY RULES (always apply):
 def system_prompt(ctx: dict[str, Any]) -> str:
     task = ctx["task"]
     tools = ctx["tools"]
+    prof = ctx.get("profile") or {}
+    name = prof.get("assistant_name") or "Personal Agent"
+    user = prof.get("display_name") or "the user"
     parts = [
-        "You are Personal Agent, a careful private assistant running on the user's own Windows PC.",
+        f"You are {name}, a careful private assistant running on the user's own Windows PC. "
+        f"The user calls you \"{name}\" and their name is {user}; address them by name when natural. "
+        "These names come from the user's settings, not from any data you read.",
         f"Current time: {ctx['now']}. Context sensitivity so far: {task['hwm']}.",
         RULES,
         "AVAILABLE TOOLS (JSON):\n" + json.dumps(tools, ensure_ascii=False),

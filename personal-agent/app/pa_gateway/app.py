@@ -144,7 +144,9 @@ class Gateway:
             raise LockedError("signed out")
 
     def status(self) -> dict[str, Any]:
+        profile = self.vault.profile if self.vault.header.data else {"display_name": "", "assistant_name": "Personal Agent"}
         out: dict[str, Any] = {"state": self.session.state, "username": self.vault.username if self.vault.header.data else "",
+                               "display_name": profile["display_name"], "assistant_name": profile["assistant_name"],
                                "dev_mode": dev_mode(), "password_wait": self.auth_state.password_wait_seconds(),
                                "pin_available": self._pin_available(), "recovery_wait": self.auth_state.recovery_wait_seconds()}
         if self.db is not None and self.session.state == UNLOCKED:
@@ -176,19 +178,24 @@ class Gateway:
                 "data_folder": str(self.paths.root), "cloud_synced": looks_cloud_synced(self.paths.root),
                 "disk_free_gb": round(usage.free / 1e9, 1), "gpu": _gpu_info(), "dev_mode": dev_mode()}
 
-    def setup(self, username: str, password: str, pin: str, allow_letters: bool = False) -> dict[str, Any]:
+    def setup(self, username: str, password: str, pin: str, allow_letters: bool = False,
+              display_name: str = "", assistant_name: str = "") -> dict[str, Any]:
         with self._lock:
             if self.session.state != SETUP_REQUIRED:
                 raise PAError("already set up", code="invalid_state")
             errs = passwords.validate_username(username) + passwords.validate_password(password, username, pin) + \
                 passwords.validate_pin(pin, allow_letters, password)
+            display_name = display_name.strip() or username
+            assistant_name = assistant_name.strip() or "Personal Agent"
+            errs += passwords.validate_profile_name(display_name, "Your name") + \
+                passwords.validate_profile_name(assistant_name, "Assistant name")
             if errs:
                 raise PAError("; ".join(errs), code="invalid_request", errors=errs)
             try:
                 protector = default_protector()
             except ProtectorError as e:
                 raise PAError(str(e), code="tpm_unavailable") from e
-            keys, rk = self.vault.create(username, password, pin, protector)
+            keys, rk = self.vault.create(username, password, pin, protector, display_name, assistant_name)
             self.auth_state.data["rk_confirmed"] = False
             self.auth_state.data["pin_allow_letters"] = allow_letters
             self.auth_state.password_ok()
@@ -409,6 +416,22 @@ class Gateway:
         self._pending_rk = rk
         self.audit.write("auth.recovery_key_rotated", "authentication", severity="medium")
         return {"recovery_key": rk, "confirm_groups": recovery.pick_confirmation_groups()}
+
+    def set_profile(self, display_name: str, assistant_name: str) -> dict[str, str]:
+        """Your name + the assistant's name (no password needed: not security-relevant, but logged)."""
+        self.require_unlocked()
+        display_name, assistant_name = display_name.strip(), assistant_name.strip()
+        errs = passwords.validate_profile_name(display_name, "Your name") + \
+            passwords.validate_profile_name(assistant_name, "Assistant name")
+        if errs:
+            raise PAError("; ".join(errs), code="invalid_request", errors=errs)
+        before = self.vault.profile
+        assert self.keys
+        self.vault.set_profile(self.keys, display_name, assistant_name)
+        self.audit.write("profile.changed", "configuration", display_name_changed=before["display_name"] != display_name,
+                         assistant_name_changed=before["assistant_name"] != assistant_name)
+        self.emit("session.changed", self.status())
+        return self.vault.profile
 
     def change_username(self, password: str, username: str) -> None:
         self.require_unlocked()

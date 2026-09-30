@@ -82,5 +82,5 @@ _Last updated: 2026-09-30 (v0.1.0)._
 | - | Accessibility review | 🟡 labels/keyboard/themes done; formal review pending |
 
 ## Numbers
-~13 k lines Python, ~3 k lines TypeScript/React, ~360 lines Rust; 144 automated tests (131 run on any OS,
+~13 k lines Python, ~3 k lines TypeScript/React, ~360 lines Rust; 147 automated tests (134 run on any OS,
 13 Windows-only), red-team corpus 13 cases.

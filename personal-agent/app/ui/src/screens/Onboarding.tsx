@@ -15,6 +15,8 @@ export function Onboarding() {
   const [step, setStep] = useState(0);
   const [pre, setPre] = useState<any>(null);
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [assistantName, setAssistantName] = useState("");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [pin, setPin] = useState("");
@@ -43,7 +45,7 @@ export function Onboarding() {
     setBusy(true);
     setErr("");
     try {
-      const r = await rpc<any>("setup.create", { username, password, pin, allow_letters: letters });
+      const r = await rpc<any>("setup.create", { username, password, pin, allow_letters: letters, display_name: displayName.trim(), assistant_name: assistantName.trim() });
       setRk(r);
       setPassword(""); setPassword2(""); setPin(""); setPin2("");
       setStep(3);
@@ -91,8 +93,14 @@ export function Onboarding() {
           <div className="col">
             <h1>Create your account</h1>
             <div className="banner info"><Icon name="info" />Your password encrypts everything. We cannot recover it for you.</div>
-            <Field label="Username" help="3-64 characters. Not a secret.">
-              <input className="input" autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
+            <Field label="Your name" help="How the assistant greets you. You can change it any time in Settings.">
+              <input className="input" autoFocus value={displayName} maxLength={40} placeholder="e.g. Sai" onChange={(e) => setDisplayName(e.target.value)} />
+            </Field>
+            <Field label="Name your assistant" help="Address the assistant by this name. You can change it any time in Settings.">
+              <input className="input" value={assistantName} maxLength={40} placeholder="Personal Agent" onChange={(e) => setAssistantName(e.target.value)} />
+            </Field>
+            <Field label="Username" help="3-64 characters, used to sign in. Not a secret.">
+              <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} />
             </Field>
             <Field label="Password" help="At least 12 characters. Paste from a password manager is fine.">
               <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -102,7 +110,7 @@ export function Onboarding() {
               <input className="input" type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
             </Field>
             <div className="row"><Button onClick={() => setStep(0)}>Back</Button><div className="spacer" />
-              <Button kind="primary" disabled={!pwOk || username.length < 3} onClick={next}>Continue</Button></div>
+              <Button kind="primary" disabled={!pwOk || username.length < 3 || !displayName.trim()} onClick={next}>Continue</Button></div>
           </div>
         )}
 
@@ -140,7 +148,7 @@ export function Onboarding() {
             <div className="brand-logo" style={{ width: 64, height: 64, borderRadius: 18 }}><Icon name="check" size={32} /></div>
             <h1>You're all set</h1>
             <p className="muted" style={{ maxWidth: 480 }}>Everything is encrypted with your password and this PC's TPM. The agent can only act through the gateway, which checks every action against your rules. The red STOP ALL button is always one click away.</p>
-            <Button kind="primary" onClick={refresh}>Open Personal Agent</Button>
+            <Button kind="primary" onClick={refresh}>Open {assistantName.trim() || "Personal Agent"}</Button>
           </div>
         )}
       </div>

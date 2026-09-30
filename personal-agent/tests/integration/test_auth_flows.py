@@ -17,6 +17,47 @@ def test_setup_and_cold_start(tmp_path):
     e.close()
 
 
+def test_profile_names_setup_signin_and_change(tmp_path):
+    e = Env(tmp_path / "d", start_core=False)
+    e.ui.call("setup.create", {"username": "tester", "password": PASSWORD, "pin": PIN,
+                               "display_name": "Sai", "assistant_name": "Jarvis"})
+    st = e.ui.call("session.status")
+    assert (st["display_name"], st["assistant_name"]) == ("Sai", "Jarvis")
+    e.gw.sign_out()
+    st = e.ui.call("session.status")  # shown on the sign-in screen before unlock
+    assert st["state"] == "SIGNED_OUT" and (st["display_name"], st["assistant_name"]) == ("Sai", "Jarvis")
+    with pytest.raises(PAError):
+        e.ui.call("account.set_profile", {"display_name": "X", "assistant_name": "Y"})
+    e.ui.call("auth.sign_in", {"username": "tester", "password": PASSWORD})
+    e.ui.call("account.set_profile", {"display_name": "Sai M", "assistant_name": "Friday"})
+    for bad in ("", "a" * 41, "<script>", "line\nbreak"):
+        with pytest.raises(PAError):
+            e.ui.call("account.set_profile", {"display_name": bad, "assistant_name": "Friday"})
+    e.close()
+    e2 = Env(tmp_path / "d", start_core=False)  # header MAC still valid after the change
+    e2.ui.call("auth.sign_in", {"username": "tester", "password": PASSWORD})
+    st = e2.ui.call("session.status")
+    assert (st["display_name"], st["assistant_name"]) == ("Sai M", "Friday")
+    assert e2.ui.call("account.signin_history") is not None
+    e2.close()
+
+
+def test_profile_defaults_and_prompt():
+    from pa_core.prompts import system_prompt
+    ctx = {"task": {"hwm": "PUBLIC", "trigger": "USER"}, "tools": [], "events": [], "now": "2026-01-01T00:00:00Z",
+           "profile": {"display_name": "Sai", "assistant_name": "Jarvis"}}
+    p = system_prompt(ctx)
+    assert "You are Jarvis" in p and "their name is Sai" in p
+    ctx.pop("profile")
+    assert "You are Personal Agent" in system_prompt(ctx)
+
+
+def test_profile_defaults_when_not_given(env_nocore):
+    env_nocore.setup(model=False)
+    st = env_nocore.ui.call("session.status")
+    assert (st["display_name"], st["assistant_name"]) == ("tester", "Personal Agent")
+
+
 def test_weak_password_and_trivial_pin_rejected(env_nocore):
     for pw, pin in (("password1234", "480713"), ("tester-Correct-Horse-9!", "480713"), (PASSWORD, "123456"), (PASSWORD, "111111")):
         with pytest.raises(PAError):

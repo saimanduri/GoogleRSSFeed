@@ -17,6 +17,7 @@
 ## Everyday use
 | I want to… | Do this |
 |---|---|
+| Rename the assistant / change my name | Setup asks for **Your name** and **Name your assistant**. Change either any time in **Settings → Account & Security → Profile**. The sign-in screen greets you by name and the assistant answers to its name in chat. |
 | Ask something | **Chat** → type, or click the mic and speak. Watch **Steps** on the right to see exactly what it does. |
 | Be reminded | Say or type "remind me to … on Friday at 9" → press **Confirm** on the card. You'll get a Windows notification. |
 | Automate something | **Missions & Routines → Describe in plain words** ("every weekday at 7:30 summarise important mail") → review → **Activate**. |

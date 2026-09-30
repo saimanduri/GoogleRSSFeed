@@ -4,6 +4,7 @@ and checks that the server process is the gateway PID we were given (pipe-squatt
 from __future__ import annotations
 
 import itertools
+import time
 from typing import Any
 
 from .errors import PAError
@@ -11,14 +12,28 @@ from .protocol import HEADER, FrameDecoder, encode_frame
 
 
 class PipeClient:
-    def __init__(self, pipe_name: str, role: str, token: str, worker: str, expected_server_pid: int | None = None):
+    def __init__(self, pipe_name: str, role: str, token: str, worker: str, expected_server_pid: int | None = None,
+                 timeout: float = 15.0):
         import win32file  # type: ignore[import-not-found]
         import win32pipe  # type: ignore[import-not-found]
         SECURITY_SQOS_PRESENT = 0x00100000
         SECURITY_IDENTIFICATION = 0x00010000
-        win32pipe.WaitNamedPipe(pipe_name, 10_000)
-        self.h = win32file.CreateFile(pipe_name, win32file.GENERIC_READ | win32file.GENERIC_WRITE, 0, None,
-                                      win32file.OPEN_EXISTING, SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, None)
+        import pywintypes  # type: ignore[import-not-found]
+        # WaitNamedPipe fails at once with ERROR_FILE_NOT_FOUND while no instance exists (gateway still starting,
+        # or between instances) and CreateFile can lose the race to another client: retry until the deadline.
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                win32pipe.WaitNamedPipe(pipe_name, 2_000)
+                self.h = win32file.CreateFile(pipe_name, win32file.GENERIC_READ | win32file.GENERIC_WRITE, 0, None,
+                                              win32file.OPEN_EXISTING, SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+                                              None)
+                break
+            except pywintypes.error as e:
+                # 2 = not found, 121 = semaphore timeout (WaitNamedPipe), 231 = all instances busy
+                if e.winerror not in (2, 121, 231) or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.1)
         if expected_server_pid is not None:
             server_pid = win32pipe.GetNamedPipeServerProcessId(self.h)
             if server_pid != expected_server_pid:

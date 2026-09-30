@@ -3,6 +3,20 @@
 Semantic versioning. Newest first. Every entry lists user-visible changes, security-relevant changes and
 DB migrations.
 
+## 0.1.1 - 2026-09-30 - personal names
+**Added**
+- Name your assistant and tell it your name during setup; both editable any time in
+  Settings → Account & Security → Profile (`account.set_profile`, audited as `profile.changed`).
+- Sign-in / lock screens greet you by name ("Welcome back, Sai", "Jarvis is locked"); sidebar, window title,
+  Home and the chat box use the assistant's name; the system prompt tells the model its name and yours.
+
+**Security**
+- Names live in the vault header (not secret, MAC-protected, validated: 1-40 chars, no control characters or
+  markup). No DB migration.
+
+**Fixed**
+- Named-pipe client retries while the gateway's pipe instance does not exist yet (startup race seen in CI).
+
 ## 0.1.0 - 2026-09-30 - first complete build
 Built from `docs/spec/personal_desktop_agent_spec_v1_1.txt` (spec v1.1 incl. section 39).
 

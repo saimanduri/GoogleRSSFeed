@@ -50,6 +50,7 @@ def task_context(gw, p: P, c: ClientInfo) -> Any:
         "mission": mission,
         "limits": {"steps": int(limits.get("steps", 25)), "context_tokens": int(gw.settings.get("llm.context_tokens"))},
         "now": now_iso(),
+        "profile": gw.vault.profile,
     }
 
 

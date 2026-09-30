@@ -15,7 +15,7 @@ export function Home() {
   const pct = (k: string) => Math.min(100, Math.round(((d.budget.used[k] ?? 0) / (d.budget.limits[k] || 1)) * 100));
   return (
     <div className="page">
-      <div className="page-header"><div><h1>{greet}, {status?.username}</h1><div className="muted">While you were away</div></div></div>
+      <div className="page-header"><div><h1>{greet}, {status?.display_name ?? status?.username}</h1><div className="muted">{status?.assistant_name ?? "Personal Agent"} · while you were away</div></div></div>
       {!d.recovery_key_confirmed && <div className="banner warn"><Icon name="alert" />Your recovery key was not confirmed. Generate a new one in Settings &gt; Account &amp; Security.</div>}
       {status?.needs_pin_setup && <div className="banner warn"><Icon name="alert" />This vault was restored on a new PC. Create a new PIN and recovery key in Settings &gt; Account &amp; Security.
         <Button small onClick={() => go("settings", { section: "account" })}>Open</Button></div>}
