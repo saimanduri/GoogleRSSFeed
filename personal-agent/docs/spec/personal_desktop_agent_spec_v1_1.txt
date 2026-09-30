@@ -1,0 +1,1585 @@
+
+PERSONAL AI AGENT - DESKTOP EDITION
+BUILD SPECIFICATION
+Version 1.1 (Harness Hardening Revision)
+Supersedes: Version 1.0
+Derived from: Autonomous Personal AI Agent Platform - Build Specification v2.1 (Enterprise)
+Target: Claude Code / Codex / equivalent coding agent
+Platform: Windows 11 (single user, single PC)
+
+============================================================
+0. BUILD INSTRUCTION
+============================================================
+
+Build a production-quality, single-user, local-first autonomous personal AI agent that runs on the user's own Windows 11 desktop.
+
+It is the personal edition of the enterprise platform. Keep the enterprise security model, scaled to one person and one PC:
+- one desktop application with ONE user interface (no separate admin portal)
+- every administrative capability lives under a "Settings" button in the left navigation pane
+- everything is configurable through the GUI; the user never has to edit a file, registry key or command line
+- local sign-in with username + password, set by the user on first run
+- password reset with PIN + recovery key
+- all secrets and passwords stored locally in an encrypted vault protected by Argon2id and the PC's TPM 2.0 chip
+- local LLM on the same PC
+- connectors (V1): Local Outlook (classic), Microsoft 365 / Exchange Online, Web search + fetch
+- persistent memory, missions, scheduled/event-driven tasks that continue while the app window is closed
+- deterministic policy engine, tool gateway, approvals, budgets, kill switch, sandboxed code execution
+- one unified, tamper-evident security log file (optionally forwarded to a SIEM)
+
+IMPORTANT SECURITY PRINCIPLES (unchanged from enterprise):
+
+1. The LLM may propose an action; it is NEVER the authority that permits it.
+2. Every consequential action passes deterministic policy enforcement in the Gateway process.
+3. Default deny.
+4. Security is evaluated on data flow (context sensitivity), not only on individual actions.
+5. Policy is re-evaluated at execution time.
+6. If an action cannot be audited, it is not executed.
+7. Security components are built before the capabilities they protect.
+8. Secrets never enter the model context, the sandbox, logs, memory or notifications.
+
+ADDITIONAL PRINCIPLES FOR THE DESKTOP EDITION:
+
+9. There is a SECURITY FLOOR: a small set of protections the user cannot switch off in Settings (Section 5.4). Settings can make the agent more restrictive freely; loosening is limited, re-authenticated and audited.
+10. If the PC cannot provide a required isolation feature (e.g. a sandbox), the dependent capability is disabled and the UI says why. It is never silently run without protection.
+11. The app never needs administrator rights after installation, and never runs any component as SYSTEM or administrator.
+
+------------------------------------------------------------
+0.1 DECISIONS CONFIRMED WITH THE USER
+------------------------------------------------------------
+
+- Operating system: Windows 11 (TPM 2.0 is a Windows 11 requirement and is relied upon).
+- AI model location: on this PC.
+- Password reset: PIN + recovery key (both required).
+- V1 connectors: Local Outlook (classic), Microsoft 365 / Exchange, Web search + fetch. More connectors (e.g. ChiRAG) are added later through the same connector framework.
+- One UI; all settings under a "Settings" button in the left pane.
+
+------------------------------------------------------------
+0.2 WHAT CHANGES VERSUS THE ENTERPRISE SPEC
+------------------------------------------------------------
+
+Kept (adapted to one PC):
+- Tool Gateway, Policy Engine (default deny), data-flow/taint control, egress control, DLP
+- approvals bound to exact payload, step-up re-authentication
+- kill switch with defined semantics
+- budgets, missions, tasks, durable queue, idempotency, OUTCOME_UNKNOWN
+- memory trust model, skills with review
+- file quarantine and scanning pipeline
+- sandboxed code execution
+- unified, hash-chained security log; optional SIEM forwarding
+- connector framework with per-connector ON/OFF and chat/mission flags
+- red-team suite and security tests
+
+Replaced:
+- Corporate SSO/MFA -> local username + password, quick-unlock PIN, recovery key, TPM-backed keys
+- Admin Portal -> "Settings" in the single UI
+- Secrets manager/KMS -> local encrypted vault (Argon2id + TPM 2.0 + AES-256-GCM)
+- Network segmentation -> separate OS processes + Windows Defender Firewall per-program rules + named-pipe IPC
+- Egress proxy -> egress filter inside the Gateway process (only process allowed outbound by firewall)
+- Server sandbox (microVM) -> Windows Sandbox (Hyper-V) or AppContainer fallback
+- Local Outlook Bridge over mTLS -> local Outlook worker process on the same PC
+- Separation of duties / second approver -> re-authentication with password + typed confirmation + audit for loosening changes
+
+Dropped (not applicable to a single user):
+- multi-tenancy, SCIM, RBAC roles, admin/auditor roles, HA deployment, dual control
+
+------------------------------------------------------------
+0.3 CHANGE LOG (v1.0 -> v1.1)
+------------------------------------------------------------
+
+New Section 39 "Agent Harness Hardening", based on lessons from DeepSeek Harness, OpenClaw and Hermes Agent (2026):
+
+High:   39.1 local listener hardening (ClawJacked) · 39.2 no configuration via links (CVE-2026-25253)
+        · 39.3 per-client method allowlists · 39.4 extension security (ClawHavoc) · 39.5 session event log
+        · 39.6 governed skill evolution · 39.7 safe summarizing of long chats
+Medium: 39.8 sub-agents and external agents · 39.9 scripts that call tools · 39.10 Security Posture page
+        · 39.11 safe updates with rollback · 39.12 search your history
+Low:    39.13 memory review and "About me" · 39.14 approval cards in chat · 39.15 missions in plain words
+Later:  39.16 isolated browser (optional) · 39.17 messaging apps (deferred)
+Also:   39.18 what was explicitly NOT adopted
+
+Related updates: Sections 2.4, 5.3, 31, 32, 33, 34, 35, 36 and Appendix A.
+
+============================================================
+1. PRODUCT VISION
+============================================================
+
+A private assistant on the user's own PC that keeps working while the user is away (as long as the PC is on and the user stays signed in to Windows, even if Windows is locked).
+
+Examples:
+- "Every morning at 7:30, summarize important emails and list what needs action."
+- "Search my Outlook archive for the vendor contract discussion from 2023."
+- "Research local LLM news overnight and prepare a report."
+- "Remember how I like these reports."
+- "Keep my API keys safe and use them only for the tools I allow."
+
+Intent becomes: mission -> plan -> tasks -> gateway-controlled tool calls -> verification -> output -> (optional) memory.
+
+============================================================
+2. ARCHITECTURE
+============================================================
+
+2.1 Processes (one PC, least privilege, separated by the OS)
+
+  +---------------------------------------------------------------------------+
+  |  Windows 11 - user's account (standard user; no admin needed at runtime)   |
+  |                                                                           |
+  |   pa-ui.exe  (single desktop window; Tauri + WebView2)                    |
+  |      |  local IPC (named pipe, per-user ACL, per-launch token)            |
+  |      v                                                                    |
+  |   pa-gateway.exe  (SECURITY CORE)                     tray icon           |
+  |      - vault (keys, secrets)        - policy engine    - approvals        |
+  |      - connectors + egress filter   - DLP              - kill switch      |
+  |      - audit writer (unified log)   - budgets          - backup           |
+  |      ^              |            |               |              |         |
+  |      | IPC          | IPC        | spawns        | spawns       | spawns  |
+  |      |              v            v               v              v         |
+  |   pa-core.exe    pa-llm      pa-outlook-     pa-parser     sandbox        |
+  |   agent runtime  (llama.cpp  worker          (file         (Windows      |
+  |   planner,       server,     (Outlook COM,   parsing,      Sandbox or    |
+  |   memory,        loopback,   read-only)      AppContainer) AppContainer) |
+  |   missions,      API key)                                                 |
+  |   scheduler                                                               |
+  |                                                                           |
+  |   Windows Defender Firewall: ONLY pa-gateway.exe may connect outbound.    |
+  |   pa-core, pa-llm, pa-outlook-worker, pa-parser, sandbox: outbound BLOCKED|
+  +---------------------------------------------------------------------------+
+                          |
+                          v (HTTPS only, allowlisted)
+            Microsoft Graph (M365) - Web search API - allowlisted websites
+
+2.2 Responsibilities
+
+pa-ui.exe
+- renders the single UI; holds no long-term secrets
+- talks only to pa-gateway over IPC
+- WebView2 locked down: no remote content, strict CSP, no navigation away, devtools disabled in release builds, no Node/filesystem APIs exposed
+
+pa-gateway.exe (security core; the ONLY process with keys and network)
+- vault and key management
+- authentication (password, PIN quick-unlock, recovery)
+- Tool Gateway (all tool calls), Policy Engine, DLP, egress filter
+- connector adapters (M365 via Graph, web), orchestration of the Outlook worker
+- approvals, budgets, kill switch
+- audit writer and unified security log
+- backups
+- tray icon ("Open", "Pause agent", "Stop everything", "Lock")
+
+pa-core.exe (agent runtime; no keys, no network)
+- agent loop, planner, context manager (taint tracking), memory, skills
+- missions, tasks, scheduler
+- calls pa-llm for inference and pa-gateway for every tool call
+- cannot read the vault; receives only data the gateway releases
+
+pa-llm (local model server; no network)
+- bundled llama.cpp server (OpenAI-compatible) bound to 127.0.0.1 on a random port, protected by a random per-launch API key known only to pa-gateway and pa-core
+- GGUF model files only (no pickle-based formats); SHA-256 verified before load
+
+pa-outlook-worker.exe (no network)
+- spawned by the gateway on demand
+- reads classic Outlook through the Outlook Object Model, read-only operations only
+- exits when idle
+
+pa-parser.exe (no network)
+- parses PDF/Office/images in an AppContainer with no capabilities, read-only input, memory/time limits
+
+Sandbox (no network)
+- runs model-written Python (Section 19)
+
+2.3 Why this split
+- A bug or prompt-injection in the agent runtime (pa-core) cannot reach secrets or the internet: it has neither.
+- Parsing malicious files and running generated code happen in processes that are firewalled and privilege-reduced.
+- The OS enforces the boundaries (process separation, pipe ACLs, firewall rules), not the LLM.
+
+2.4 IPC security
+- Windows named pipes; ACL grants access only to the current user's SID (and denies network logon SIDs).
+- Pipe names include a random per-launch component.
+- The server verifies the client process: image path under the install directory and a valid Authenticode signature from the product's publisher.
+- A per-launch random token handshake is required on every connection.
+- NO TCP listening sockets except pa-llm on 127.0.0.1 (API-key protected, random port). The app never runs a localhost web server for its UI.
+- Messages are schema-validated (JSON Schema / pydantic) on receipt.
+- Each client is limited to its own list of allowed methods (Section 39.3).
+
+2.5 Installation layout
+- Program files: C:\Program Files\PersonalAgent\ (per-machine install, write-protected for standard users so no process can tamper with binaries)
+- Data: %LOCALAPPDATA%\PersonalAgent\ with NTFS ACL: current user (full), SYSTEM (full), inheritance removed, all others denied
+- The installer (MSI, code-signed) is the only step needing admin rights: it installs binaries and creates the firewall rules and the per-user logon scheduled task.
+- The app refuses to place its data folder inside a cloud-synced folder (OneDrive, Dropbox, Google Drive) and warns if BitLocker (or equivalent full-disk encryption) is off.
+
+============================================================
+3. TECHNOLOGY BASELINE
+============================================================
+
+- UI: Tauri 2 (Rust shell) + WebView2 + React/TypeScript
+- Gateway: Rust (recommended, memory-safe for the security core) or Python 3.12 with strict typing if the team prefers one language; the vault crypto must use vetted libraries either way
+- Core runtime: Python 3.12, asyncio
+- Local database: SQLite with SQLCipher (AES-256) for the vault DB and app DB
+- Vector store: sqlite-vec (inside the encrypted database) or LanceDB with file-level encryption
+- Crypto:
+    - Argon2id (libsodium / argon2 reference)
+    - AES-256-GCM or XChaCha20-Poly1305 (libsodium / RustCrypto / Windows CNG)
+    - HKDF-SHA-256
+    - HMAC-SHA-256 for the log chain
+    - Windows CNG "Microsoft Platform Crypto Provider" for TPM-bound keys
+- LLM runtime: bundled llama.cpp server (default). Optional: Ollama or LM Studio (see Section 20.4 for hardening requirements and warnings)
+- Sandbox: Windows Sandbox (Windows 11 Pro/Enterprise/Education with virtualization enabled); fallback AppContainer + Job Object
+- Outlook: Outlook Object Model (COM) from a separate worker process
+- M365: Microsoft Graph via MSAL (public client, auth code + PKCE, system browser)
+- Packaging: signed MSI; signed update packages
+- Tests: pytest, cargo test, Playwright for UI
+UI has to be not routine, but super fluid. AI buttons are clickable. Like how Deepseek harness shows every step of what happened when i ask something should be easily seen for last 100 requests atleast, old may be archived and be accessible via history search. if vector DB local is needed we can use something like SQLite vector database or similar that is easy to configure and manage without any compromise to security.
+
+============================================================
+4. IDENTITY, SIGN-IN AND KEY MANAGEMENT
+============================================================
+
+4.1 Concepts
+- Username: the user's local display/login name for this app. Not a secret. One vault per Windows user account.
+- Password: the primary secret. Required at every cold start (after reboot, Windows sign-out, hibernate, or app restart).
+- PIN: a short code for (a) quick unlock after the app auto-locks, while the agent is still running, and (b) together with the recovery key, resetting a forgotten password. The PIN is bound to this PC's TPM.
+- Recovery key: a long random key shown once at setup, to print or store offline. Used with the PIN to reset the password.
+
+4.2 First-run setup wizard (GUI)
+
+Step 1 - Welcome and checks
+- Shows: Windows version, TPM 2.0 present and ready, BitLocker status, virtualization/Windows Sandbox availability, data folder location, disk space, GPU/NPU detection for the model.
+- Blocks setup if TPM 2.0 is not usable. Warns (does not block) if BitLocker is off, with a "How to turn on" link.
+
+Step 2 - Create account
+- Username (3-64 characters)
+- Password + confirm:
+    - minimum 12 characters, maximum 256
+    - strength meter (zxcvbn-style); must reach "strong"
+    - checked against a bundled offline list of common/breached passwords
+    - must not contain the username
+    - paste allowed (password managers)
+- Explanation text: "Your password encrypts everything. We cannot recover it for you."
+
+Step 3 - Create PIN
+- 6 to 12 digits by default; option "allow letters" for an alphanumeric PIN
+- rejects trivial PINs (repeated digits, simple sequences such as 123456 or 654321, and other patterns from a bundled list of common PINs)
+- must differ from the password
+- the PIN is registered with the TPM (Section 4.4)
+
+Step 4 - Recovery key
+- A 160-bit random key displayed as 8 groups of 5 characters (Crockford Base32), e.g. 7K2QD-9XM4R-...
+- Buttons: "Save as PDF" (prompts for location; recommends printing and deleting the file), "Copy" (clipboard excluded from history, auto-cleared after 30 s)
+- The user must type back two random groups to confirm they recorded it.
+- Clear warning box:
+    "To reset a forgotten password you need BOTH your PIN and this recovery key, on THIS computer.
+     If you forget your password AND lose either your PIN or this key, your data cannot be recovered.
+     Keep an encrypted backup (Settings > Backup) - backups are restored with your password."
+
+Step 5 - Local AI model
+- choose from a curated list sized to the detected hardware, or "I'll add one later"
+- download over HTTPS from an allowlisted source with published SHA-256; verify before use
+- or import a local GGUF file (SHA-256 shown and recorded). We should be able to connect models on Ollama/vLLM/RUN AI.
+IN Settings we should have option to choose any LLM, add/modify anytime. 
+
+Step 6 - Connectors (optional now)
+- all connectors are OFF by default; the user can connect them here or later in Settings > Connectors
+
+Step 7 - Autonomy defaults
+- choose a profile: "Cautious" (default), "Balanced". (There is no profile that removes the security floor.)
+
+Step 8 - Backup
+- choose a backup folder (external drive recommended) and schedule, or skip with a warning. This can be configured later, but capability should be there.
+
+Step 9 - Done
+- shows a summary and a link to the "How your data is protected" help page
+
+4.3 Key hierarchy
+
+  Vault Master Key (VMK): 256-bit random, generated at setup.
+     |
+     +-- HKDF -> K_db     (SQLCipher key for app/vault database)
+     +-- HKDF -> K_files  (wraps per-file random keys for My Files and artifacts)
+     +-- HKDF -> K_log    (HMAC key for the unified log chain)
+     +-- HKDF -> K_secret (encrypts user secrets in the Secrets vault, per-item keys)
+     +-- HKDF -> K_ipc    (derives per-launch IPC tokens)
+
+  The VMK is never stored in plaintext. It is stored only in these wrapped forms in vault.header (versioned, integrity-protected):
+
+  W_pw    = AEAD( KEK_pw, VMK )
+            KEK_pw = Argon2id(password, salt_pw)
+            Argon2id parameters calibrated at setup to take >= 1 second on this PC,
+            minimum memory 256 MiB, iterations >= 3, parallelism 4. Parameters stored in the header.
+
+  W_reset = AEAD( KEK_reset, VMK )
+            KEK_reset = HKDF( S_tpm || RKey_stretched )
+              S_tpm          = a 256-bit secret decryptable ONLY by a non-exportable TPM key whose use requires the PIN
+              RKey_stretched = Argon2id(recovery key, salt_rk) (moderate cost; the recovery key already has 160 bits of entropy)
+            => opening W_reset requires THIS PC's TPM + the correct PIN + the recovery key.
+
+  There is NO wrapped copy of the VMK that the PIN alone can open at rest. An attacker who copies the data folder needs the password, or (recovery key + this PC's TPM + PIN).
+
+4.4 PIN and TPM
+- At setup, the gateway creates a non-exportable RSA-2048 or ECC P-256 key in the TPM via the Microsoft Platform Crypto Provider, with the PIN as the key's usage authorization.
+- S_tpm is encrypted to that key and stored in the header.
+- The TPM's dictionary-attack protection limits PIN guessing in hardware (lockout after a small number of failures, increasing lockout time). The app additionally disables the PIN after 5 consecutive failures until the next password sign-in.
+- If the TPM is cleared or the motherboard is replaced, the PIN and W_reset stop working; the password still works, and the user re-creates the PIN.
+
+4.5 Unlock flows
+
+Cold start (after reboot, sign-out, hibernate, app restart):
+- username + password only -> Argon2id -> unwrap VMK -> gateway unlocked.
+
+Quick unlock (after the UI auto-locked, agent still running):
+- PIN only; valid only while the gateway process has stayed unlocked since the last password sign-in.
+- Implementation: while the UI is locked, the VMK stays only in pa-gateway's protected memory (needed so missions can keep running). Quick unlock proves the user is present by performing a TPM operation with the PIN-authorized key (decrypting a fresh random challenge). A wrong PIN counts toward the TPM lockout and the app's 5-failure limit.
+- If "Pause missions while Windows is locked" is ON, the stricter mode applies: on UI lock the gateway wipes the VMK from memory and unlocking requires the password.
+- Quick unlock expires after a configurable maximum (default 24 hours since last password entry), after which the password is required.
+
+Step-up (re-authentication for sensitive actions):
+- Required for: revealing a stored secret, exporting data, changing security settings, approving high-risk actions, disconnecting/reconnecting connectors, restoring a backup, viewing the Transcript Store.
+- Accepts PIN (default) or password; loosening security settings ALWAYS requires the password.
+- A successful step-up is valid for 5 minutes (configurable 1-15) for the same category of action.
+
+4.6 Reset and change flows
+
+Forgot password:
+1. Sign-in screen -> "Forgot password?"
+2. Enter PIN (TPM verifies) and the recovery key.
+3. Gateway opens W_reset -> VMK.
+4. User sets a new password (same rules). W_pw is re-created with a new salt.
+5. The recovery key is then ROTATED automatically: a new recovery key is generated and shown (the old one has now been used). W_reset is re-created.
+6. All pending approvals are voided; the event is logged; a notice is shown on the Home screen at next sign-in.
+
+Change password (known):
+- Settings > Account & Security -> requires current password -> new password -> W_pw re-created.
+
+Forgot PIN:
+- Sign in with password -> Settings > Account & Security -> "Set new PIN" -> new TPM key, W_reset re-created with the existing recovery key (requires the recovery key; if lost, generate a new one - see below).
+
+Lost recovery key:
+- Sign in with password -> "Generate new recovery key" -> requires password + PIN -> old W_reset destroyed, new key shown and confirmed.
+
+Forgot password AND lost PIN or recovery key:
+- Not recoverable on this PC by design. The user may restore an encrypted backup only if they remember the password used for that backup. The UI states this plainly at setup and in Settings.
+
+4.7 Brute-force and session protections
+- Password attempts: exponential delay (1, 2, 4, 8 ... s, max 5 min) after 3 failures; persistent counter; every failure logged. Offline guessing is slowed by Argon2id.
+- PIN attempts: TPM hardware lockout + app disables PIN after 5 failures.
+- Recovery attempts: 5 failures -> recovery disabled for 1 hour; logged.
+- Auto-lock UI after idle (default 10 min; range 1-60).
+- Lock UI when Windows locks (default ON).
+- On Windows sign-out, shutdown, restart or hibernate: all keys are wiped from memory; missions pause until the next password sign-in.
+- On sleep: keys stay in memory only if BitLocker is on; otherwise wiped (default; configurable only toward "always wipe").
+- Keys held in memory: locked pages (VirtualLock), encrypted in memory where supported (CryptProtectMemory), zeroized after use; crash dumps disabled for pa-gateway (WER exclusion); no swap of key material.
+- Screens showing secrets use SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE) so they are excluded from screenshots/screen sharing.
+
+4.8 Honest limits (shown in the in-app help)
+- If malware runs as the user on the same PC while the vault is unlocked, it may capture keystrokes or the screen. Process separation, firewall rules and short unlock windows reduce this risk but cannot eliminate it. Keep Windows and Defender up to date.
+- Physical access to an unlocked, signed-in PC is equivalent to access to the agent.
+
+============================================================
+5. THE SINGLE USER INTERFACE
+============================================================
+
+5.1 Layout
+
+  +----------------------------------------------------------------------------------+
+  | [=] Personal Agent        [ status: Running · 2 tasks ]   [Lock]  [ STOP ALL ]    |
+  +--------------------+-------------------------------------------------------------+
+  |  Home              |                                                             |
+  |  Chat              |                                                             |
+  |  Missions          |                     main content area                       |
+  |  Tasks             |                                                             |
+  |  Approvals   (1)   |                                                             |
+  |  My Files          |                                                             |
+  |  Memory            |                                                             |
+  |  Secrets           |                                                             |
+  |  Activity          |                                                             |
+  |                    |                                                             |
+  |                    |                                                             |
+  |  ---------------   |                                                             |
+  |  [ Settings ]      |                                                             |
+  |  user: you  (●)     |                                                             |
+  +--------------------+-------------------------------------------------------------+
+
+- The top bar always shows agent status, a "Lock" button and a red "STOP ALL" button (the kill switch).
+- The left pane lists everyday areas; the "Settings" button is pinned at the bottom of the left pane.
+- A badge shows pending approvals.
+- Keyboard accessible; screen-reader labels; light/dark theme; scalable text.
+
+5.2 Everyday areas
+
+Home ("While you were away")
+- tasks completed, findings, files created, memories proposed, failed tasks with reasons, tasks waiting (e.g. "Outlook was closed", "Microsoft 365 turned off by you"), OUTCOME_UNKNOWN items, pending approvals, security events (failed sign-ins, recovery used, settings changed)
+
+Chat
+- streaming responses; citations; shows which sources were used (Outlook, M365, web, files, model only)
+- shows the context sensitivity badge ("This chat contains CONFIDENTIAL data")
+- markdown sanitized; no remote images auto-loaded; external links show full URL and open in the default browser only after a click-through
+- per-chat switch "Allow tools in this chat"
+
+Missions
+- create/edit with a guided form: objective, schedule or trigger, allowed connectors/tools, budgets, output format, notification level, missed-run policy
+- list with status, last/next run, outputs, approvals, errors, dependency warnings ("needs Outlook open", "PC must be on and you must stay signed in")
+- only the user can create, activate, widen or resume a mission; the agent can only propose one
+
+Tasks
+- states: queued, running, waiting for resource, waiting for approval, suspended, paused, outcome unknown, completed, failed, cancelled, timed out
+- per task: timeline, tool calls, policy decisions, budget usage, "Stop" button
+
+Approvals
+- exact action and exact payload (full text, recipients, URL/query), sensitivity, destination, risk, originating task/mission, expiry
+- Approve (with step-up for high risk) / Deny / Edit-and-re-propose (editing creates a new approval with a new hash)
+
+My Files
+- upload (drag-and-drop), folders, tags, search, processing status, classification label
+- preview in a sandboxed viewer (no scripts; PDFs rendered to images by pa-parser)
+- open externally only via "Save a copy" (explicit)
+- "Add to My Knowledge"
+
+Memory
+- list by type; explicit vs inferred; trust level; provenance; confidence; correct / disable / delete
+- "Proposed memories" inbox to confirm or reject
+
+Secrets (local password/secret vault)
+- see Section 6
+
+Activity
+- human-readable timeline from the unified security log; filter by time, connector, mission, decision
+- "What did the agent do between [time] and [time]?" quick query
+- integrity status badge (log chain verified / broken)
+We should have something like Claude Routines that i can assign to run at scheduled interval.
+
+I should be able to record my audio using it and i can configure an audio model like STT running on Ollama/vllm /runai to be connected to it. I should be able to simply talk and ask it to remind me on particular date, my application should remind me on that date after my confirmation. Like how claude once any task is completed it notifies the user, here also i should be reminded once i ask similar to claude.
+
+5.3 Settings (button at the bottom of the left pane)
+
+Settings opens a second-level list in the left pane. EVERYTHING configurable lives here; there is no config file the user needs to edit.
+
+  Settings
+  |- Account & Security
+  |- Connectors
+  |- AI Model
+  |- Autonomy & Budgets
+  |- Rules & Safety (policy)
+  |- Approvals
+  |- Tools & Skills
+  |- Web Access
+  |- Files & Storage
+  |- Memory
+  |- Notifications
+  |- Logs & SIEM
+  |- Backup & Restore
+  |- Emergency Stop
+  |- Updates
+  |- Privacy & Data
+  |- Diagnostics & About
+
+Full list of controls (all GUI):
+
+Account & Security
+- username (change; requires password)
+- change password (current password required)
+- set/change PIN; enable/disable PIN quick unlock
+- generate new recovery key (password + PIN)
+- auto-lock timeout (1-60 min)
+- lock when Windows locks (on/off)
+- quick-unlock maximum age (1-72 h; default 24 h)
+- step-up validity (1-15 min)
+- wipe keys on sleep (always / only if BitLocker off)
+- pause missions while Windows is locked (on/off; default off)
+- sign-in history (last 50 attempts)
+- security checks panel: TPM, BitLocker, Windows Sandbox, Defender status, data folder ACL, firewall rules present (with "Repair" action that re-requests admin elevation for firewall rules only)
+- Security Posture page: full posture checks with explanations and Fix buttons (Section 39.10)
+
+Connectors (see Section 8)
+- per connector: status, ON/OFF toggle, "Use in chat", "Use in missions", Connect/Disconnect, scopes, last used, dependent missions
+- "Pause all connectors" master switch
+
+AI Model
+- installed models (name, size, SHA-256, source, quantization, date), add/remove/verify
+- default model per role (fast / standard / reasoning / vision if available)
+- runtime: Built-in (recommended) / Ollama / LM Studio, with hardening status
+- context size, GPU layers, max concurrent requests
+- "Test model" (runs the built-in red-team smoke test and a quality check before a model can be set as default)
+
+Autonomy & Budgets
+- profile: Cautious / Balanced
+- per-task defaults and daily totals: runtime, tokens, tool calls, web requests, files, egress bytes, sub-tasks, depth, concurrent tasks
+- priority: interactive chat over background missions (fixed ON)
+- keep PC awake during mission windows (on/off) and allow wake timers (on/off)
+
+Rules & Safety (policy)
+- data sensitivity defaults per source (e.g. mail = CONFIDENTIAL)
+- context sensitivity rules for web search/fetch (table from Section 13.3; can be made stricter)
+- blocked topics/keywords/patterns for outbound text (DLP patterns; add custom patterns such as account numbers)
+- trigger rules for incoming-mail missions (allowed senders/domains/folders, rate limit)
+- "Show me the rules in plain language" view listing every active rule and whether it is part of the security floor
+- policy change history with diffs; revert button
+
+Approvals
+- which actions need approval (can add more, cannot remove floor items)
+- default expiry
+- require PIN or password for high-risk approvals (password option = stricter)
+
+Tools & Skills
+- enable/disable tools
+- Python analysis (sandbox status; disabled if no sandbox available)
+- skills list: view definition, version history/diff, lineage, automated test results, approve/retire; proposed skills inbox
+- extensions list: signed connectors with capability manifests; enable/disable each (Section 39.4)
+- scripts that call tools: off/on (Section 39.9)
+- sub-agents: max concurrent per task; external agent delegation (off; not available in V1)
+- isolated browser: off/on when available (Section 39.16, later)
+
+Web Access
+- search provider selection and API key (stored in vault)
+- domain allowlist / blocklist editor
+- max page size, timeouts, redirect limit
+- "Fetch any site" mode (off by default; when on, still subject to SSRF rules, DLP and context sensitivity)
+
+Files & Storage
+- storage used, quota
+- data folder location (moves with integrity check; refuses cloud-synced folders)
+- retention per data type
+- quarantine viewer (files that failed checks)
+- Defender scan status for files
+
+Memory
+- enable/disable memory
+- auto-confirm off/on for low-importance preferences (important ones always need confirmation)
+- retention; delete all memory
+
+Notifications
+- Windows toast notifications on/off
+- content level: "Notification only" (default) / "Short summary" (never includes CONFIDENTIAL content)
+- never show on the lock screen (fixed ON for anything above PUBLIC)
+- quiet hours
+- optional email-to-self summary via M365 (off by default; subject to DLP)
+
+Logs & SIEM
+- log file location (default %LOCALAPPDATA%\PersonalAgent\logs\agent-security.jsonl)
+- rotation size/age, retention
+- verify integrity now
+- export (with step-up)
+- optional forwarding: syslog over TLS (RFC 5425) or HTTPS endpoint, with server certificate pinning; test connection
+- format: JSON Lines with OCSF-aligned fields (fixed); CEF output option for forwarding
+
+Backup & Restore
+- backup location, schedule (daily/weekly), number of versions kept
+- "Back up now", "Verify backup" (test decrypt), "Restore" (step-up + password)
+- warning if no backup in the last 14 days
+
+Emergency Stop
+- current state of switches: pause agent, stop all tasks, disable all connectors, disable web access, disable Python sandbox
+- global hotkey for STOP ALL (default Ctrl+Alt+Shift+S; changeable)
+- "Release" requires password
+
+Updates
+- current version; check for updates; signed update notes; "Install" requires step-up
+- auto-check on/off (never auto-installs silently)
+
+Privacy & Data
+- what is stored and where (plain-language table)
+- export my data (encrypted archive, step-up)
+- delete everything (password + typed confirmation; secure wipe of keys; files deleted)
+
+Diagnostics & About
+- component health (gateway, core, model, Outlook worker, parser, sandbox)
+- create a diagnostics bundle (metadata only; secrets and content excluded; preview before saving)
+- licences, version, build hash
+
+5.4 Security floor (cannot be turned off in Settings)
+1. Sign-in with password at cold start; auto-lock exists (timeout adjustable, not disableable).
+2. Vault encryption; secrets never reach the model, sandbox, logs, memory or notifications.
+3. Tool Gateway + Policy Engine on every tool call; default deny.
+4. Sending, forwarding or deleting email, and any external write, always require approval.
+5. Model-generated code runs only in the sandbox; no host shell tool exists.
+6. Untrusted content can never change settings, policies, connectors, memory trust or skills.
+7. File quarantine and scanning for every ingested file.
+8. RESTRICTED data can never be sent out.
+9. Unified security log with integrity chain; actions stop if logging fails.
+10. Kill switch always available in the top bar and tray.
+11. Only pa-gateway may reach the network.
+
+5.5 Rules for changing settings
+- Tightening: immediate; logged.
+- Loosening (e.g. enabling "Fetch any site", raising budgets, enabling Mail.Send capability): password required, a confirmation dialog that states the risk in plain language, 10-second read delay before "Confirm" is enabled, logged with before/after values.
+- The agent has no tool that can read or change settings.
+
+============================================================
+6. SECRETS VAULT (YOUR PASSWORDS AND KEYS)
+============================================================
+
+6.1 Purpose
+Store all of the user's secrets locally and safely:
+- connector credentials (M365 refresh token, web search API key)
+- any passwords, API keys, notes or tokens the user chooses to keep (a personal password manager)
+
+6.2 Storage
+- Each secret item is encrypted with its own random key (AES-256-GCM / XChaCha20-Poly1305); item keys are wrapped with K_secret.
+- Items live inside the SQLCipher database (double encryption).
+- Metadata (title, type, tags, allowed-tool bindings, created/updated, last used) is also encrypted.
+
+6.3 GUI (left pane > Secrets)
+- list with search, tags and types (Password, API key, Token, Note, Card-like data)
+- add/edit with password generator (length, character sets)
+- reveal value: step-up required; value auto-hidden after 20 s; window excluded from screen capture
+- copy value: step-up required; the clipboard entry is excluded from Windows clipboard history/cloud sync and auto-cleared after 30 s (configurable 10-120 s)
+- item history (previous versions, encrypted), restore a version
+- "Used by" bindings: which connector/tool may use this secret (see 6.4)
+- health report: weak, reused, old secrets (computed locally)
+- import from CSV (warned: delete the CSV afterwards; offered secure delete) and export (encrypted archive only, step-up + password)
+
+6.4 How the agent may use a secret
+- The agent never sees secret values. There is no tool that returns a secret to pa-core.
+- A secret can be BOUND to a specific tool/connector (e.g. "Web search API key -> web.search"). The gateway injects it into the outbound request at execution time, in memory only.
+- Unbound user secrets (e.g. a bank password) are never used by the agent at all. There is no "fill this password into a website" capability in V1.
+- Outbound DLP scans every request and response for any stored secret value (via keyed hashes of secrets) and blocks/redacts on match; a match is a security event.
+
+============================================================
+7. TOOL GATEWAY AND POLICY ENGINE
+============================================================
+
+7.1 Tool definition
+Each tool: name, version, connector, input/output schema, argument constraints, side-effect type (NONE / INTERNAL_WRITE / EXTERNAL_WRITE / EGRESS), risk, output sensitivity, rate limit, timeout, approval rule, bound secret (if any), definition hash (pinned).
+
+V1 tools:
+- outlook_local.list_folders, outlook_local.search, outlook_local.get_message, outlook_local.get_attachment, outlook_local.calendar_read
+- outlook_local.create_draft (optional, off by default)
+- m365.search_mail, m365.get_message, m365.get_attachment, m365.calendar_read
+- m365.create_draft (optional, off by default)
+- m365.send_mail (optional capability, off by default; ALWAYS requires approval)
+- web.search, web.fetch
+- files.read, files.write (My Files; by file ID)
+- python.run (sandbox only)
+- notify.user (Windows toast; content-level rules apply)
+
+7.2 Invocation sequence (every call; no bypass)
+
+  kill switch check
+  -> schema validation
+  -> caller identity (pa-core instance + task/mission IDs from gateway's own records)
+  -> connector effective state (Section 8.2), incl. chat vs mission flag
+  -> resource ownership / scope (file IDs, folder allowlists)
+  -> argument constraints (recipients, domains, sizes)
+  -> data-flow check against context sensitivity (Section 13)
+  -> policy decision (default deny)
+  -> budget check
+  -> DLP / egress check
+  -> approval if required (payload-hash bound)
+  -> policy re-check immediately before execution
+  -> audit "about to execute" (must succeed)
+  -> execute (egress filter / Outlook worker / sandbox)
+  -> validate + classify result
+  -> audit "result"
+  -> return to pa-core labelled UNTRUSTED DATA
+
+7.3 Policy engine
+- Rules as code (embedded OPA/Rego or Cedar, or a typed rule module), versioned; defaults ship with the app and are unit tested.
+- User edits in Settings produce rule overlays that can only tighten floor rules.
+- Decisions: ALLOW / DENY / REQUIRE_APPROVAL / SANDBOX. Conflict: DENY > REQUIRE_APPROVAL > SANDBOX > ALLOW.
+- Engine failure -> DENY.
+- Every decision logged with rule version.
+
+============================================================
+8. CONNECTOR FRAMEWORK AND CONNECTOR SETTINGS
+============================================================
+
+8.1 V1 connectors
+- outlook_local  (classic Outlook on this PC)
+- m365           (Microsoft 365 / Exchange Online via Microsoft Graph)
+- web            (web search + fetch)
+Future connectors (e.g. ChiRAG, IMAP, calendars, other APIs) plug into the same framework with their own adapter, tool definitions and tests. No framework changes should be needed.
+
+8.2 Effective state (computed by the gateway on every call)
+
+  USABLE = connector toggle ON
+       AND NOT "Pause all connectors"
+       AND NOT agent paused / emergency stop
+       AND connection valid (token present / Outlook available)
+       AND context flag allows it:
+             chat      -> "Use in chat" ticked
+             mission   -> "Use in missions" ticked
+
+8.3 Behavior when switched OFF (Settings > Connectors)
+1. Saved and logged before the toggle shows "Off".
+2. New calls denied within 2 seconds (single PC target).
+3. In-flight calls cancelled; late results discarded, never added to context or memory.
+4. Tasks needing it -> WAITING_FOR_RESOURCE ("turned off by you"); no retry storms; mission shows a warning.
+5. The agent may not reach the same data another way (e.g. with m365 OFF, web.fetch to outlook.office.com / graph.microsoft.com is denied).
+
+"Disconnect":
+- everything above, plus revoke/delete stored tokens (M365: delete refresh token; call Microsoft sign-out/revoke endpoint where available), purge connector caches.
+
+Switch ON again:
+- if still connected: immediate
+- if disconnected: re-connect flow with step-up
+- suspended missions resume only when the user clicks "Resume"
+
+============================================================
+9. LOCAL OUTLOOK CONNECTOR
+============================================================
+
+9.1 Scope
+Read the user's classic Outlook for Windows (including PST archives and cached OST data) on the same PC. New Outlook for Windows does not support the Object Model; the UI detects this and suggests the M365 connector instead.
+
+9.2 Design
+- pa-gateway spawns pa-outlook-worker.exe on demand, as the same user, at medium or lower integrity where Outlook allows it, with firewall outbound blocked.
+- The worker exposes a fixed set of read operations over a private pipe to the gateway only. It never receives prompts or model output.
+- The worker uses the Outlook Object Model via COM, read-only. It must NOT suppress, bypass or auto-click the Outlook Object Model Guard or any security prompt. If Outlook shows a security prompt (e.g. antivirus not reported healthy), the operation waits for the user or fails with a clear message.
+- The worker does not start Outlook silently if it is closed unless the user enabled "Start Outlook when needed" (off by default); otherwise the task waits ("Outlook is closed").
+
+9.3 Operations
+Read-only (V1): list_folders, search (query, folder scope, date range, max results), get_message (plain text body; HTML stripped; images not loaded), get_attachment (streamed straight into quarantine), calendar_read.
+Optional (off by default): create_draft (marked "AI Draft"; recipients limited to the original thread participants unless approved).
+Not supported: send, forward, delete, move, rules, contacts export, account settings.
+
+9.4 Scope controls (Settings > Connectors > Local Outlook)
+- folder allowlist/denylist (defaults exclude Deleted Items, Junk, and any folder the user marks Private)
+- include PST archives (per file, on/off)
+- max items per request, max body size, max attachment size, date range limit
+- items with Microsoft sensitivity labels at the highest level: excluded or metadata-only (default metadata-only)
+
+9.5 Data handling
+- results are UNTRUSTED, source=outlook_local, sensitivity from label else CONFIDENTIAL
+- no persistent cache of message bodies outside the encrypted database; transient buffers in memory only
+
+============================================================
+10. MICROSOFT 365 / EXCHANGE ONLINE CONNECTOR
+============================================================
+
+10.1 Authentication
+- MSAL public-client flow: authorization code + PKCE in the system browser (not an embedded webview), redirect to a loopback or custom-scheme URI handled by the gateway.
+- Uses an Entra ID app registration: either the user's organization's registration (preferred when the organization requires admin consent) or one the user creates. The Settings screen guides through entering the Client ID and Tenant ID; no client secret is used (public client).
+- Refresh token stored only in the vault; access tokens in gateway memory only.
+
+10.2 Scopes (incremental; least privilege)
+- Default: User.Read, Mail.Read, Calendars.Read, offline_access
+- Requested only when the user enables the feature in Settings:
+    - Mail.ReadWrite (for drafts)
+    - Mail.Send (for approved sending; each send always requires approval)
+- The granted scopes are shown in plain language in Settings.
+
+10.3 Operations
+- search_mail, get_message, get_attachment (into quarantine), calendar_read
+- create_draft (optional): marked "AI Draft" (category + visible note), recipients limited to the thread unless approved
+- send_mail (optional): approval required every time, payload-hash bound, idempotent (Section 17.3)
+- no delete / move / rules / forwarding in V1
+
+10.4 Data handling
+- untrusted; sensitivity from Microsoft Purview labels when present, else CONFIDENTIAL
+- Graph endpoints are on the egress allowlist only while the connector is ON
+
+============================================================
+11. WEB SEARCH AND FETCH CONNECTOR
+============================================================
+
+11.1 Search
+- provider selectable in Settings > Web Access (e.g. Brave Search API, Exa API, Bing Web Search, or a self-hosted SearXNG URL); API key stored in the vault and bound to web.search
+- the query text is EGRESS: it is checked against context sensitivity and DLP before sending
+
+11.2 Fetch (egress filter inside pa-gateway)
+- HTTPS only by default
+- domain allowlist by default; "Fetch any site" mode optional (off)
+- SSRF protection: resolve DNS in the gateway; block private, loopback, link-local, CGNAT, multicast and metadata ranges (IPv4/IPv6, incl. IPv4-mapped); pin the resolved IP; re-check every redirect (max 5); block non-standard ports unless allowlisted; block file://, ftp://, data: etc.
+- size limit (default 5 MB), timeout (default 20 s), content-type allowlist (HTML, text, PDF, JSON)
+- no JavaScript execution; HTML converted to text by the gateway; PDFs go to the file pipeline
+- cookies are never sent; no logged-in browsing; user browser profiles are never read
+- responses are UNTRUSTED; hidden text, comments, metadata labelled
+
+============================================================
+12. PROMPT INJECTION DEFENSE
+============================================================
+
+All external content is untrusted: mail (Outlook, M365), calendar invites, web pages, search results, files, OCR text, sandbox output, tool results.
+
+- Trusted instructions (system prompt, user settings, policies) are kept separate from untrusted data; untrusted data is placed only in delimited data sections with source and sensitivity labels.
+- Injection detection (heuristics + optional small classifier) raises a flag and can lower the task's rights, but is never the only defense; the gateway/policy prevent unauthorized actions regardless.
+- Tasks triggered by incoming mail from outside run with reduced rights (Section 16.3).
+
+============================================================
+13. DATA SENSITIVITY AND DATA-FLOW CONTROL
+============================================================
+
+13.1 Levels: PUBLIC < INTERNAL < CONFIDENTIAL < RESTRICTED
+
+Defaults (editable to stricter in Settings > Rules & Safety):
+- Outlook / M365 mail and calendar: CONFIDENTIAL (or the item's sensitivity label if higher)
+- My Files: INTERNAL (user can label any file higher)
+- Secrets: RESTRICTED (never enter context anyway)
+- Web content: PUBLIC
+
+13.2 Propagation
+- Derived items (summaries, drafts, memories, reports, sandbox output) inherit the highest input level.
+- The model cannot lower a label; only the user can, with step-up; logged.
+
+13.3 Context high-water mark
+Each task/chat tracks the highest sensitivity that has entered its context.
+
+  high-water mark | web.search / web.fetch                   | external write (send mail, etc.)
+  ----------------+------------------------------------------+-------------------------------------
+  PUBLIC          | allowed (allowlists apply)               | approval
+  INTERNAL        | allowed                                  | approval
+  CONFIDENTIAL    | approval showing exact query/URL         | approval with password step-up
+  RESTRICTED      | denied                                   | denied
+
+- The planner may start a clean sub-task for public web research; the gateway passes it only approved public inputs.
+
+============================================================
+14. EGRESS AND DLP
+============================================================
+
+14.1 Egress channels (all checked)
+web search queries, fetched URLs, M365 send/draft recipients and content, notifications (toasts, email-to-self), log forwarding to SIEM (metadata only), update checks (no user data), model downloads (no user data), file names/metadata sent anywhere.
+
+14.2 Enforcement layers
+1. OS: Windows Defender Firewall per-program rules - outbound blocked for pa-core, pa-llm, pa-outlook-worker, pa-parser and the sandbox; only pa-gateway (and the signed updater) may connect out. The Security checks panel verifies the rules at every start and blocks startup of the agent runtime if they are missing (offers "Repair").
+2. Application: the gateway egress filter (allowlists, SSRF rules, sizes, rate limits).
+3. Content: DLP patterns (built-in: secret values from the vault, API key formats, card numbers, IBAN/account formats, national ID formats configurable by the user) + context sensitivity rules.
+4. Volume: egress bytes/records budgets per task and per day.
+
+14.3 UI rendering
+- Chat never auto-loads remote images; links require a click; the WebView cannot navigate to remote pages.
+
+============================================================
+15. FILE SECURITY PIPELINE
+============================================================
+
+Sources: user upload, Outlook attachment, M365 attachment, web downloads (PDF), sandbox output, agent output.
+
+  ingest -> QUARANTINE (encrypted, not usable)
+         -> validate (type sniffing vs extension, size, archive depth/ratio/count limits)
+         -> Microsoft Defender scan (via AMSI / MpCmdRun custom scan) + macro/active-content detection
+         -> safe extraction / disarm (text + page images; macros and embedded objects removed)
+         -> classify (inherit source label)
+         -> parse in pa-parser (AppContainer, no network, time/memory limits)
+         -> available to the agent as UNTRUSTED data
+
+- Failing files stay in quarantine (Settings > Files & Storage > Quarantine), with reason; the user can delete them.
+- Hidden content (white/tiny text, off-page text, comments, metadata, alt text, OCR text in images) is extracted but labelled.
+- Files are never opened with their default Windows handler by the app.
+
+============================================================
+16. MISSIONS, TRIGGERS AND SCHEDULING
+============================================================
+
+16.1 Missions
+Fields: objective, schedule/trigger (with timezone), allowed connectors/tools, allowed in overnight runs, budgets, model (optional pin), output format, notification level, missed-run policy (SKIP / RUN_ONCE default / RUN_ALL), resource-wait timeout.
+Lifecycle: DRAFT, ACTIVE, PAUSED, SUSPENDED, WAITING_APPROVAL, COMPLETED, FAILED, CANCELLED.
+Only the user creates/activates/widens/resumes missions (agent can propose).
+
+16.2 Running while away
+- pa-gateway and pa-core start at Windows sign-in via a per-user scheduled task and keep running with only the tray icon when the window is closed.
+- Missions run while the user is signed in to Windows, including while Windows is locked (unless "Pause missions while Windows is locked" is ON).
+- Missions do not run while the PC is off, hibernated, or signed out; they catch up per missed-run policy at the next password sign-in.
+- Optional: keep awake during mission windows; wake timers for scheduled missions (requires the user to be signed in; if keys were wiped the run waits for sign-in).
+
+16.3 Triggers
+Types and trust:
+- USER (from chat/UI): full rights within policy
+- SCHEDULE: the mission's allowed tools
+- LOCAL_EVENT (new file in My Files): mission tools
+- EXTERNAL_EVENT (new mail): reduced rights - read-only, no egress, no drafts to outside recipients, memory writes at most INFERRED
+Controls: sender/domain/folder filters, rate limit (default 20 runs/hour; excess batched), and each triggered run consumes budget.
+
+16.4 Scheduling details
+- IANA timezone, DST-safe
+- catch-up runs jittered and rate-limited
+- single scheduler instance (lock file + database lease)
+
+============================================================
+17. TASKS, DURABILITY AND IDEMPOTENCY
+============================================================
+
+17.1 Task states
+CREATED, PLANNING, QUEUED, RUNNING, WAITING_FOR_RESOURCE, WAITING_FOR_APPROVAL, SUSPENDED, VERIFYING, OUTCOME_UNKNOWN, COMPLETED, FAILED, CANCELLED, TIMED_OUT.
+
+17.2 Durability
+- SQLite (WAL mode, inside SQLCipher) is the system of record for tasks and queue; state persisted transactionally on every transition.
+- After crash/restart/sign-in, recoverable tasks resume.
+
+17.3 Idempotency
+- Every side effect has key = hash(task_id + action_id + payload_hash); outbox pattern (save intent -> act -> record outcome).
+- M365 send: set a unique internet message header containing the key; after a crash, search Sent Items for it.
+- If the outcome cannot be determined: OUTCOME_UNKNOWN; shown on Home; never retried automatically.
+
+============================================================
+18. BUDGETS
+============================================================
+
+Per task and per day (user-level), editable in Settings > Autonomy & Budgets:
+runtime, LLM tokens, GPU time, tool calls, web requests, files processed, output size, external writes, egress bytes/records, retries, sub-tasks, depth (default 3), concurrent tasks (default 3).
+
+On exhaustion: stop -> save state -> report (Home + log).
+Interactive chat has priority over background missions on the local model.
+
+Defaults (Cautious profile):
+- per task: 30 min, 200k tokens, 100 tool calls, 30 web requests, 20 files, 0 external writes without approval, 100 KB egress
+- per day: 4 h runtime, 2M tokens, 150 web requests, 1 MB egress
+
+============================================================
+19. SANDBOXED CODE EXECUTION
+============================================================
+
+19.1 Preferred: Windows Sandbox
+- available on Windows 11 Pro/Enterprise/Education with virtualization enabled
+- disposable Hyper-V-isolated environment launched from a generated .wsb configuration:
+    - networking disabled
+    - vGPU disabled, audio/video input disabled, printer and clipboard redirection disabled
+    - one mapped folder read-only (inputs copied in by the gateway, by file ID) and one mapped output folder
+    - a pinned, signed portable Python with approved packages
+    - run command executes the script; environment is destroyed after completion
+- time limit enforced by the gateway (terminate sandbox)
+
+19.2 Fallback: AppContainer + Job Object
+- used if Windows Sandbox is unavailable (e.g. Windows 11 Home)
+- Python runs in an AppContainer with NO capabilities (no network, no user folders), low integrity, inside a Job Object limiting CPU, memory, process count, and wall time; working directory is a per-run folder with an ACL for that AppContainer only; firewall outbound blocked
+- the UI labels this mode "Standard isolation" and Windows Sandbox as "Strong isolation"
+
+19.3 Neither available
+- python.run is disabled; Settings explains how to enable Windows Sandbox.
+
+19.4 Rules
+- only files explicitly granted for the task are copied in
+- all outputs are untrusted; files go through the file pipeline; outputs inherit the highest input sensitivity
+- no secrets, tokens, vault paths or user profile paths are ever visible inside the sandbox
+
+============================================================
+20. LOCAL LLM RUNTIME
+============================================================
+
+20.1 Built-in runtime (default)
+- bundled llama.cpp server, started by pa-gateway with: --host 127.0.0.1, random port, --api-key <random per launch>, no model download capability at runtime
+- firewall outbound blocked for the process
+- GGUF model files only; SHA-256 verified at load; model registry records name, source URL, license, quantization, size, hash, date
+
+20.2 Model management (Settings > AI Model)
+- curated catalog with hashes; download via the gateway over HTTPS from allowlisted hosts; verify; then "Test model" (red-team smoke test + quality checks) before it can become default
+- manual import of a GGUF file (hash recorded; warning shown)
+
+20.3 Routing
+- the LLM Router in pa-core picks the model by role (fast / standard / reasoning / vision) per Settings; the model never selects endpoints
+- missions may pin a model; a model change requires re-test before pinned missions use it
+
+20.4 Optional external runtimes (Ollama / LM Studio)
+- allowed only if: bound to 127.0.0.1 only, browser origins restricted (e.g. OLLAMA_ORIGINS not set to "*"), and the app's health check confirms it is not reachable from the network
+- the UI marks these as "Reduced isolation" because they are separate programs that do not use the app's per-launch API key and any local process can call them
+- the app never lets these runtimes pull models automatically
+
+20.5 Privacy
+- prompt/response logging in the runtime is disabled; transcripts needed for troubleshooting are stored only in the encrypted Transcript Store (Section 25.5)
+- no cross-conversation KV cache persistence to disk
+
+============================================================
+21. MEMORY
+============================================================
+
+Types: working, episodic, semantic, procedural, preferences, project.
+Record fields: id, type, content, source, provenance (message/file IDs), trust level, confidence, sensitivity, created, last verified, status, expiry.
+Storage: inside the encrypted database; embeddings also encrypted.
+
+Trust levels:
+- TRUSTED: what the user states in the UI
+- VERIFIED: repeated user-initiated actions, or user-confirmed
+- INFERRED: model inference (shown in "Proposed memories")
+- UNTRUSTED: mail, web, files, API content
+
+Rules:
+- only TRUSTED/VERIFIED may change preferences automatically; agent-initiated actions never count as evidence
+- memory can never change settings, policies, connectors, skills or security
+- at use time, memories derived from a source the user has since deleted or disconnected are hidden
+- deleting a source cascades to derived memories and embeddings
+
+============================================================
+22. SKILLS
+============================================================
+
+- reusable workflows with declared tools, connectors, risk, max steps, timeout, schemas
+- the agent may propose; the user reviews the full definition and diff; approval requires step-up (password for skills using write/egress tools)
+- skills are scanned for embedded instructions aimed at the model before review
+- versioned, signed locally (HMAC with a vault key), audited on every run
+- a skill cannot declare permissions beyond current policy; skills whose connectors are OFF cannot run
+
+============================================================
+23. APPROVALS
+============================================================
+
+- Shown in Approvals with exact payload, sensitivity, destination, risk, origin, expiry (default 24 h; high risk 1 h).
+- Bound to SHA-256 of the exact payload + destination; any change voids it; single-use.
+- High-risk approvals require step-up (PIN by default; "password only" option in Settings).
+- Policy, kill switch and connector state are re-checked immediately before execution.
+- Approvals are never granted from a notification, email or link; only inside the unlocked app.
+- Fatigue controls: rate limit on approval requests; similar low-risk requests batched; a warning if approvals are being accepted in under 2 seconds repeatedly.
+
+Always need approval (floor): sending email, any external write, fetching/searching while the context is CONFIDENTIAL, running a newly proposed skill for the first time, enabling a mission that uses write tools.
+
+============================================================
+24. KILL SWITCH (EMERGENCY STOP)
+============================================================
+
+Controls: top bar "STOP ALL", tray menu, global hotkey, Settings > Emergency Stop.
+Levels: pause agent; stop all tasks; disable all connectors; disable web access; disable sandbox; STOP ALL (everything).
+
+Semantics:
+- state stored in the database and read by pa-gateway before every step and tool call
+- new tool calls blocked within 2 seconds
+- in-flight calls cancelled; late results discarded
+- sandbox terminated; Outlook worker terminated
+- scheduled runs do not fire; queued tasks held (not deleted)
+- pending approvals voided
+- STOP ALL additionally terminates pa-core and pa-llm
+- release requires the password; logged
+
+============================================================
+25. UNIFIED SECURITY LOG
+============================================================
+
+25.1 One file
+- All security-relevant events from all components are written by the single Audit Writer inside pa-gateway to ONE active file:
+    %LOCALAPPDATA%\PersonalAgent\logs\agent-security.jsonl   (location changeable in Settings)
+- JSON Lines, UTF-8, versioned schema with OCSF-aligned field names.
+- Rotation by size/age (default 100 MB or 7 days); the active path never changes; rotated segments are sealed and kept per retention (default 1 year).
+
+25.2 Integrity
+- each event: sequence number, prev_hash, and an HMAC-SHA-256 chain value keyed with K_log (so the chain cannot be recomputed without the vault key)
+- each rotated segment ends with a seal record
+- "Verify integrity" in Settings and on every start; failures raise a security event on Home
+- log folder ACL: current user only; files opened append-only by the writer
+
+25.3 Fail closed
+- consequential actions write "about to execute" first; if the write fails, the action does not run
+- bounded durable spool for short disk hiccups
+
+25.4 Content minimization
+- metadata only: IDs, hashes, sizes, sensitivity, decisions, connectors, tools, results
+- never: secret values, passwords, PINs, recovery keys, tokens, email bodies, file contents, full prompts
+- redaction filter + secret scanner (keyed hashes of vault secrets) before write; failures become "[REDACTED:ERROR]", the event is still written
+
+25.5 Transcript Store
+- full prompts/completions/tool payloads (for "why did the agent do this?") are kept in the encrypted database, referenced by transcript_id in the log
+- viewing requires step-up; retention default 30 days
+
+25.6 SIEM (optional)
+- off by default; Settings > Logs & SIEM: syslog-TLS (RFC 5425) or HTTPS forwarding with certificate pinning, test button, forwarding lag indicator
+- any standard shipper (Splunk UF, Elastic Agent, Fluent Bit, Wazuh, Sentinel AMA) can also tail the file path; a read-only ACL entry for a chosen local account can be added through the GUI (step-up)
+
+25.7 Events logged
+sign-in success/failure, quick unlock, step-up, recovery use, password/PIN/recovery key changes, lock/unlock, settings changes (before/after), connector ON/OFF/connect/disconnect/scopes, every policy decision, every tool call (about-to-execute + result), egress with destination/size/DLP result, approvals lifecycle, kill switch activations/releases, mission/task transitions, file ingest/scan/quarantine/delete, secret created/revealed/copied/used-by-tool (never the value), memory lifecycle, skill lifecycle, sandbox runs/violations, model load/verify/change, backup/restore, updates, log rotation/seal/verify results, firewall/security-check results.
+
+============================================================
+26. NOTIFICATIONS
+============================================================
+
+- Windows toast notifications; content level "Notification only" by default ("1 approval waiting")
+- never shown on the lock screen for content above PUBLIC; the app sets toast privacy so previews are hidden
+- no approval actions inside toasts; clicking opens the app, which requires unlock
+- optional email-to-self through M365 is DLP-checked and limited to "Notification only" unless the user chooses "Short summary" (never includes CONFIDENTIAL content)
+- quiet hours; rate limit
+
+============================================================
+27. BACKUP AND RESTORE
+============================================================
+
+- Backup file (.pabk): encrypted archive of the database, files, settings, skills, policies, sealed logs (optional)
+- Encrypted with a random backup key (AES-256-GCM); the backup key is wrapped with Argon2id(password) - restore needs the password used at backup time
+- Stored in a user-chosen folder (external drive recommended; cloud folders allowed for BACKUPS only, since they are encrypted, with a warning)
+- Schedule daily/weekly; versions kept (default 7); "Verify backup" performs a full test decrypt and integrity check
+- Restore: step-up + password; restoring onto a new PC requires setting a new PIN and generates a new recovery key (TPM-bound parts are not portable by design)
+- Secrets are never exported in plaintext
+
+============================================================
+28. RETENTION AND DELETION
+============================================================
+
+Configurable retention: chats, Transcript Store, task history, mission outputs, files, artifacts, memories, quarantine, logs, backups.
+- temporary/sandbox workspaces deleted after each run
+- deleting a file or disconnecting a connector (with "also delete data") cascades to derived artifacts, embeddings and memories
+- "Delete everything": password + typed confirmation; wipes keys first (crypto-erase), then deletes files
+
+============================================================
+29. UPDATES AND SUPPLY CHAIN
+============================================================
+
+- MSI and update packages Authenticode-signed; update manifest signed with a separate key pinned in the app
+- updates are offered, never silently installed; install requires step-up
+- rollback to previous version supported
+- pinned dependencies, SBOM per release, dependency vulnerability scanning, SAST, secret scanning in CI
+- bundled Python runtime and llama.cpp pinned and hash-verified
+- the app never downloads and executes code at runtime except signed updates
+
+============================================================
+30. RESILIENCE AND DIAGNOSTICS
+============================================================
+
+Handles: model runtime crash (restart with backoff), Outlook closed/busy, M365/Graph outage or throttling (backoff, circuit breaker), web down, disk full (fail closed for consequential actions), crash of pa-core (restart; tasks resume), unexpected shutdown (resume after next sign-in).
+
+Diagnostics:
+- component health panel
+- metrics shown in the UI: tasks, queue, latencies, tokens, denials, approvals, egress volume, sandbox runs, log verification status
+- diagnostics bundle: metadata only, previewed before saving
+
+============================================================
+31. SECURITY TESTING
+============================================================
+
+Automated tests (CI) for:
+
+Authentication and vault
+- wrong password/PIN/recovery lockouts and delays
+- vault header tampering detected (AEAD failure -> refuse)
+- copy of the data folder to another PC cannot be opened with PIN + recovery key; only with the password
+- forgot-password flow requires BOTH PIN (TPM) and recovery key; rotates recovery key afterwards
+- keys wiped on sign-out/hibernate; missions pause
+- secrets never appear in logs, crash output, IPC traces, model context or sandbox (canary secrets)
+- clipboard auto-clear and history exclusion
+
+Process and OS isolation
+- pa-core, pa-llm, pa-outlook-worker, pa-parser, sandbox cannot open outbound connections (firewall test)
+- named pipes reject other users and unsigned client processes
+- pa-llm rejects requests without the per-launch API key
+- data folder ACL denies other local users
+
+Connectors
+- OFF toggle blocks calls within 2 s in chat and missions; late results discarded
+- no alternate-path access (web.fetch to Graph/OWA when m365 is OFF)
+- Outlook worker has no send/delete capability; does not bypass Object Model Guard
+- M365 requests only enabled scopes
+
+Prompt injection and exfiltration
+- malicious emails (Outlook and M365), calendar invites, web pages, PDFs with hidden text, OCR text
+- confidential data in search queries, URLs, notifications, draft recipients, file names
+- chained allowed actions
+
+Files
+- malware (EICAR), macro documents, decompression bombs, malformed PDFs, masquerading executables, HTML/SVG preview scripts
+
+Agent
+- infinite loops, sub-task explosions, budget exhaustion, malicious skill proposals, memory poisoning via induced repetition, trigger flooding by email
+
+Web
+- SSRF (private IPs, IPv6, redirects, DNS rebinding), oversized responses, non-HTTPS
+
+Audit
+- "about to execute" precedes every action; action blocked if log write fails
+- chain verification detects edits, deletions, reordering
+
+Kill switch
+- each level enforced within 2 s with defined in-flight behavior; release needs password
+
+Harness hardening (Section 39)
+- a test web page tries to reach pa-llm (and any external runtime) from a browser: rejected; key-guess lockout rotates port and key
+- DNS rebinding against pa-llm rejected
+- URI scheme and notification links with endpoint-like parameters change nothing and send nothing
+- pa-core is denied settings, secrets, approvals.approve and kill-switch methods
+- skill files containing code, commands or download links are rejected; unsigned or changed connectors fail to load
+- nothing reaches pa-llm without a session-log entry; replay reproduces the context
+- skill proposals from runs that touched untrusted instructions are blocked; unsafe versions fail automated tests
+- injections designed to survive summarizing do not become instructions; limits persist after summarizing
+- sub-agents cannot exceed parent rights; child reads raise the parent's sensitivity
+- scripted tool calls go through the full gateway sequence and budgets
+- a failed update rolls back automatically; tasks are neither lost nor duplicated
+- history search excludes deleted items
+
+============================================================
+32. RED-TEAM SUITE
+============================================================
+
+- adversarial corpus stored in the repo (/security/redteam)
+- each attack run N=20 times per release and per model change
+- release FAILS if in any run an unauthorized action executed, protected data reached an unauthorized destination, or settings/memory trust changed from untrusted content
+- model-level "attack success" rate tracked as a metric; the deterministic outcome is the gate
+- also runs as "Test model" in Settings (a short subset) before a new model can become default
+
+============================================================
+33. DEVELOPMENT PHASES (SECURITY FIRST)
+============================================================
+
+PHASE 1 - Security spine
+- installer (signed MSI), data folder ACLs, firewall rules
+- pa-gateway: vault (Argon2id, TPM PIN, recovery key), sign-in/lock/step-up, unified log, policy engine, kill switch
+- named-pipe IPC with process verification
+- single UI shell: left pane + Settings button + first-run wizard + Account & Security + Emergency Stop + Logs
+
+PHASE 2 - Secrets and files
+- Secrets vault UI
+- file pipeline (quarantine, Defender scan, pa-parser)
+- My Files
+
+PHASE 3 - Agent core
+- pa-llm (llama.cpp) + model management + Test model
+- pa-core: agent loop, context manager with sensitivity tracking, memory, tasks (durable), approvals, budgets
+- sandbox (Windows Sandbox + AppContainer fallback)
+
+PHASE 4 - Connectors
+- connector framework + Settings > Connectors
+- web search + fetch (egress filter, SSRF)
+- Microsoft 365 (MSAL, Graph)
+- Local Outlook (worker)
+
+PHASE 5 - Autonomy and learning
+- missions, scheduler, triggers, catch-up
+- skills, preference learning
+- notifications, Home "While you were away"
+
+PHASE 6 - Hardening
+- red-team suite, penetration test of IPC/firewall/vault, crash/recovery tests, backup/restore tests, update signing, accessibility review
+
+Security tests are written with each component, not deferred to Phase 6.
+
+v1.1 placement of Section 39 items:
+- Phase 1: 39.1, 39.2, 39.3, 39.5, 39.10, 39.11
+- Phase 3: 39.7, 39.8, 39.9
+- Phase 4: 39.4 (connector packaging and manifests)
+- Phase 5: 39.6, 39.12, 39.13, 39.14, 39.15
+- After V1: 39.16, 39.17
+
+============================================================
+34. ACCEPTANCE CRITERIA
+============================================================
+
+V1 is complete only when:
+
+Sign-in and secrets
+1. First-run wizard sets username, password, PIN and recovery key entirely through the GUI.
+2. Cold start requires the password; quick unlock uses the PIN; auto-lock works.
+3. Forgot password works only with PIN + recovery key on this PC, and rotates the recovery key.
+4. Copied data folder cannot be opened without the password.
+5. Secrets vault stores, reveals (step-up), copies (auto-clear) and binds secrets; the agent never sees values.
+
+Single UI
+6. One window; left pane with everyday areas; every setting reachable under the Settings button; no file editing needed.
+7. Security floor items cannot be disabled; loosening requires password and is logged.
+
+Isolation
+8. Only pa-gateway can reach the network (verified by test and by the Security checks panel).
+9. Model-written code runs only in Windows Sandbox or AppContainer; otherwise disabled.
+10. pa-llm is loopback-only and API-key protected.
+
+Connectors
+11. Local Outlook read/search works read-only without bypassing Outlook security prompts.
+12. M365 read/search works with least-privilege scopes; send (if enabled) always requires approval.
+13. Web search/fetch works through the egress filter with SSRF protection.
+14. Turning any connector off takes effect within 2 s in chat and missions; Disconnect revokes tokens.
+
+Agent safety
+15. Missions run while the window is closed and Windows is locked; pause on sign-out/hibernate and catch up.
+16. Tool authorization is deterministic, default deny, re-checked at execution.
+17. Prompt injection cannot grant rights, change settings or cause sends.
+18. Context sensitivity rules govern search/fetch/send.
+19. Approvals are payload-bound and step-up protected.
+20. Budgets stop runaway tasks; OUTCOME_UNKNOWN is never auto-retried.
+21. Kill switch works within 2 s, independent of the model.
+
+Audit and recovery
+22. All security events of the app are in one HMAC-chained JSONL log file; integrity verification works; no secrets or content in it.
+23. Optional SIEM forwarding works.
+24. Encrypted backup and restore (including to a new PC) tested.
+25. Red-team suite passes the deterministic gate.
+
+Harness hardening (v1.1)
+26. pa-llm rejects browser-origin requests, wrong Host headers and wrong keys; brute force triggers rotation (39.1).
+27. No link or URI can change settings or send tokens (39.2).
+28. pa-core cannot call any settings, secrets, approval or kill-switch method (39.3).
+29. Skills are declarative; connectors are signed and manifest-enforced; no marketplace (39.4).
+30. The model's context is built only from the session log and can be replayed (39.5).
+31. Skill versions pass lineage and automated tests before activation; no in-place self-modification (39.6).
+32. Summaries keep sensitivity, trust labels and limits (39.7).
+33. Updates snapshot and roll back automatically on failure (39.11).
+
+============================================================
+35. IMPLEMENTATION RULES FOR CLAUDE/CODEX
+============================================================
+
+1. Build the security spine first; keep the app runnable at every milestone.
+2. Use vetted crypto libraries only; never implement primitives.
+3. Never log, print or send secrets, PINs, passwords, recovery keys or tokens.
+4. Never give pa-core network access or vault access.
+5. Never add a shell/command tool for the model.
+6. Never bypass Outlook security prompts.
+7. Never open a TCP listener except pa-llm on loopback with an API key.
+8. Every setting has a GUI control; defaults live in code, user values in the encrypted database.
+9. Default deny for tools, connectors, domains.
+10. Fail closed when policy, logging, vault or isolation checks fail.
+11. Tests for every security-sensitive component in the same change.
+12. Mock adapters only in test builds; release builds cannot load them.
+13. No telemetry leaves the PC.
+14. Keep connectors pluggable so ChiRAG and others can be added without framework changes.
+15. Never trust a request because it comes from 127.0.0.1.
+16. Never accept settings, endpoints or actions from links or notifications.
+17. Give each IPC client only the methods it needs.
+18. Never execute code supplied by a skill.
+19. Never send anything to the model that was not logged first.
+20. Never let a skill, summary or sub-agent widen rights or drop limits.
+
+============================================================
+36. PROJECT STRUCTURE
+============================================================
+
+/app
+  /ui                  (Tauri + React: shell, left pane, pages, Settings)
+  /gateway             (vault, auth, policy, tools, connectors, egress, dlp, approvals,
+                        budgets, killswitch, audit, backup, ipc)
+  /core                (agent loop, context, memory, skills, missions, tasks, scheduler, llm router)
+  /workers
+    /outlook           (pa-outlook-worker)
+    /parser            (pa-parser)
+    /sandbox           (Windows Sandbox config + AppContainer launcher)
+  /llm-runtime         (llama.cpp packaging, model registry)
+  /sessionlog          (session event log, context projection, replay)
+  /extensions          (connector package signing/manifests, skill manifest validator)
+  /posture             (security posture checks)
+/installer             (WiX/MSI, firewall rules, scheduled task, ACLs)
+/security
+  /policies            (default rules + tests)
+  /redteam
+  /test-corpus
+/docs
+  architecture, threat-model, user-guide ("How your data is protected"), recovery-guide, log-schema
+
+============================================================
+37. ASSUMPTIONS AND OPEN ITEMS
+============================================================
+
+Assumptions made in this spec (change them if they are wrong):
+1. One user per Windows account; no sharing of the agent between people.
+2. The PC has TPM 2.0 enabled (Windows 11 requirement) and ideally BitLocker on.
+3. "Strong isolation" for Python needs Windows 11 Pro/Enterprise/Education; on Home the AppContainer fallback is used.
+4. Microsoft 365 access may require the organization's IT to approve the app registration (admin consent) and may be subject to organization policies (Conditional Access, device compliance). The connector shows the exact Microsoft error if blocked.
+5. Automating classic Outlook may be restricted by the organization's endpoint policies; the app does not work around such restrictions.
+6. Local model quality depends on hardware; a GPU with >= 8 GB VRAM or a recent NPU/Apple-class performance is recommended for comfortable speed.
+7. Overnight missions require the PC to stay on and the user to stay signed in to Windows (locked is fine).
+8. ChiRAG and other connectors are out of scope for V1 and will be added through the connector framework.
+
+============================================================
+38. DESIGN PHILOSOPHY
+============================================================
+
+LOCAL, and locked down.
+AUTONOMOUS, but never unaccountable.
+SIMPLE to operate (one window, one Settings button), but not simple to break.
+YOUR secrets stay on YOUR PC, encrypted, and the AI never sees them.
+
+        LLM                 = proposes
+        GATEWAY + POLICY    = decides and executes
+        WINDOWS (firewall,  = enforces the walls
+        processes, TPM)
+        UNIFIED LOG         = remembers what happened
+        YOU                 = final say, one STOP button away
+
+============================================================
+39. AGENT HARNESS HARDENING (NEW IN v1.1)
+============================================================
+
+Background: lessons from 2026 agent harnesses (see the enterprise spec, Section 60, for the full background):
+- DeepSeek Harness: plugins everywhere, append-only session event log ("anything the model sees is logged"), tool hooks, sub-agents.
+- OpenClaw: CVE-2026-25253 (a link set the gateway URL and leaked the token), ClawJacked (websites hijacking the local agent over localhost WebSocket), ClawHavoc (malicious skills in a public marketplace); plus useful ideas such as in-chat approvals, a security audit, and backup-before-update.
+- Hermes Agent: self-improving skills, memory nudges, cross-session search, natural-language scheduling, scripts that call tools.
+- Research on self-improving agents: unsafe successes can become reusable skills.
+
+This desktop edition adopts the following. The security floor (Section 5.4) applies to all of it.
+
+------------------------------------------------------------
+39.1 Local listener hardening (ClawJacked)   [High]
+------------------------------------------------------------
+Any website you visit can try to talk to programs on your own PC. Therefore:
+- The app still opens NO listening port except pa-llm (Section 2.4). pa-llm:
+    - binds 127.0.0.1 only, random port per launch
+    - requires a 256-bit random API key per launch
+    - rejects any request that has an Origin header or browser fetch-metadata headers (Sec-Fetch-*)
+    - accepts only Host = 127.0.0.1:<port> (blocks DNS rebinding)
+    - after 5 failed key attempts from any client: restart with a new port and key, and raise a security event on Home
+- Microsoft 365 sign-in redirect: prefer the custom scheme handler; if a loopback redirect is used, it listens on a random port, accepts exactly one request whose state + PKCE match, and closes within 120 seconds.
+- Optional external runtimes (Ollama / LM Studio, Section 20.4): the Security Posture page (39.10) tests whether a web page could reach them (Origin checks, bind address) and marks them "At risk" if so; the app refuses to use a runtime that answers requests from browser origins.
+- Named pipes: ACLs and client signature checks as in Section 2.4; repeated handshake failures raise a security event.
+
+------------------------------------------------------------
+39.2 No configuration via links (CVE-2026-25253)   [High]
+------------------------------------------------------------
+- The app's custom URI scheme (used only for the Microsoft sign-in callback) and any links in notifications may ONLY bring the app to the front and open a screen.
+- Links can never change settings, endpoints, connectors, models or policies, never start actions or approvals, and never cause the app to send a token anywhere.
+- The M365 callback handler accepts only a response that matches a sign-in the user started in the last 10 minutes (state + PKCE); anything else is discarded and logged.
+- Endpoints (Graph, search provider, SIEM target) are set only in Settings, with step-up; loosening follows Section 5.5.
+
+------------------------------------------------------------
+39.3 Per-client method allowlists on the gateway   [High]
+------------------------------------------------------------
+Today each IPC client proves who it is; now each also gets only the methods it needs:
+- pa-ui           : everything user-facing; settings, approvals, secrets reveal and kill-switch release only with the required step-up
+- pa-core         : tools.invoke, llm.token (for pa-llm), memory.propose, tasks.update_own, approvals.request, history.search. NO settings, secrets, connectors, skills activation, approvals.approve or kill-switch methods.
+- pa-outlook-worker, pa-parser : only their own result channels
+- sandbox RPC (39.9) : tools.invoke with the task's identity, only when enabled
+- Unknown or disallowed methods are denied and logged. There is no "full access" token.
+
+------------------------------------------------------------
+39.4 Extension security (ClawHavoc)   [High]
+------------------------------------------------------------
+- SKILLS are declarative files (JSON/YAML) that reference built-in tools. No code, no shell commands, no download links, no install steps.
+- CONNECTORS in V1 ship only with the app, signed by the app publisher. Future connectors (e.g. ChiRAG) are added through signed app updates or signed connector packages that:
+    - run in their own process with outbound traffic only through pa-gateway
+    - declare a capability manifest (destinations, data types, side effects, secrets needed) shown to you before enabling
+    - are enforced to that manifest at runtime
+- There is no marketplace. Importing a skill from a file is allowed but gets the same review as an agent-proposed skill (Section 22 + 39.6).
+- Text inside skills or connector descriptions is untrusted. The UI never shows "run this command" or "download this helper" instructions from an extension.
+- Each extension can be disabled individually from Settings > Tools & Skills; revoked versions are blocked by hash.
+
+------------------------------------------------------------
+39.5 Session event log ("anything the model sees is logged")   [High]
+------------------------------------------------------------
+- Every chat and task has an append-only, encrypted session log (inside the encrypted database / Transcript Store) of everything that enters or leaves the model: system prompt version, your messages, retrieved items with source/sensitivity/trust, tool calls and results, summaries, sub-agent messages, approvals.
+- The model's context is built only from this log. Nothing reaches pa-llm unless it was logged first.
+- The sensitivity level and source list for a task (Section 13.3) are computed from the log.
+- Any step can be replayed from the log (Settings > Diagnostics > "Replay step") to understand why the agent did something, or to test a new model or skill version.
+- The unified security log references session-log entries by ID and hash only.
+
+------------------------------------------------------------
+39.6 Governed skill evolution   [High]
+------------------------------------------------------------
+- A skill may be proposed only from runs that you or a schedule started, had no injection warnings, had no denied actions or rejected approvals, and did not take any instruction from untrusted content (mail, web, files). Otherwise the proposal is blocked or marked "tainted origin" with a red warning.
+- Each skill step records which run it came from (lineage), visible in the skill review screen.
+- Before a skill version can be activated, the app tests it automatically in the sandbox: its own examples, the red-team subset for its tools, and a fresh-session carry-over test. Any failure blocks activation and explains why.
+- New destinations, new recipients, instructions to skip checks, encoded text or secret references in a skill are highlighted in the review diff.
+- "Improving" a skill always creates a proposed new version; the active version never changes without your approval.
+- Skills unused for 90 days are retired automatically (you can re-activate after review).
+- If a skill version causes repeated denials, it is suspended automatically and shown on Home.
+
+------------------------------------------------------------
+39.7 Safe summarizing of long chats   [High]
+------------------------------------------------------------
+- A summary keeps the highest sensitivity level and the full source list of what it replaces.
+- Text from untrusted sources is reported as data ("the email asked to forward the file"), never turned into an instruction.
+- After summarizing, your instructions, pending approvals, budgets and mission limits are re-loaded from trusted storage, never from the summary.
+- The original entries stay in the session log.
+
+------------------------------------------------------------
+39.8 Sub-agents and external agents   [Medium]
+------------------------------------------------------------
+- A sub-agent is a sub-task with no more rights than its parent.
+- Sensitivity flows both ways: it starts at the parent's level (unless it is a clean public-research sub-task), and what it reads raises the parent's level.
+- Messages between sub-agents are untrusted and logged.
+- Handing work to an external agent (e.g. Claude Code, Codex, a cloud agent) is disabled by default. It could only be enabled later as a signed connector that runs in the sandbox without credentials, with DLP and sensitivity checks on what is sent.
+- Sub-agents use the parent's budget; at most 3 running at once per task (default).
+
+------------------------------------------------------------
+39.9 Scripts that call tools   [Medium]
+------------------------------------------------------------
+Off by default (Settings > Tools & Skills). If turned on:
+- Python in the sandbox can call tools only through a stub that forwards each call to pa-gateway with the task's identity, sensitivity level and budget. Every call goes through the full check sequence (Section 7.2).
+- Approvals still pop up for you; the script waits.
+- The sandbox still has no network of its own.
+- All calls are logged in the session log. Not available in the AppContainer fallback unless you accept "Standard isolation" for this feature explicitly.
+
+------------------------------------------------------------
+39.10 Security Posture page   [Medium]
+------------------------------------------------------------
+The "Security checks" panel becomes a full page: Settings > Account & Security > Security Posture. It checks and explains, with a "Fix" button where possible:
+- TPM, BitLocker, Windows Defender and Windows updates status
+- firewall rules present and effective (live outbound test from blocked processes)
+- data folder ACL and not inside a synced folder
+- pa-llm listener hardening (39.1) and any external runtime exposure
+- sandbox strength (Strong / Standard / Unavailable)
+- settings looser than the Cautious defaults
+- unsigned or changed extensions, skills with tainted origin
+- secrets that are weak, reused or old
+- quick approvals pattern
+- log chain status, last backup age, model tested or not
+Runs at start, daily, after any settings change, and on demand. Results are logged; High findings appear on Home.
+
+------------------------------------------------------------
+39.11 Safe updates   [Medium]
+------------------------------------------------------------
+- Before installing an update: automatic encrypted snapshot of the database, settings, skills and policies; verified.
+- After the update: health checks. If anything fails, the app rolls back to the previous version and snapshot automatically and tells you.
+- Running tasks are checkpointed before the update and resumed after it, never run twice (Section 17.3).
+
+------------------------------------------------------------
+39.12 Search your history   [Medium]
+------------------------------------------------------------
+- Encrypted full-text search (SQLite FTS5 inside the encrypted database) over chats, task results and files, from a search box in Chat and Activity.
+- The agent can use it as a read-only tool (history.search) over your own data.
+- Deleted items and data from disconnected sources (if you chose "also delete data") are excluded.
+- Results are untrusted and raise the task's sensitivity level.
+
+------------------------------------------------------------
+39.13 Memory review and "About me"   [Low]
+------------------------------------------------------------
+- Weekly memory review on Home: new, stale (not confirmed in 90 days) and conflicting memories to confirm, edit or delete.
+- Memory page gains an "About me" view: what the agent believes about you, with where each item came from; inferred items shown separately; all editable.
+- The agent may suggest clean-ups; it cannot delete or rewrite what you told it directly.
+
+------------------------------------------------------------
+39.14 Approval cards in chat   [Low]
+------------------------------------------------------------
+- Approvals can also appear as cards inside the chat with "Allow once" and "Deny".
+- Same protections as Section 23: exact-payload hash, PIN/password step-up for high risk, expiry, and a re-check when clicked.
+- No "Always allow" for anything above low risk. "Allow for this run" only for low-risk read operations, ending with the task.
+
+------------------------------------------------------------
+39.15 Create missions in plain words   [Low]
+------------------------------------------------------------
+- In Missions, "Describe a mission": type what you want ("every weekday at 7:30 summarize important mail").
+- The app fills in the mission form (schedule, connectors, tools, budgets, notifications) for you to review and edit.
+- Nothing is saved or activated until you confirm, and the proposal cannot exceed your current settings.
+
+------------------------------------------------------------
+39.16 Isolated browser   [Later - optional, off by default]
+------------------------------------------------------------
+- Only with Windows Sandbox ("Strong isolation"); not offered on the AppContainer fallback.
+- A fresh browser inside Windows Sandbox for each task: no cookies, no saved passwords, never your own browser profile.
+- Traffic passes through pa-gateway's egress filter (allowlists, SSRF, DLP, sensitivity rules).
+- Downloads go to quarantine; submitting any form needs approval; page content is untrusted; the sandbox is destroyed after the task.
+
+------------------------------------------------------------
+39.17 Messaging apps (WhatsApp, Telegram, Teams...)   [Later - deferred]
+------------------------------------------------------------
+Not in V1, because anyone who can message the agent could steer it. If added later:
+- only your own paired account (pairing done inside the app with step-up)
+- sender allowlist; group chats disabled
+- every incoming message treated as untrusted
+- replies contain notifications only, never CONFIDENTIAL content
+- approvals are never done from the messaging app; it links you back to the desktop app
+
+------------------------------------------------------------
+39.18 Explicitly NOT adopted
+------------------------------------------------------------
+- plugins running inside the security core with full rights
+- sandbox off by default
+- a public skill marketplace
+- skills that change themselves without review
+- approving from outside the unlocked app
+- accepting prompt-injection consequences as "not a vulnerability"
+
+============================================================
+APPENDIX A. ENTERPRISE -> DESKTOP MAPPING
+============================================================
+
+Enterprise (v2.0)                         | Desktop edition
+------------------------------------------+---------------------------------------------------------
+SSO + MFA                                 | username + password (Argon2id), PIN (TPM), step-up
+Admin Portal                              | Settings button in the single UI
+Secrets manager + KMS                     | local vault: Argon2id + TPM 2.0 + AES-256-GCM, SQLCipher
+Agent identity / delegation (OBO)         | gateway holds tokens; pa-core never sees them
+SCIM / entitlement re-check               | connector state + token validity checked every call
+Tool Gateway + Policy Engine              | same, inside pa-gateway
+Egress proxy + network segmentation       | Windows Firewall per-program rules + gateway egress filter
+Local Outlook Bridge (mTLS)               | local Outlook worker process (same PC, no network)
+microVM sandbox                           | Windows Sandbox (Hyper-V) / AppContainer fallback
+Approvals + second approver               | approvals + step-up; loosening needs password + delay
+Kill switches                             | STOP ALL button, tray, hotkey; 2 s target
+Unified log -> SIEM                       | same single JSONL file, HMAC chain, optional forwarding
+Transcript Store                          | encrypted DB table, step-up to view
+Backups / RPO-RTO                         | encrypted .pabk backups, scheduled, verify + restore
+Multi-tenancy, RLS, RBAC, HA              | not applicable (single user, single PC)
+Harness hardening (Enterprise 60.x)       | Section 39.x (same numbering order: 60.1 -> 39.1 ... 60.18 -> 39.18)
+
+============================================================
+APPENDIX B. EXAMPLE LOG EVENT
+============================================================
+
+{"schema_version":"1.0","event_id":"evt_01JA0K3V9R","sequence":20417,"prev_hash":"b41e…",
+ "chain_hmac":"9c07…","timestamp":"2026-10-01T02:14:07.512Z","category":"authorization",
+ "event_type":"policy.decision","actor_type":"agent","user":"local-user","task_id":"task_7c1…",
+ "mission_id":"m_morning_mail","trigger_type":"SCHEDULE","connector":"web","tool":"web.search",
+ "context_high_water_mark":"CONFIDENTIAL","policy_decision":"REQUIRE_APPROVAL",
+ "policy_version":"local-1.0.3+user-7","decision_reason":"egress_with_confidential_context",
+ "payload_hash":"sha256:5e88…","bytes_out":0,"result":"pending_approval",
+ "correlation_id":"c_9b12…","component":"pa-gateway","component_version":"1.0.0"}
+
+The search text itself is not in the log; it is visible in the Approvals screen and in the encrypted Transcript Store.
+
+============================================================
+END OF SPECIFICATION
+============================================================

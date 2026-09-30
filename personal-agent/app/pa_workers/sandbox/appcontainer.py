@@ -43,10 +43,38 @@ class PROCESS_INFORMATION(ctypes.Structure):
     _fields_ = [("hProcess", wt.HANDLE), ("hThread", wt.HANDLE), ("dwProcessId", wt.DWORD), ("dwThreadId", wt.DWORD)]
 
 
+def _k32():
+    """kernel32 with exact signatures (x64: untyped ctypes calls can corrupt pointer/size arguments)."""
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.InitializeProcThreadAttributeList.argtypes = [ctypes.c_void_p, wt.DWORD, wt.DWORD, ctypes.POINTER(ctypes.c_size_t)]
+    k32.InitializeProcThreadAttributeList.restype = wt.BOOL
+    k32.UpdateProcThreadAttribute.argtypes = [ctypes.c_void_p, wt.DWORD, ctypes.c_size_t, ctypes.c_void_p, ctypes.c_size_t,
+                                              ctypes.c_void_p, ctypes.c_void_p]
+    k32.UpdateProcThreadAttribute.restype = wt.BOOL
+    k32.DeleteProcThreadAttributeList.argtypes = [ctypes.c_void_p]
+    k32.CreateProcessW.argtypes = [wt.LPCWSTR, wt.LPWSTR, ctypes.c_void_p, ctypes.c_void_p, wt.BOOL, wt.DWORD, ctypes.c_void_p,
+                                   wt.LPCWSTR, ctypes.POINTER(STARTUPINFOEXW), ctypes.POINTER(PROCESS_INFORMATION)]
+    k32.CreateProcessW.restype = wt.BOOL
+    k32.SetHandleInformation.argtypes = [wt.HANDLE, wt.DWORD, wt.DWORD]
+    k32.WaitForSingleObject.argtypes = [wt.HANDLE, wt.DWORD]
+    k32.WaitForSingleObject.restype = wt.DWORD
+    k32.TerminateProcess.argtypes = [wt.HANDLE, wt.UINT]
+    k32.GetExitCodeProcess.argtypes = [wt.HANDLE, ctypes.POINTER(wt.DWORD)]
+    k32.ResumeThread.argtypes = [wt.HANDLE]
+    k32.CloseHandle.argtypes = [wt.HANDLE]
+    return k32
+
+
 def container_sid() -> tuple[ctypes.c_void_p, str]:
     """Create (or open) the AppContainer profile; returns (PSID, string SID)."""
     userenv = ctypes.WinDLL("userenv")
     advapi = ctypes.WinDLL("advapi32")
+    userenv.CreateAppContainerProfile.argtypes = [wt.LPCWSTR, wt.LPCWSTR, wt.LPCWSTR, ctypes.c_void_p, wt.DWORD,
+                                                  ctypes.POINTER(ctypes.c_void_p)]
+    userenv.CreateAppContainerProfile.restype = ctypes.c_long
+    userenv.DeriveAppContainerSidFromAppContainerName.argtypes = [wt.LPCWSTR, ctypes.POINTER(ctypes.c_void_p)]
+    userenv.DeriveAppContainerSidFromAppContainerName.restype = ctypes.c_long
+    advapi.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(wt.LPWSTR)]
     sid = ctypes.c_void_p()
     hr = userenv.CreateAppContainerProfile(ctypes.c_wchar_p(PROFILE_NAME), ctypes.c_wchar_p("Personal Agent sandbox"),
                                            ctypes.c_wchar_p("Isolated Python analysis"), None, 0, ctypes.byref(sid))
@@ -54,7 +82,7 @@ def container_sid() -> tuple[ctypes.c_void_p, str]:
         hr = userenv.DeriveAppContainerSidFromAppContainerName(ctypes.c_wchar_p(PROFILE_NAME), ctypes.byref(sid))
     if hr != 0:
         raise OSError(f"AppContainer profile error 0x{hr & 0xFFFFFFFF:08X}")
-    s = ctypes.c_wchar_p()
+    s = wt.LPWSTR()
     advapi.ConvertSidToStringSidW(sid, ctypes.byref(s))
     return sid, s.value or ""
 
@@ -81,7 +109,7 @@ def run_in_appcontainer(cmdline: str, cwd: Path, stdout_path: Path, stderr_path:
 
     import win32job  # type: ignore[import-not-found]
 
-    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32 = _k32()
     sid, _ = container_sid()
     caps = SECURITY_CAPABILITIES(sid, None, 0, 0)
     size = ctypes.c_size_t()
@@ -89,8 +117,8 @@ def run_in_appcontainer(cmdline: str, cwd: Path, stdout_path: Path, stderr_path:
     attr = ctypes.create_string_buffer(size.value)
     if not k32.InitializeProcThreadAttributeList(attr, 1, 0, ctypes.byref(size)):
         raise ctypes.WinError(ctypes.get_last_error())
-    if not k32.UpdateProcThreadAttribute(attr, 0, ctypes.c_size_t(PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES),
-                                         ctypes.byref(caps), ctypes.sizeof(caps), None, None):
+    if not k32.UpdateProcThreadAttribute(attr, 0, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+                                         ctypes.addressof(caps), ctypes.sizeof(caps), None, None):
         raise ctypes.WinError(ctypes.get_last_error())
     out_f = open(stdout_path, "wb")
     err_f = open(stderr_path, "wb")
@@ -109,9 +137,13 @@ def run_in_appcontainer(cmdline: str, cwd: Path, stdout_path: Path, stderr_path:
         env = "SYSTEMROOT=C:\\Windows\0PYTHONDONTWRITEBYTECODE=1\0PYTHONNOUSERSITE=1\0PYTHONIOENCODING=utf-8\0\0"
         # the environment block contains embedded NULs: it must be passed as a raw buffer, not a c_wchar_p
         env_buf = ctypes.create_unicode_buffer(env, len(env) + 1)
-        ok = k32.CreateProcessW(None, buf, None, None, True,
-                                EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
-                                ctypes.cast(env_buf, ctypes.c_void_p), ctypes.c_wchar_p(str(cwd)), ctypes.byref(si), ctypes.byref(pi))
+        flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT
+        ok = k32.CreateProcessW(None, buf, None, None, True, flags, ctypes.cast(env_buf, ctypes.c_void_p), str(cwd),
+                                ctypes.byref(si), ctypes.byref(pi))
+        if not ok and ctypes.get_last_error() == 203:
+            # some Windows builds reject a minimal custom block for AppContainers: inherit the (secret-free)
+            # gateway environment instead - the container still cannot read user folders or the network
+            ok = k32.CreateProcessW(None, buf, None, None, True, flags, None, str(cwd), ctypes.byref(si), ctypes.byref(pi))
         if not ok:
             raise ctypes.WinError(ctypes.get_last_error())
         job = win32job.CreateJobObject(None, "")
