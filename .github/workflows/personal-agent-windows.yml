@@ -1,0 +1,46 @@
+# Windows CI for the personal-agent/ sub-project (see personal-agent/.github/workflows/windows-ci.yml)
+name: personal-agent-windows
+
+on:
+  push:
+    paths: ["personal-agent/**", ".github/workflows/personal-agent-windows.yml"]
+  pull_request:
+    paths: ["personal-agent/**"]
+  workflow_dispatch:
+
+jobs:
+  python:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: personal-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: personal-agent/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip freeze > requirements.lock
+      - name: Lint
+        run: ruff check app tests --select E,F,W,B --ignore E501,B905,B007,B904
+      - name: Tests (unit + integration + Windows)
+        env:
+          PA_REDTEAM_N: "20"
+        run: python -m pytest -q -ra --junitxml=test-results.xml
+      - name: End-to-end selftest
+        working-directory: personal-agent/app
+        run: python -m pa_gateway --selftest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            personal-agent/test-results.xml
+            personal-agent/requirements.lock

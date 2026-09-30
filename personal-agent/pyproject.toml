@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "personal-agent"
+version = "0.1.0"
+description = "Personal AI Agent - Desktop Edition (Windows 11, local-first, security-first)"
+requires-python = ">=3.12,<3.13"
+readme = "README.md"
+license = { text = "Proprietary - personal use" }
+dependencies = [
+  "cryptography>=43",
+  "argon2-cffi>=23.1",
+  "pydantic>=2.7",
+  "httpx>=0.27",
+  "numpy>=1.26",
+  "pypdf>=4.2",
+  "tzlocal>=5.2",
+  "tzdata>=2024.1",
+  "sqlcipher3-wheels>=0.5.2 ; sys_platform == 'win32'",
+  "pywin32>=306 ; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-timeout>=2.3", "pyinstaller>=6.6", "ruff>=0.5"]
+
+[project.scripts]
+pa-gateway = "pa_gateway.__main__:main"
+pa-core = "pa_core.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["app"]
+include = ["pa_common*", "pa_gateway*", "pa_core*", "pa_workers*"]
+
+[tool.setuptools.package-data]
+"pa_gateway" = ["data/*.txt", "data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["app"]
+timeout = 120
+markers = [
+  "windows: requires Windows APIs (runs on GitHub windows-latest runners and on the laptop)",
+  "laptop: requires real hardware/software not available on CI (TPM with PIN, Windows Sandbox, Outlook). Run manually - see TESTS.md",
+  "redteam: red-team deterministic gate",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "S"]
+ignore = ["S101", "S603", "S607", "S311", "E501"]

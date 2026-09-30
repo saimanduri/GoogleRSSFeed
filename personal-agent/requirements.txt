@@ -1,0 +1,12 @@
+# Runtime dependencies (pinned major versions; exact pins are resolved in CI and recorded in requirements.lock)
+cryptography>=43,<51
+argon2-cffi>=23.1,<26
+pydantic>=2.7,<3
+httpx>=0.27,<0.29
+numpy>=1.26,<3
+pypdf>=4.2,<7
+tzlocal>=5.2,<6
+tzdata>=2024.1
+sqlcipher3-wheels>=0.5.2 ; sys_platform == "win32"
+sqlcipher3-binary>=0.5.2 ; sys_platform == "linux"
+pywin32>=306 ; sys_platform == "win32"
