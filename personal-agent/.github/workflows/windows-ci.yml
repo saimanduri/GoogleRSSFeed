@@ -29,6 +29,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
           pip freeze > requirements.lock
+      - name: Environment check (native libraries)
+        continue-on-error: true
+        run: python scripts/check_env.py
       - name: Lint
         run: ruff check app tests --select E,F,W,B --ignore E501,B905,B007,B904
       - name: Tests (unit + integration + Windows)
