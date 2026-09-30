@@ -41,6 +41,19 @@ cd app\ui; npm run build                  # UI type-check + production build
 `ui` job: `npm run build`, `tauri build --no-bundle` (Rust compile of pa-ui.exe).
 `bundle` job: PyInstaller executables + pa-ui.exe → artifact `PersonalAgent-windows-bundle`.
 
+Last verified (v0.1.1, 2026-09-30): `python` 147 tests - all passed on Windows (incl. AppContainer no-network
+and real gateway + pa-core over named pipes); `ui` passed (pa-ui.exe compiled); `bundle` built all
+executables. pa-core's firewall self-test reports "outbound NOT blocked" on CI (no firewall rules there) -
+that check is laptop item B1 after `install-dev.ps1`.
+
+### Profile names (v0.1.1) - laptop
+- [ ] P1 Setup: enter "Your name" + "Name your assistant" → Home says "Good …, <your name>", sidebar and window
+      title show the assistant name.
+- [ ] P2 Lock (Win+L or Lock button) → lock screen says "<assistant> is locked"; cold start says
+      "Welcome back, <your name>".
+- [ ] P3 Settings → Account & Security → Profile: change both names → Save → UI updates at once; ask in chat
+      "what is your name?" → the model answers with the new name.
+
 ## Laptop test checklist (manual / `-m laptop`)
 Run these on your Windows 11 laptop after installing the bundle (or from source with `PA_DEV_MODE` **off**).
 Tick them off in this file or in an issue.
