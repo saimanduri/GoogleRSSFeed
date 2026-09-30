@@ -26,6 +26,9 @@ PROBES = {
     "sqlcipher_file_wal": "import sqlcipher3, tempfile, os; p=os.path.join(tempfile.mkdtemp(),'x.db'); c=sqlcipher3.connect(p); "
                           "c.execute(\"pragma key=\\\"x'\" + '00'*32 + \"'\\\"\"); c.execute('pragma journal_mode=WAL'); "
                           "c.execute('create table t(a)'); print('ok')",
+    "sqlcipher_memsec_file_wal (expected to FAIL on Windows; not used)": "import sqlcipher3, tempfile, os; p=os.path.join(tempfile.mkdtemp(),'x.db'); c=sqlcipher3.connect(p); "
+                          "c.execute(\"pragma key=\\\"x'\" + '00'*32 + \"'\\\"\"); c.execute('pragma cipher_memory_security = ON'); c.execute('pragma journal_mode=WAL'); "
+                          "[c.execute(f'create table t{i}(a)') for i in range(30)]; print('ok')",
     "schema_in_thread": "import sys, threading; sys.path.insert(0, r'" + str(ROOT / "app") + "'); "
                         "import tempfile, os; from pathlib import Path; from pa_gateway.db.database import Database; "
                         "r={}; t=threading.Thread(target=lambda: r.update(db=Database(Path(tempfile.mkdtemp())/'a.db', b'\\x01'*32))); "

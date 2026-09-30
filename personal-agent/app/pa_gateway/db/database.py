@@ -34,7 +34,9 @@ class Database:
         self._conn = sqlite.connect(str(path), check_same_thread=False, isolation_level=None, timeout=30)
         self._conn.row_factory = sqlite.Row
         self._conn.execute(f"PRAGMA key = \"x'{key.hex()}'\"")
-        self._conn.execute("PRAGMA cipher_memory_security = ON")
+        # cipher_memory_security stays OFF (SQLCipher default): on Windows it VirtualLock()s every allocation and
+        # overflows the stack once the process working-set quota is exhausted. Key material is still wiped by
+        # SQLCipher and by pa_gateway.vault.secretmem; see docs/SECRETS_HANDLING.md.
         try:
             self._conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
         except sqlite.DatabaseError as e:
