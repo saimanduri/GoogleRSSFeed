@@ -14,14 +14,16 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $hash = (git rev-parse --short HEAD 2>$null); if (-not $hash) { $hash = "local" }
-$release = if ($Dev) { "False" } else { "True" }
-$signed = if ($Signed) { "True" } else { "False" }
+# PowerShell names are case-insensitive: never reuse $Dev/$Signed for locals
+$releaseFlag = if ($Dev) { "False" } else { "True" }
+$signedFlag = if ($Signed) { "True" } else { "False" }
 $bi = "app\pa_common\buildinfo.py"
 $orig = Get-Content $bi -Raw
 try {
-  $new = $orig -replace "RELEASE_BUILD = \w+", "RELEASE_BUILD = $release" -replace "SIGNED_BUILD = \w+", "SIGNED_BUILD = $signed" -replace 'BUILD_HASH = ".*"', "BUILD_HASH = `"$hash`""
+  $new = $orig -replace "RELEASE_BUILD = \w+", "RELEASE_BUILD = $releaseFlag" -replace "SIGNED_BUILD = \w+", "SIGNED_BUILD = $signedFlag" -replace 'BUILD_HASH = ".*"', "BUILD_HASH = `"$hash`""
   Set-Content $bi $new -NoNewline
   pyinstaller scripts\pyinstaller\personal-agent.spec --noconfirm --clean --distpath build\pyi-dist --workpath build\pyi-work
+  if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed ($LASTEXITCODE)" }
 } finally {
   Set-Content $bi $orig -NoNewline   # never leave release flags in the source tree
 }
