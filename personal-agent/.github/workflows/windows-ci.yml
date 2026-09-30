@@ -98,7 +98,10 @@ jobs:
           ./scripts/build.ps1 -OutDir dist/PersonalAgent
       - name: Smoke-test the frozen executables
         run: |
-          ./dist/PersonalAgent/pa-core.exe --selftest-network; "pa-core exit: $LASTEXITCODE (1 = outbound NOT blocked, expected on CI without firewall rules)"
+          ./dist/PersonalAgent/pa-core.exe --selftest-network; $rc = $LASTEXITCODE
+          "pa-core exit: $rc (0 = blocked, 1 = outbound NOT blocked - expected on CI without firewall rules)"
+          if ($rc -notin 0, 1) { throw "pa-core.exe did not run correctly ($rc)" }
+          $global:LASTEXITCODE = 0
           if (-not (Test-Path dist/PersonalAgent/pa-ui.exe)) { throw "pa-ui.exe missing" }
       - uses: actions/upload-artifact@v4
         with:
