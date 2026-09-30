@@ -45,10 +45,13 @@ export function Toggle({ on, onChange, disabled, label }: { on: boolean; onChang
 export function Field({ label, help, error, children }: { label?: ReactNode; help?: ReactNode; error?: ReactNode; children: ReactNode }) {
   return (
     <div className="field">
-      {label && <label>{label}</label>}
-      {children}
+      {/* the label wraps its control so it is announced by screen readers and clickable */}
+      <label className="field-label">
+        {label && <span className="field-title">{label}</span>}
+        {children}
+      </label>
       {help && <div className="help">{help}</div>}
-      {error && <div className="err">{error}</div>}
+      {error && <div className="err" role="alert">{error}</div>}
     </div>
   );
 }

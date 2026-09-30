@@ -19,7 +19,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pa_common.buildinfo import RELEASE_BUILD
+from pa_common.buildinfo import RELEASE_BUILD, SIGNED_BUILD
 from pa_common.devmode import dev_mode
 from pa_common.ids import new_id
 from pa_common.protocol import FrameDecoder, FrameError, encode_frame
@@ -261,14 +261,16 @@ class PipeServer:
         return False
 
     def _image_ok(self, image: str | None, expected_exe: str) -> bool:
-        if not RELEASE_BUILD and dev_mode():
-            return True  # developer mode: clients run as python.exe / dev Tauri build (Posture shows this)
+        """Client verification (spec 2.4): exact executable inside the install folder, plus a valid
+        Authenticode signature when the build is signed. Source/developer runs are allowed only in dev mode."""
+        if not getattr(sys, "frozen", False):
+            return (not RELEASE_BUILD) and dev_mode()
         if not image or self.install_dir is None:
             return False
         p = Path(image)
         if p.name.lower() != expected_exe or p.parent.resolve() != self.install_dir.resolve():
             return False
-        return authenticode_valid(str(p))
+        return authenticode_valid(str(p)) if SIGNED_BUILD else True
 
 
 def _safe_send(send, msg) -> None:

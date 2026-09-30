@@ -22,7 +22,7 @@ export function ApprovalCard({ a, onDone }: { a: any; onDone?: () => void }) {
     try {
       await call("approvals.decide", { approval_id: a.id, approve, payload_hash: a.payload_hash, opened_at_ms: opened.current,
         ...(edited ? { edited_payload: edited } : {}) });
-      toast(edited ? "Edited and re-proposed - review the new version" : approve ? "Allowed once" : "Denied", approve ? "ok" : "info");
+      toast(edited ? "Edited and re-proposed - review the new version" : approve ? (a.tool === "reminders.propose" ? "Reminder confirmed" : "Allowed once") : "Denied", approve ? "ok" : "info");
       onDone?.();
     } catch (e: any) { toast(errText(e), "danger"); } finally { setBusy(false); }
   };

@@ -107,9 +107,11 @@ def run_in_appcontainer(cmdline: str, cwd: Path, stdout_path: Path, stderr_path:
         pi = PROCESS_INFORMATION()
         buf = ctypes.create_unicode_buffer(cmdline)
         env = "SYSTEMROOT=C:\\Windows\0PYTHONDONTWRITEBYTECODE=1\0PYTHONNOUSERSITE=1\0PYTHONIOENCODING=utf-8\0\0"
+        # the environment block contains embedded NULs: it must be passed as a raw buffer, not a c_wchar_p
+        env_buf = ctypes.create_unicode_buffer(env, len(env) + 1)
         ok = k32.CreateProcessW(None, buf, None, None, True,
                                 EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
-                                ctypes.c_wchar_p(env), ctypes.c_wchar_p(str(cwd)), ctypes.byref(si), ctypes.byref(pi))
+                                ctypes.cast(env_buf, ctypes.c_void_p), ctypes.c_wchar_p(str(cwd)), ctypes.byref(si), ctypes.byref(pi))
         if not ok:
             raise ctypes.WinError(ctypes.get_last_error())
         job = win32job.CreateJobObject(None, "")

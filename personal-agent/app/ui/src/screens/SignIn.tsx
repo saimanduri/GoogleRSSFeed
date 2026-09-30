@@ -75,7 +75,6 @@ export function SignIn() {
               </Button>
             )}
             {!locked && <Button kind="ghost" small onClick={() => setMode("forgot")}>Forgot password?</Button>}
-            {!locked && <Button kind="ghost" small onClick={() => setMode("restore")}>Restore a backup</Button>}
             {locked && <Button kind="ghost" small onClick={async () => { await rpc("killswitch.activate", { level: "stop_all", source: "lock_screen" }); }}>STOP ALL</Button>}
           </div>
           {status.dev_mode && <div className="banner warn small"><Icon name="alert" />Developer mode</div>}
@@ -126,7 +125,7 @@ function Forgot({ onBack, onDone }: { onBack: () => void; onDone: (rk: any) => v
   );
 }
 
-function RestoreNewPc({ onBack }: { onBack: () => void }) {
+export function RestoreNewPc({ onBack }: { onBack: () => void }) {
   const [path, setPath] = useState("");
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");

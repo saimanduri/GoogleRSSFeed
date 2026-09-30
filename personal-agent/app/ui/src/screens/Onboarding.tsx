@@ -4,6 +4,8 @@ import { native, pickFile, pickSavePath, rpc } from "../api/gateway";
 import { errText, useApp } from "../app";
 import { Icon } from "../components/Icon";
 import { Badge, Button, Field, Toggle } from "../components/ui";
+import { LoosenDialog } from "../components/LoosenDialog";
+import { RestoreNewPc } from "./SignIn";
 import { ModelAdder } from "./settings/ModelSettings";
 
 const STEPS = ["Welcome", "Account", "PIN", "Recovery key", "AI model", "Connectors", "Autonomy", "Backup", "Done"];
@@ -23,6 +25,7 @@ export function Onboarding() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [rk, setRk] = useState<{ recovery_key: string; confirm_groups: number[] } | null>(null);
+  const [restore, setRestore] = useState(false);
 
   useEffect(() => { void rpc("setup.preflight").then(setPre).catch((e) => setErr(errText(e))); }, []);
   useEffect(() => {
@@ -55,6 +58,7 @@ export function Onboarding() {
   const pwOk = strength && strength.errors.length === 0 && password === password2;
   const pinOk = pin.length >= 6 && pin === pin2 && pinErrors.length === 0;
 
+  if (restore) return <RestoreNewPc onBack={() => setRestore(false)} />;
   return (
     <div className="auth-wrap">
       <div className="auth-card wizard-card">
@@ -78,7 +82,8 @@ export function Onboarding() {
               </div>
             )}
             {pre?.dev_mode && <div className="banner warn"><Icon name="alert" />Developer mode is on. Do not use real data.</div>}
-            <div className="row"><div className="spacer" /><Button kind="primary" disabled={!pre || !pre.tpm_ok || pre.cloud_synced} onClick={next}>Continue</Button></div>
+            <div className="row"><Button kind="ghost" onClick={() => setRestore(true)}>Restore from a backup instead</Button><div className="spacer" />
+              <Button kind="primary" disabled={!pre || !pre.tpm_ok || pre.cloud_synced} onClick={next}>Continue</Button></div>
           </div>
         )}
 
@@ -235,27 +240,29 @@ function ConnectorsStep({ onNext }: { onNext: () => void }) {
 
 function AutonomyStep({ onNext }: { onNext: () => void }) {
   const [profile, setProfile] = useState("cautious");
+  const [loosen, setLoosen] = useState<null | { changes: any; loosening: any[] }>(null);
+  const next = async () => {
+    if (profile === "balanced") {
+      const preview = await rpc<any>("settings.profile_preview", { profile });
+      setLoosen({ changes: preview.changes, loosening: preview.loosening });
+      return;
+    }
+    onNext();
+  };
   return (
     <div className="col">
       <h1>How independent should the agent be?</h1>
       <div className="grid-2">
         {[["cautious", "Cautious (recommended)", "Small budgets, approvals for anything that leaves this PC, no auto-confirmed memories."],
           ["balanced", "Balanced", "Larger budgets for longer missions. The security floor still applies - there is no profile that removes it."]].map(([id, t, d]) => (
-          <div key={id} className={`card clickable ${profile === id ? "selected" : ""}`} style={profile === id ? { borderColor: "var(--accent)", boxShadow: "0 0 0 3px var(--accent-soft)" } : {}}
-            onClick={() => setProfile(id)}>
+          <div key={id} className="card clickable" style={profile === id ? { borderColor: "var(--accent)", boxShadow: "0 0 0 3px var(--accent-soft)" } : {}}
+            onClick={() => setProfile(id)} role="radio" aria-checked={profile === id} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setProfile(id)}>
             <div className="card-title">{t}</div><p className="muted small">{d}</p>
           </div>
         ))}
       </div>
-      <div className="row"><div className="spacer" /><Button kind="primary" onClick={async () => {
-        if (profile === "balanced") {
-          const preview = await rpc<any>("settings.profile_preview", { profile });
-          const tok = await rpc<any>("settings.begin_loosen", { changes: preview.changes });
-          const pw = window.prompt("Balanced loosens budgets. Enter your password to confirm (after reading, wait 10 seconds):");
-          if (pw) { await new Promise((r) => setTimeout(r, 10500)); await rpc("settings.apply", { changes: preview.changes, password: pw, loosen_token: tok.token }).catch(() => undefined); }
-        }
-        onNext();
-      }}>Continue</Button></div>
+      <div className="row"><div className="spacer" /><Button kind="primary" onClick={next}>Continue</Button></div>
+      {loosen && <LoosenDialog changes={loosen.changes} loosening={loosen.loosening} onClose={() => setLoosen(null)} onApplied={onNext} />}
     </div>
   );
 }

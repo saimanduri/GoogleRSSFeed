@@ -1,8 +1,7 @@
-# Personal Agent - Windows CI.
-# Runs on GitHub-hosted Windows runners: lint, full test suite (incl. Windows-only tests), end-to-end
-# selftest, red-team gate, UI type-check/build, Tauri build and a PyInstaller bundle uploaded as an artifact.
-# This file is used when personal-agent/ is its own repository. The copy in the parent repository's
-# .github/workflows/ runs the same jobs with working-directory personal-agent.
+# Windows CI for  (mirror of .github/workflows/windows-ci.yml with paths prefixed).
+# python : lint, environment check, full test suite incl. Windows-only tests + red-team gate, end-to-end selftest
+# ui     : TypeScript check, Vite build, Tauri (Rust) build of pa-ui.exe
+# bundle : PyInstaller executables + pa-ui.exe -> downloadable "PersonalAgent-windows-bundle" artifact
 name: personal-agent-windows
 
 on:
@@ -30,11 +29,10 @@ jobs:
           pip install -r requirements-dev.txt
           pip freeze > requirements.lock
       - name: Environment check (native libraries)
-        continue-on-error: true
         run: python scripts/check_env.py
       - name: Lint
         run: ruff check app tests --select E,F,W,B --ignore E501,B905,B007,B904
-      - name: Tests (unit + integration + Windows)
+      - name: Tests (unit + integration + Windows + red-team N=20)
         env:
           PA_REDTEAM_N: "20"
         run: python -m pytest -q -ra --junitxml=test-results.xml
@@ -60,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -88,6 +86,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
       - uses: actions/download-artifact@v4
         with:
           name: pa-ui
@@ -96,7 +96,11 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           ./scripts/build.ps1 -OutDir dist/PersonalAgent
+      - name: Smoke-test the frozen executables
+        run: |
+          ./dist/PersonalAgent/pa-core.exe --selftest-network; "pa-core exit: $LASTEXITCODE (1 = outbound NOT blocked, expected on CI without firewall rules)"
+          if (-not (Test-Path dist/PersonalAgent/pa-ui.exe)) { throw "pa-ui.exe missing" }
       - uses: actions/upload-artifact@v4
         with:
-          name: PersonalAgent-windows-dev-bundle
+          name: PersonalAgent-windows-bundle
           path: dist/PersonalAgent

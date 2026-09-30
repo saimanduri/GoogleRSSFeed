@@ -149,7 +149,7 @@ def test_defender_detects_eicar_if_present(tmp_path):
 def test_firewall_rule_script_syntax():
     root = __import__("pathlib").Path(__file__).resolve().parents[2]
     r = subprocess.run(["powershell", "-NoProfile", "-Command",
-                        f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{root / 'installer' / 'windows' / 'firewall-rules.ps1'}', [ref]$null, [ref]$e); if ($e) {{ exit 1 }}"],
+                        f"$t = $null; $e = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile('{root / 'installer' / 'windows' / 'firewall-rules.ps1'}', [ref]$t, [ref]$e); if ($e) {{ exit 1 }}"],
                        capture_output=True)
     assert r.returncode == 0, r.stderr
 

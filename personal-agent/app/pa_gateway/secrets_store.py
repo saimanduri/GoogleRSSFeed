@@ -270,7 +270,7 @@ def _win_clipboard_set(text: str) -> None:
         zero = (0).to_bytes(4, "little")
         win32clipboard.SetClipboardData(no_history, zero)
         win32clipboard.SetClipboardData(no_cloud, zero)
-        win32clipboard.SetClipboardData(exclude, b"")
+        win32clipboard.SetClipboardData(exclude, zero)
     finally:
         win32clipboard.CloseClipboard()
 

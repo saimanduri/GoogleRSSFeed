@@ -66,6 +66,7 @@ function status() {
 }
 
 function step(runId: string, type: string, title: string, status = "done", detail: any = {}) {
+  for (const prev of S.steps[runId] ?? []) if (prev.status === "running" && type !== "policy") prev.status = "done";
   const s = { id: id("stp"), run_id: runId, seq: (S.steps[runId]?.length ?? 0) + 1, type, title, status, detail, started_at: now(), duration_ms: Math.floor(Math.random() * 400) };
   (S.steps[runId] ||= []).push(s);
   emit("run.step", { run_id: runId, step_id: s.id, seq: s.seq, type, title, status, detail });
@@ -105,6 +106,11 @@ function finish(chatId: string, runId: string, answer: string) {
 
 export async function mockCall(method: string, p: any): Promise<any> {
   await new Promise((r) => setTimeout(r, 60));
+  const r = await mockImpl(method, p);
+  return r === undefined ? r : structuredClone(r); // like the real IPC: every response is a fresh copy
+}
+
+async function mockImpl(method: string, p: any): Promise<any> {
   switch (method) {
     case "session.status": return status();
     case "session.touch": return { ok: true };

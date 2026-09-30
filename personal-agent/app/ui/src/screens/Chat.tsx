@@ -153,7 +153,7 @@ export function Chat() {
         </div>
         <div className="composer">
           <div className="composer-box">
-            <textarea ref={taRef} rows={1} value={text} placeholder="Message Personal Agent... (Enter to send, Shift+Enter for a new line)"
+            <textarea ref={taRef} rows={1} value={text} placeholder="Message Personal Agent…" title="Enter to send · Shift+Enter for a new line"
               onChange={(e) => { setText(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(220, e.target.scrollHeight)}px`; }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
             {status?.ui?.["voice.enabled"] !== false && <VoiceButton onText={(t) => send(t, true)} />}
