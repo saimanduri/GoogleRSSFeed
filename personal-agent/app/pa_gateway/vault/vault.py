@@ -30,7 +30,7 @@ from .protector import KeyProtector, protector_for
 from .secretmem import SecretBytes
 
 HEADER_VERSION = 1
-DEFAULT_ASSISTANT_NAME = "Personal Agent"
+DEFAULT_ASSISTANT_NAME = "ChiRAG Agent"
 AAD_PW = b"pa/vault/W_pw/v1"
 AAD_RESET = b"pa/vault/W_reset/v1"
 SUBKEYS = ("K_db", "K_files", "K_log", "K_secret", "K_ipc", "K_hdr", "K_dlp", "K_skill", "K_backup_local")

@@ -1,0 +1,2583 @@
+{
+ "about": "Every UI action with its backend call, expected response and expected backend side effects (security-log events). Run: python scripts/e2e_runner.py. UI-side expectations are in ui_actions.json.",
+ "steps": [
+  {
+   "id": "meta.about",
+   "ui": "Settings > Diagnostics & About",
+   "call": "about",
+   "expect": {
+    "has": [
+     "version"
+    ]
+   }
+  },
+  {
+   "id": "meta.status_fresh",
+   "ui": "App start (no account)",
+   "call": "session.status",
+   "expect": {
+    "eq": {
+     "state": "SETUP_REQUIRED"
+    }
+   }
+  },
+  {
+   "id": "setup.preflight",
+   "ui": "Wizard step 1 (checks)",
+   "call": "setup.preflight",
+   "expect": {
+    "has": [
+     "tpm"
+    ]
+   }
+  },
+  {
+   "id": "setup.weak_password",
+   "ui": "Wizard: type a weak password (strength meter)",
+   "call": "setup.check_password",
+   "params": {
+    "password": "password123",
+    "username": "tester9"
+   },
+   "expect": {
+    "truthy": [
+     "errors"
+    ]
+   }
+  },
+  {
+   "id": "setup.strong_password",
+   "ui": "Wizard: strong password enables Continue",
+   "call": "setup.check_password",
+   "params": {
+    "password": "${PASSWORD}",
+    "username": "tester9"
+   },
+   "expect": {
+    "falsy": [
+     "errors"
+    ]
+   }
+  },
+  {
+   "id": "setup.trivial_pin",
+   "ui": "Wizard: PIN 123456 is refused",
+   "call": "setup.check_pin",
+   "params": {
+    "pin": "123456"
+   },
+   "expect": {
+    "truthy": [
+     "errors"
+    ]
+   }
+  },
+  {
+   "id": "setup.good_pin",
+   "ui": "Wizard: good PIN accepted",
+   "call": "setup.check_pin",
+   "params": {
+    "pin": "${PIN}"
+   },
+   "expect": {
+    "falsy": [
+     "errors"
+    ]
+   }
+  },
+  {
+   "id": "setup.create",
+   "ui": "Wizard: Create account",
+   "call": "setup.create",
+   "hook": "recovery_answers",
+   "params": {
+    "username": "tester9",
+    "password": "${PASSWORD}",
+    "pin": "${PIN}",
+    "display_name": "E2E Tester",
+    "assistant_name": "Probe"
+   },
+   "expect": {
+    "has": [
+     "recovery_key",
+     "confirm_groups"
+    ]
+   },
+   "audit": [
+    "setup.completed"
+   ]
+  },
+  {
+   "id": "setup.recovery_pdf",
+   "ui": "Wizard: Save recovery key as PDF",
+   "call": "setup.recovery_pdf",
+   "params": {
+    "path": "${TMP}/rk.pdf"
+   },
+   "expect": {
+    "file_exists": [
+     "${TMP}/rk.pdf"
+    ]
+   },
+   "audit": [
+    "recovery_key.saved_to_file"
+   ]
+  },
+  {
+   "id": "setup.confirm_wrong",
+   "ui": "Wizard: wrong recovery groups are refused",
+   "call": "setup.confirm_recovery",
+   "params": {
+    "answers": {
+     "0": "AAAAA",
+     "1": "BBBBB"
+    }
+   },
+   "expect": {
+    "error_code": "recovery_mismatch"
+   }
+  },
+  {
+   "id": "setup.confirm_recovery",
+   "ui": "Wizard: type back 2 groups",
+   "call": "setup.confirm_recovery",
+   "params": {
+    "answers": "${RK_ANSWERS}"
+   },
+   "expect": {
+    "eq": {
+     "ok": true
+    }
+   },
+   "audit": [
+    "recovery_key.confirmed"
+   ]
+  },
+  {
+   "id": "meta.status_unlocked",
+   "ui": "Home after setup",
+   "call": "session.status",
+   "expect": {
+    "eq": {
+     "state": "UNLOCKED",
+     "display_name": "E2E Tester",
+     "assistant_name": "Probe"
+    }
+   }
+  },
+  {
+   "id": "meta.touch",
+   "ui": "Any click/keypress (idle timer)",
+   "call": "session.touch"
+  },
+  {
+   "id": "auth.lock",
+   "ui": "Top bar: Lock",
+   "call": "auth.lock",
+   "audit": [
+    "auth.locked"
+   ]
+  },
+  {
+   "id": "auth.locked_blocks",
+   "ui": "Locked: other screens refuse",
+   "call": "chat.list",
+   "expect": {
+    "error_code": "locked"
+   }
+  },
+  {
+   "id": "auth.quick_unlock",
+   "ui": "Lock screen: PIN + Unlock",
+   "call": "auth.quick_unlock",
+   "params": {
+    "pin": "${PIN}"
+   },
+   "audit": [
+    "auth.quick_unlock"
+   ]
+  },
+  {
+   "id": "auth.sign_out",
+   "ui": "Sign out (cold start state)",
+   "call": "auth.sign_out",
+   "audit": [
+    "auth.signout"
+   ]
+  },
+  {
+   "id": "auth.sign_in_wrong",
+   "ui": "Sign-in: wrong password",
+   "call": "auth.sign_in",
+   "params": {
+    "username": "tester9",
+    "password": "Wrong-Password-1234!"
+   },
+   "expect": {
+    "error_code": "auth_failed"
+   },
+   "audit": [
+    "auth.signin_failed"
+   ]
+  },
+  {
+   "id": "auth.sign_in",
+   "ui": "Sign-in: username + password",
+   "call": "auth.sign_in",
+   "params": {
+    "username": "tester9",
+    "password": "${PASSWORD}"
+   },
+   "audit": [
+    "auth.signin"
+   ]
+  },
+  {
+   "id": "auth.stepup_password",
+   "ui": "Re-auth dialog: password",
+   "call": "auth.step_up",
+   "params": {
+    "category": "secrets",
+    "method": "password",
+    "secret": "${PASSWORD}"
+   },
+   "audit": [
+    "auth.stepup"
+   ]
+  },
+  {
+   "id": "auth.stepup_pin",
+   "ui": "Re-auth dialog: PIN",
+   "call": "auth.step_up",
+   "params": {
+    "category": "export",
+    "method": "pin",
+    "secret": "${PIN}"
+   }
+  },
+  {
+   "id": "account.profile",
+   "ui": "Settings > Account > Profile > Save",
+   "call": "account.set_profile",
+   "params": {
+    "display_name": "Renamed",
+    "assistant_name": "Probe2"
+   },
+   "audit": [
+    "profile.changed"
+   ]
+  },
+  {
+   "id": "account.profile_check",
+   "ui": "Sidebar/title show new names",
+   "call": "session.status",
+   "expect": {
+    "eq": {
+     "display_name": "Renamed",
+     "assistant_name": "Probe2"
+    }
+   }
+  },
+  {
+   "id": "account.username",
+   "ui": "Settings > Account > Change username",
+   "call": "account.change_username",
+   "params": {
+    "password": "${PASSWORD}",
+    "username": "tester10"
+   },
+   "audit": [
+    "auth.username_changed"
+   ]
+  },
+  {
+   "id": "account.signin_history",
+   "ui": "Settings > Account > Sign-in history",
+   "call": "account.signin_history",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "account.change_password",
+   "ui": "Settings > Account > Password > Change",
+   "call": "account.change_password",
+   "params": {
+    "current": "${PASSWORD}",
+    "new": "${PW2}"
+   },
+   "set": {
+    "PASSWORD": "${PW2}"
+   },
+   "audit": [
+    "auth.password_changed"
+   ]
+  },
+  {
+   "id": "account.set_pin",
+   "ui": "Settings > Account > Change PIN",
+   "call": "account.set_pin",
+   "params": {
+    "password": "${PASSWORD}",
+    "pin": "${PIN2}",
+    "recovery_key": "${RK}"
+   },
+   "set": {
+    "PIN": "${PIN2}"
+   },
+   "audit": [
+    "auth.pin_changed"
+   ]
+  },
+  {
+   "id": "account.new_recovery_key",
+   "ui": "Settings > Account > New recovery key",
+   "call": "account.new_recovery_key",
+   "params": {
+    "password": "${PASSWORD}",
+    "pin": "${PIN}"
+   },
+   "expect": {
+    "has": [
+     "recovery_key"
+    ]
+   },
+   "save": {
+    "RK": "recovery_key"
+   },
+   "audit": [
+    "auth.recovery_key_rotated"
+   ]
+  },
+  {
+   "id": "auth.forgot_password",
+   "ui": "Sign-in: Forgot password (PIN + recovery key)",
+   "call": "auth.forgot_password",
+   "params": {
+    "pin": "${PIN}",
+    "recovery_key": "${RK}",
+    "new_password": "${PW3}"
+   },
+   "set": {
+    "PASSWORD": "${PW3}"
+   },
+   "expect": {
+    "has": [
+     "recovery_key"
+    ]
+   },
+   "save": {
+    "RK": "recovery_key"
+   },
+   "pre": "sign_out",
+   "audit": [
+    "auth.password_reset"
+   ]
+  },
+  {
+   "id": "auth.sign_in_after_reset",
+   "ui": "Sign in with the reset password",
+   "call": "auth.sign_in",
+   "params": {
+    "username": "tester10",
+    "password": "${PASSWORD}"
+   }
+  },
+  {
+   "id": "posture.run",
+   "ui": "Settings > Account > Security posture",
+   "call": "posture.run",
+   "expect": {
+    "len_ge": {
+     "$len": 5
+    }
+   }
+  },
+  {
+   "id": "posture.fix_unknown",
+   "ui": "Posture > Fix (unknown action)",
+   "call": "posture.fix",
+   "params": {
+    "action": "nope"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   },
+   "stepup": "security_settings"
+  },
+  {
+   "id": "posture.fix_verify_log",
+   "ui": "Posture > Verify log",
+   "call": "posture.fix",
+   "params": {
+    "action": "verify_log"
+   },
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   },
+   "stepup": "security_settings"
+  },
+  {
+   "id": "settings.describe",
+   "ui": "Settings (any section)",
+   "call": "settings.describe",
+   "expect": {
+    "has": [
+     "groups",
+     "settings"
+    ]
+   }
+  },
+  {
+   "id": "settings.classify_tighten",
+   "ui": "Settings: change a value (tighten/loosen decision)",
+   "call": "settings.classify",
+   "params": {
+    "changes": {
+     "ui.theme": "dark"
+    }
+   },
+   "expect": {
+    "has": [
+     "loosening"
+    ]
+   }
+  },
+  {
+   "id": "settings.apply_theme",
+   "ui": "Settings > Appearance: theme card",
+   "call": "settings.apply",
+   "params": {
+    "changes": {
+     "ui.theme": "ocean",
+     "ui.background": "waves"
+    }
+   },
+   "audit": [
+    "settings.changed"
+   ]
+  },
+  {
+   "id": "settings.apply_bad",
+   "ui": "Settings: invalid value rejected",
+   "call": "settings.apply",
+   "params": {
+    "changes": {
+     "ui.theme": "neon-pink"
+    }
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "settings.apply_unknown",
+   "ui": "Settings: unknown key rejected",
+   "call": "settings.apply",
+   "params": {
+    "changes": {
+     "nope.nothing": 1
+    }
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "settings.begin_loosen",
+   "ui": "Loosening dialog (10 s wait)",
+   "call": "settings.begin_loosen",
+   "params": {
+    "changes": {
+     "web.allowlist": [
+      "example.org"
+     ]
+    }
+   },
+   "expect": {
+    "has": [
+     "token"
+    ]
+   }
+  },
+  {
+   "id": "settings.loosen_needs_password",
+   "ui": "Loosening without password/token is refused",
+   "call": "settings.apply",
+   "params": {
+    "changes": {
+     "web.allowlist": [
+      "example.org"
+     ]
+    }
+   },
+   "expect": {
+    "error_code": "password_required"
+   }
+  },
+  {
+   "id": "settings.history",
+   "ui": "Settings > Rules > history",
+   "call": "settings.history",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "settings.profile_preview",
+   "ui": "Settings > Autonomy > profile preview",
+   "call": "settings.profile_preview",
+   "params": {
+    "profile": "cautious"
+   },
+   "expect": {
+    "has": [
+     "changes"
+    ]
+   }
+  },
+  {
+   "id": "settings.rules_plain",
+   "ui": "Settings > Rules & Safety (plain language)",
+   "call": "settings.rules_plain",
+   "expect": {
+    "has": [
+     "rules"
+    ]
+   }
+  },
+  {
+   "id": "ui.open_link_screen",
+   "ui": "Notification / link click opens a screen",
+   "call": "ui.open_link",
+   "params": {
+    "url": "personalagent://approvals"
+   },
+   "expect": {
+    "eq": {
+     "screen": "approvals"
+    }
+   }
+  },
+  {
+   "id": "ui.open_link_cannot_change_settings",
+   "ui": "Links can only open screens (never change settings)",
+   "call": "ui.open_link",
+   "params": {
+    "url": "personalagent://settings?ui.theme=dark&security.auto_lock_minutes=999"
+   },
+   "expect": {
+    "eq": {
+     "screen": "settings"
+    }
+   },
+   "audit": [
+    "ui.link_params_ignored"
+   ]
+  },
+  {
+   "id": "ui.open_link_unknown",
+   "ui": "Unknown link screen is rejected",
+   "call": "ui.open_link",
+   "params": {
+    "url": "personalagent://format-disk"
+   },
+   "expect": {
+    "eq": {
+     "screen": "home"
+    }
+   },
+   "audit": [
+    "ui.link_rejected"
+   ]
+  },
+  {
+   "id": "home.summary",
+   "ui": "Home",
+   "call": "home.summary",
+   "expect": {
+    "has": [
+     "events",
+     "budget"
+    ]
+   }
+  },
+  {
+   "id": "home.dismiss",
+   "ui": "Home > Updates > Dismiss",
+   "call": "home.dismiss",
+   "params": {
+    "id": "evt-does-not-exist"
+   }
+  },
+  {
+   "id": "notifications.list",
+   "ui": "Notifications",
+   "call": "notifications.list"
+  },
+  {
+   "id": "notifications.mark_read",
+   "ui": "Notifications > Mark read",
+   "call": "notifications.mark_read",
+   "params": {}
+  },
+  {
+   "id": "llm.models_empty",
+   "ui": "Settings > AI Model",
+   "call": "llm.models"
+  },
+  {
+   "id": "llm.add_mock",
+   "ui": "AI Model > Add model (dev mock)",
+   "call": "llm.add",
+   "params": {
+    "model": {
+     "provider": "dev_mock",
+     "name": "mock"
+    }
+   },
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "MOCK": "id"
+   },
+   "audit": [
+    "model.added"
+   ]
+  },
+  {
+   "id": "llm.test_mock",
+   "ui": "AI Model > Test model",
+   "call": "llm.test",
+   "params": {
+    "model_id": "${MOCK}"
+   },
+   "expect": {
+    "has": [
+     "checks"
+    ]
+   },
+   "audit": [
+    "model.tested"
+   ]
+  },
+  {
+   "id": "llm.set_role",
+   "ui": "AI Model > default chat model",
+   "call": "llm.set_role",
+   "params": {
+    "role": "standard",
+    "model_id": "${MOCK}"
+   },
+   "audit": [
+    "settings.changed"
+   ]
+  },
+  {
+   "id": "llm.add_second",
+   "ui": "AI Model > Add another model",
+   "call": "llm.add",
+   "params": {
+    "model": {
+     "provider": "dev_mock",
+     "name": "mock2"
+    }
+   },
+   "save": {
+    "MOCK2": "id"
+   }
+  },
+  {
+   "id": "llm.remove",
+   "ui": "AI Model > Remove model",
+   "call": "llm.remove",
+   "params": {
+    "model_id": "${MOCK2}"
+   }
+  },
+  {
+   "id": "llm.remote_needs_password",
+   "ui": "AI Model > remote endpoint needs password",
+   "call": "llm.add",
+   "params": {
+    "model": {
+     "provider": "openai",
+     "name": "remote",
+     "endpoint": "http://203.0.113.9:8000/v1",
+     "model_name": "x"
+    }
+   },
+   "expect": {
+    "error_code": "password_required"
+   }
+  },
+  {
+   "id": "llm.discover_ollama",
+   "ui": "AI Model > Ollama > Discover",
+   "call": "llm.discover",
+   "params": {
+    "provider": "ollama",
+    "endpoint": "http://127.0.0.1:11434"
+   },
+   "requires": "ollama",
+   "expect": {
+    "has": [
+     "models"
+    ]
+   }
+  },
+  {
+   "id": "llm.inspect_ollama",
+   "ui": "AI Model > Ollama > pick a discovered model (type is detected)",
+   "call": "llm.inspect",
+   "params": {
+    "provider": "ollama",
+    "endpoint": "http://127.0.0.1:11434",
+    "model_name": "gemma4:latest"
+   },
+   "requires": "ollama",
+   "expect": {
+    "has": [
+     "kind"
+    ]
+   }
+  },
+  {
+   "id": "web.test_search_not_set_up",
+   "ui": "Settings > Connectors > Web > Test web search (no provider yet)",
+   "call": "web.test_search",
+   "params": {},
+   "expect": {
+    "error_code": "needs_setup"
+   }
+  },
+  {
+   "id": "voice.no_stt",
+   "ui": "Chat > mic with no STT model",
+   "call": "voice.transcribe",
+   "params": {
+    "mime": "audio/webm"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "chat.create",
+   "ui": "Chat > New chat",
+   "call": "chat.create",
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "CHAT": "id"
+   }
+  },
+  {
+   "id": "localfiles.grant",
+   "ui": "Chat > paperclip: attach a file from this PC",
+   "call": "localfiles.grant",
+   "params": {
+    "chat_id": "${CHAT}",
+    "path": "${TMP}/sales.csv"
+   },
+   "expect": {
+    "has": [
+     "id",
+     "name",
+     "kind"
+    ],
+    "eq": {
+     "kind": "table",
+     "name": "sales.csv"
+    }
+   },
+   "save": {
+    "LF": "id"
+   },
+   "audit": [
+    "localfile.granted"
+   ]
+  },
+  {
+   "id": "localfiles.grant_blocked",
+   "ui": "Chat > attach: unsupported file type",
+   "call": "localfiles.grant",
+   "params": {
+    "chat_id": "${CHAT}",
+    "path": "${TMP}/nope.exe"
+   },
+   "expect": {
+    "error_code": "not_found"
+   }
+  },
+  {
+   "id": "localfiles.list",
+   "ui": "Chat: attached-file chips",
+   "call": "localfiles.list",
+   "params": {
+    "chat_id": "${CHAT}"
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "localfiles.folder_info",
+   "ui": "Chat > folder button: approval dialog shows counts",
+   "call": "localfiles.folder_info",
+   "params": {
+    "path": "${TMP}"
+   },
+   "expect": {
+    "has": [
+     "files",
+     "subfolders",
+     "subfolder_names"
+    ],
+    "eq": {
+     "subfolders": 2
+    }
+   }
+  },
+  {
+   "id": "localfiles.grant_folder_subfolders_unconfirmed",
+   "ui": "Folder dialog: subfolders ticked without confirmation",
+   "call": "localfiles.grant_folder",
+   "params": {
+    "chat_id": "${CHAT}",
+    "path": "${TMP}",
+    "include_subfolders": true,
+    "confirm_subfolders": false
+   },
+   "expect": {
+    "error_code": "subfolders_need_approval"
+   }
+  },
+  {
+   "id": "localfiles.grant_folder",
+   "ui": "Chat > folder button > Share folder (without subfolders)",
+   "call": "localfiles.grant_folder",
+   "params": {
+    "chat_id": "${CHAT}",
+    "path": "${TMP}",
+    "include_subfolders": false,
+    "confirm_subfolders": false
+   },
+   "expect": {
+    "has": [
+     "id",
+     "scope"
+    ],
+    "eq": {
+     "scope": "folder",
+     "recursive": false,
+     "expired": false
+    }
+   },
+   "save": {
+    "LFD": "id"
+   },
+   "audit": [
+    "localfile.folder_granted"
+   ]
+  },
+  {
+   "id": "localfiles.grant_folder_drive_root",
+   "ui": "Folder dialog: a whole drive is refused",
+   "call": "localfiles.grant_folder",
+   "params": {
+    "chat_id": "${CHAT}",
+    "path": "C:\\\\",
+    "include_subfolders": false,
+    "confirm_subfolders": false
+   },
+   "expect": {
+    "error_code": "policy_denied"
+   }
+  },
+  {
+   "id": "localfiles.requests",
+   "ui": "Chat: cards 'assistant wants to read a subfolder'",
+   "call": "localfiles.requests",
+   "params": {
+    "chat_id": "${CHAT}"
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 0
+    }
+   }
+  },
+  {
+   "id": "localfiles.allow_subfolders_unconfirmed",
+   "ui": "Subfolder card: Allow without confirmation",
+   "call": "localfiles.allow_subfolders",
+   "params": {
+    "grant_id": "${LFD}",
+    "confirm": false
+   },
+   "expect": {
+    "error_code": "subfolders_need_approval"
+   }
+  },
+  {
+   "id": "localfiles.allow_subfolders",
+   "ui": "Subfolder card > Allow subfolders",
+   "call": "localfiles.allow_subfolders",
+   "params": {
+    "grant_id": "${LFD}",
+    "confirm": true
+   },
+   "expect": {
+    "eq": {
+     "recursive": true
+    }
+   },
+   "audit": [
+    "localfile.subfolders_allowed"
+   ]
+  },
+  {
+   "id": "localfiles.reapprove",
+   "ui": "Chat chip: Allow again (after a new session)",
+   "call": "localfiles.reapprove",
+   "params": {
+    "grant_id": "${LFD}"
+   },
+   "expect": {
+    "eq": {
+     "recursive": false,
+     "expired": false
+    }
+   },
+   "audit": [
+    "localfile.reapproved"
+   ]
+  },
+  {
+   "id": "localfiles.deny_request",
+   "ui": "Subfolder card > Not now",
+   "call": "localfiles.deny_request",
+   "params": {
+    "request_id": "lfr_none"
+   },
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   }
+  },
+  {
+   "id": "localfiles.revoke",
+   "ui": "Chat: remove an attached file (x on the chip)",
+   "call": "localfiles.revoke",
+   "params": {
+    "grant_id": "${LF}"
+   },
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   },
+   "audit": [
+    "localfile.revoked"
+   ]
+  },
+  {
+   "id": "chat.update",
+   "ui": "Chat > pin / folder / rename",
+   "call": "chat.update",
+   "params": {
+    "chat_id": "${CHAT}",
+    "title": "E2E chat",
+    "pinned": true,
+    "folder": "Work"
+   },
+   "audit": [
+    "chat.updated"
+   ]
+  },
+  {
+   "id": "chat.update_bad_folder",
+   "ui": "Chat > folder with markup is refused",
+   "call": "chat.update",
+   "params": {
+    "chat_id": "${CHAT}",
+    "folder": "<b>x</b>"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "chat.list_pinned",
+   "ui": "Chat list shows Pinned / folder",
+   "call": "chat.list",
+   "expect": {
+    "eq": {
+     "0.pinned": 1,
+     "0.folder": "Work",
+     "0.title": "E2E chat"
+    }
+   }
+  },
+  {
+   "id": "chat.send",
+   "ui": "Chat > Send",
+   "call": "chat.send",
+   "params": {
+    "chat_id": "${CHAT}",
+    "text": "hello from the e2e runner"
+   },
+   "expect": {
+    "has": [
+     "run_id"
+    ]
+   },
+   "save": {
+    "RUN": "run_id"
+   },
+   "audit": [
+    "task.created"
+   ]
+  },
+  {
+   "id": "chat.reply_arrives",
+   "ui": "Chat: assistant reply appears",
+   "call": "chat.get",
+   "params": {
+    "chat_id": "${CHAT}"
+   },
+   "poll": {
+    "until": {
+     "path": "messages.$len",
+     "op": "len_ge",
+     "value": 2
+    },
+    "timeout": 60
+   },
+   "expect": {
+    "contains": {
+     "messages.1.content": "hello from the e2e runner"
+    }
+   }
+  },
+  {
+   "id": "runs.list",
+   "ui": "Activity > Requests & steps",
+   "call": "runs.list",
+   "params": {
+    "limit": 20
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "runs.get",
+   "ui": "Activity > select a request / Chat > Steps",
+   "call": "runs.get",
+   "params": {
+    "run_id": "${RUN}"
+   },
+   "expect": {
+    "has": [
+     "steps"
+    ]
+   }
+  },
+  {
+   "id": "runs.transcript",
+   "ui": "Activity > run transcript",
+   "call": "runs.transcript",
+   "params": {
+    "run_id": "${RUN}"
+   },
+   "stepup": "transcripts"
+  },
+  {
+   "id": "runs.transcript_event",
+   "ui": "Activity > run transcript (pick the model request)",
+   "call": "runs.transcript",
+   "params": {
+    "run_id": "${RUN}"
+   },
+   "stepup": "transcripts",
+   "save": {
+    "EVT": "[kind=llm.request].id"
+   }
+  },
+  {
+   "id": "runs.replay",
+   "ui": "Activity > Replay this request (optionally on another model)",
+   "call": "runs.replay",
+   "params": {
+    "event_id": "${EVT}",
+    "model_id": "${MOCK}"
+   },
+   "stepup": "transcripts",
+   "expect": {
+    "has": [
+     "replayed",
+     "original",
+     "model"
+    ]
+   },
+   "audit": [
+    "llm.replay"
+   ]
+  },
+  {
+   "id": "chat.canary_never_returned",
+   "ui": "A secret stored earlier never shows in chat",
+   "call": "chat.get",
+   "params": {
+    "chat_id": "${CHAT}"
+   },
+   "expect": {
+    "absent": [
+     "${CANARY}"
+    ]
+   }
+  },
+  {
+   "id": "history.search",
+   "ui": "History / palette search",
+   "call": "history.search",
+   "params": {
+    "query": "e2e runner"
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "tasks.list",
+   "ui": "Tasks",
+   "call": "tasks.list",
+   "params": {
+    "states": [
+     "QUEUED",
+     "RUNNING",
+     "COMPLETED"
+    ],
+    "limit": 50
+   }
+  },
+  {
+   "id": "tasks.get_missing",
+   "ui": "Tasks > open missing task",
+   "call": "tasks.get",
+   "params": {
+    "task_id": "task_missing"
+   },
+   "expect": {
+    "error_code": "not_found"
+   }
+  },
+  {
+   "id": "tasks.stop",
+   "ui": "Tasks > Stop",
+   "call": "tasks.stop",
+   "params": {
+    "task_id": "task_missing"
+   },
+   "expect": {
+    "error_code": "not_found"
+   }
+  },
+  {
+   "id": "tasks.resume_invalid",
+   "ui": "Tasks > Resume (not resumable)",
+   "call": "tasks.resume",
+   "params": {
+    "task_id": "task_missing"
+   },
+   "expect": {
+    "error_code": "invalid_state"
+   }
+  },
+  {
+   "id": "chat.archive",
+   "ui": "Chat > Archive",
+   "call": "chat.update",
+   "params": {
+    "chat_id": "${CHAT}",
+    "archived": true
+   }
+  },
+  {
+   "id": "chat.list_archived",
+   "ui": "Chat > Show archived",
+   "call": "chat.list",
+   "params": {
+    "archived": true
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "chat.delete",
+   "ui": "Chat > Delete",
+   "call": "chat.delete",
+   "params": {
+    "chat_id": "${CHAT}"
+   },
+   "audit": [
+    "chat.deleted"
+   ]
+  },
+  {
+   "id": "chat.deleted_gone",
+   "ui": "Deleted chat disappears (also from history)",
+   "call": "chat.list",
+   "params": {
+    "archived": true
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 0
+    }
+   }
+  },
+  {
+   "id": "approvals.create_via_chat",
+   "ui": "Chat: 'remind me ...' creates a confirmation card",
+   "call": "chat.create",
+   "save": {
+    "CHAT2": "id"
+   }
+  },
+  {
+   "id": "approvals.ask",
+   "ui": "Chat > Send 'remind me to stretch tomorrow at 9'",
+   "call": "chat.send",
+   "params": {
+    "chat_id": "${CHAT2}",
+    "text": "remind me to stretch tomorrow at 9"
+   }
+  },
+  {
+   "id": "approvals.pending",
+   "ui": "Approvals > Waiting",
+   "call": "approvals.list",
+   "params": {
+    "status": "PENDING"
+   },
+   "poll": {
+    "until": {
+     "path": "$len",
+     "op": "len_ge",
+     "value": 1
+    },
+    "timeout": 60
+   },
+   "save": {
+    "APPR": "0.id",
+    "APPR_HASH": "0.payload_hash"
+   }
+  },
+  {
+   "id": "approvals.bad_hash",
+   "ui": "Approval card: tampered payload is refused",
+   "call": "approvals.decide",
+   "params": {
+    "approval_id": "${APPR}",
+    "approve": true,
+    "payload_hash": "sha256:bogus"
+   },
+   "expect": {
+    "error_code": "approval_hash_mismatch"
+   }
+  },
+  {
+   "id": "approvals.approve",
+   "ui": "Approval card > Confirm",
+   "call": "approvals.decide",
+   "params": {
+    "approval_id": "${APPR}",
+    "approve": true,
+    "payload_hash": "${APPR_HASH}"
+   },
+   "audit": [
+    "approval.approved"
+   ]
+  },
+  {
+   "id": "approvals.single_use",
+   "ui": "Approval card: second use is refused",
+   "call": "approvals.decide",
+   "params": {
+    "approval_id": "${APPR}",
+    "approve": true,
+    "payload_hash": "${APPR_HASH}"
+   },
+   "expect": {
+    "error_code": "approval_not_pending"
+   }
+  },
+  {
+   "id": "approvals.history",
+   "ui": "Approvals > History",
+   "call": "approvals.list",
+   "params": {
+    "status": "APPROVED"
+   }
+  },
+  {
+   "id": "reminders.create",
+   "ui": "Reminders > New / chat confirmation",
+   "call": "reminders.create",
+   "params": {
+    "text": "e2e reminder",
+    "due_at": "2099-01-01T09:00",
+    "timezone": "UTC"
+   },
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "REM": "id"
+   },
+   "audit": [
+    "reminder.scheduled"
+   ]
+  },
+  {
+   "id": "reminders.list",
+   "ui": "Reminders",
+   "call": "reminders.list",
+   "params": {},
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "reminders.snooze",
+   "ui": "Reminders > Snooze",
+   "call": "reminders.action",
+   "params": {
+    "id": "${REM}",
+    "action": "snooze",
+    "minutes": 15
+   }
+  },
+  {
+   "id": "reminders.cancel",
+   "ui": "Reminders > Cancel",
+   "call": "reminders.action",
+   "params": {
+    "id": "${REM}",
+    "action": "cancel"
+   },
+   "audit": [
+    "reminder.cancelled"
+   ]
+  },
+  {
+   "id": "reminders.bad_action",
+   "ui": "Reminders: unknown action refused",
+   "call": "reminders.action",
+   "params": {
+    "id": "${REM}",
+    "action": "explode"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "reminders.show_done",
+   "ui": "Reminders > Show all",
+   "call": "reminders.list",
+   "params": {
+    "include_done": true
+   }
+  },
+  {
+   "id": "missions.parse_schedule",
+   "ui": "Missions > schedule in plain words",
+   "call": "missions.parse_schedule",
+   "params": {
+    "text": "every weekday at 7:30",
+    "timezone": "Asia/Kolkata"
+   },
+   "expect": {
+    "has": [
+     "schedule",
+     "next_run"
+    ],
+    "truthy": [
+     "next_run"
+    ]
+   }
+  },
+  {
+   "id": "missions.describe",
+   "ui": "Missions > Describe in plain words",
+   "call": "missions.describe",
+   "params": {
+    "text": "every weekday at 7:30 summarise important mail"
+   }
+  },
+  {
+   "id": "missions.create",
+   "ui": "Missions > New > Save",
+   "call": "missions.create",
+   "params": {
+    "mission": {
+     "name": "e2e mission",
+     "objective": "say hello",
+     "schedule": "every day at 7",
+     "timezone": "UTC",
+     "allowed_tools": [],
+     "missed_run_policy": "SKIP"
+    }
+   },
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "MSN": "id"
+   },
+   "audit": [
+    "mission.created"
+   ]
+  },
+  {
+   "id": "missions.update",
+   "ui": "Missions > Edit > Save",
+   "call": "missions.update",
+   "params": {
+    "mission_id": "${MSN}",
+    "mission": {
+     "name": "e2e mission 2"
+    }
+   },
+   "audit": [
+    "mission.updated"
+   ]
+  },
+  {
+   "id": "missions.activate",
+   "ui": "Missions > Activate",
+   "call": "missions.activate",
+   "params": {
+    "mission_id": "${MSN}"
+   },
+   "audit": [
+    "mission.status"
+   ]
+  },
+  {
+   "id": "missions.run_now",
+   "ui": "Missions > Run now",
+   "call": "missions.run_now",
+   "params": {
+    "mission_id": "${MSN}"
+   },
+   "audit": [
+    "task.created"
+   ]
+  },
+  {
+   "id": "missions.pause",
+   "ui": "Missions > Pause",
+   "call": "missions.set_status",
+   "params": {
+    "mission_id": "${MSN}",
+    "status": "PAUSED"
+   }
+  },
+  {
+   "id": "missions.bad_status",
+   "ui": "Missions: cannot resume via set_status",
+   "call": "missions.set_status",
+   "params": {
+    "mission_id": "${MSN}",
+    "status": "ACTIVE"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "missions.list",
+   "ui": "Missions list",
+   "call": "missions.list",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "emailskills.list",
+   "ui": "Settings > Email monitoring / Outlook: list of skills",
+   "call": "emailskills.list",
+   "params": {
+    "mark_seen": true
+   },
+   "expect": {
+    "len_ge": {
+     "skills.$len": 10
+    },
+    "has": [
+     "outlook_installed",
+     "usable"
+    ]
+   }
+  },
+  {
+   "id": "emailskills.set_needs_setup",
+   "ui": "Email monitoring: switch a skill on before Outlook is connected",
+   "call": "emailskills.set",
+   "params": {
+    "skill": "approvals",
+    "enabled": true
+   },
+   "expect": {
+    "error_code": "needs_setup"
+   }
+  },
+  {
+   "id": "emailskills.set_off",
+   "ui": "Email monitoring: switch a skill off",
+   "call": "emailskills.set",
+   "params": {
+    "skill": "approvals",
+    "enabled": false
+   },
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   }
+  },
+  {
+   "id": "emailskills.run_needs_setup",
+   "ui": "Outlook > Run now before Outlook is connected",
+   "call": "emailskills.run",
+   "params": {
+    "skill": "approvals"
+   },
+   "expect": {
+    "error_code": "needs_setup"
+   }
+  },
+  {
+   "id": "network.logs",
+   "ui": "Activity > Network Logs",
+   "call": "network.logs",
+   "params": {
+    "days": 7
+   },
+   "expect": {
+    "has": [
+     "rows",
+     "summary",
+     "retention_days"
+    ]
+   }
+  },
+  {
+   "id": "network.logs_filtered",
+   "ui": "Network Logs: filter by website / result",
+   "call": "network.logs",
+   "params": {
+    "days": 1,
+    "host": "example",
+    "outcome": "blocked",
+    "include_local": false
+   },
+   "expect": {
+    "has": [
+     "rows",
+     "total"
+    ]
+   }
+  },
+  {
+   "id": "system.usage",
+   "ui": "Left menu: live GPU meter",
+   "call": "system.usage",
+   "expect": {
+    "has": [
+     "available",
+     "history"
+    ]
+   }
+  },
+  {
+   "id": "settings.picture_rejected",
+   "ui": "Settings > Appearance: picture that is not a real image",
+   "call": "settings.apply",
+   "params": {
+    "changes": {
+     "ui.assistant_icon": "data:image/svg+xml;base64,PHN2Zy8+"
+    }
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "missions.cancel",
+   "ui": "Missions > Cancel",
+   "call": "missions.set_status",
+   "params": {
+    "mission_id": "${MSN}",
+    "status": "CANCELLED"
+   }
+  },
+  {
+   "id": "files.upload",
+   "ui": "My Files > Upload",
+   "call": "files.upload",
+   "params": {
+    "path": "${TMP}/hello.txt",
+    "tags": [
+     "e2e"
+    ]
+   },
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "FILE": "id"
+   },
+   "audit": [
+    "file.ingested"
+   ]
+  },
+  {
+   "id": "files.ready",
+   "ui": "My Files: file passes quarantine -> READY",
+   "call": "files.list",
+   "params": {},
+   "poll": {
+    "until": {
+     "path": "files.0.status",
+     "op": "eq",
+     "value": "READY"
+    },
+    "timeout": 30
+   }
+  },
+  {
+   "id": "files.reread",
+   "ui": "My Files > file > Read with vision model",
+   "call": "files.reread",
+   "params": {
+    "file_id": "${FILE}"
+   },
+   "expect": {
+    "error_code": "no_vision_model"
+   }
+  },
+  {
+   "id": "files.release_unscanned",
+   "ui": "My Files > Quarantine > Allow without antivirus scan (needs re-authentication)",
+   "call": "files.release_unscanned",
+   "params": {
+    "file_id": "${FILE}"
+   },
+   "expect": {
+    "error_code": "invalid_state"
+   }
+  },
+  {
+   "id": "files.meta_update",
+   "ui": "My Files > file > Summary > Edit > Save",
+   "call": "files.meta_update",
+   "params": {
+    "file_id": "${FILE}",
+    "title": "E2E note",
+    "doc_type": "Text file",
+    "summary": "A small note used by the end-to-end run.",
+    "keywords": [
+     "e2e"
+    ]
+   },
+   "expect": {
+    "has": [
+     "title",
+     "summary"
+    ],
+    "eq": {
+     "edited": true
+    }
+   },
+   "audit": [
+    "file.meta_edited"
+   ]
+  },
+  {
+   "id": "files.meta_update_rejects_ids",
+   "ui": "Summary editor refuses ID-like values",
+   "call": "files.meta_update",
+   "params": {
+    "file_id": "${FILE}",
+    "title": "x",
+    "summary": "my pan is ABCDE1234F",
+    "keywords": []
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "files.analyse",
+   "ui": "My Files > file > Summarise again",
+   "call": "files.analyse",
+   "params": {
+    "file_id": "${FILE}"
+   },
+   "expect": {
+    "has": [
+     "started"
+    ]
+   }
+  },
+  {
+   "id": "files.preview",
+   "ui": "My Files > Preview",
+   "call": "files.preview",
+   "params": {
+    "file_id": "${FILE}"
+   },
+   "expect": {
+    "contains": {
+     "text": "hello e2e file"
+    }
+   }
+  },
+  {
+   "id": "home.widgets",
+   "ui": "Home: widgets board",
+   "call": "home.widgets",
+   "params": {},
+   "expect": {
+    "has": [
+     "catalog",
+     "enabled",
+     "data"
+    ]
+   }
+  },
+  {
+   "id": "home.widgets_set",
+   "ui": "Home > Widgets panel: switch widgets on/off",
+   "call": "home.widgets_set",
+   "params": {
+    "enabled": [
+     "reminders",
+     "storage",
+     "attention"
+    ]
+   },
+   "expect": {
+    "has": [
+     "enabled",
+     "data"
+    ]
+   }
+  },
+  {
+   "id": "files.update",
+   "ui": "My Files > rename / tags / knowledge",
+   "call": "files.update",
+   "params": {
+    "file_id": "${FILE}",
+    "name": "renamed.txt",
+    "tags": [
+     "e2e",
+     "x"
+    ],
+    "in_knowledge": true
+   }
+  },
+  {
+   "id": "files.label",
+   "ui": "My Files > Set label",
+   "call": "files.set_label",
+   "params": {
+    "file_id": "${FILE}",
+    "level": "CONFIDENTIAL"
+   },
+   "audit": [
+    "file.label_changed"
+   ]
+  },
+  {
+   "id": "files.save_copy",
+   "ui": "My Files > Save a copy",
+   "call": "files.save_copy",
+   "params": {
+    "file_id": "${FILE}",
+    "path": "${TMP}/copy.txt"
+   },
+   "expect": {
+    "file_exists": [
+     "${TMP}/copy.txt"
+    ]
+   }
+  },
+  {
+   "id": "files.delete",
+   "ui": "My Files > Delete",
+   "call": "files.delete",
+   "params": {
+    "file_id": "${FILE}"
+   },
+   "audit": [
+    "file.deleted"
+   ]
+  },
+  {
+   "id": "files.missing_upload",
+   "ui": "My Files > Upload a missing file",
+   "call": "files.upload",
+   "params": {
+    "path": "${TMP}/nope.txt"
+   },
+   "expect": {
+    "error_code": "not_found"
+   }
+  },
+  {
+   "id": "memory.add",
+   "ui": "Memory > Add",
+   "call": "memory.add",
+   "params": {
+    "content": "I prefer short reports",
+    "type": "preference"
+   },
+   "audit": [
+    "memory.created"
+   ]
+  },
+  {
+   "id": "memory.list",
+   "ui": "Memory",
+   "call": "memory.list",
+   "params": {},
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   },
+   "save": {
+    "MEM": "0.id"
+   }
+  },
+  {
+   "id": "memory.edit",
+   "ui": "Memory > Edit",
+   "call": "memory.action",
+   "params": {
+    "id": "${MEM}",
+    "action": "edit",
+    "content": "I prefer very short reports"
+   },
+   "audit": [
+    "memory.edited"
+   ]
+  },
+  {
+   "id": "memory.disable",
+   "ui": "Memory > Disable",
+   "call": "memory.action",
+   "params": {
+    "id": "${MEM}",
+    "action": "disable"
+   }
+  },
+  {
+   "id": "memory.enable",
+   "ui": "Memory > Enable",
+   "call": "memory.action",
+   "params": {
+    "id": "${MEM}",
+    "action": "enable"
+   }
+  },
+  {
+   "id": "memory.bad_action",
+   "ui": "Memory: unknown action refused",
+   "call": "memory.action",
+   "params": {
+    "id": "${MEM}",
+    "action": "launch"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "memory.about_me",
+   "ui": "Memory > About me",
+   "call": "memory.about_me"
+  },
+  {
+   "id": "memory.review",
+   "ui": "Memory > Weekly review",
+   "call": "memory.review"
+  },
+  {
+   "id": "memory.delete",
+   "ui": "Memory > Delete one",
+   "call": "memory.action",
+   "params": {
+    "id": "${MEM}",
+    "action": "delete"
+   },
+   "audit": [
+    "memory.deleted"
+   ]
+  },
+  {
+   "id": "memory.delete_all",
+   "ui": "Memory > Delete all memory",
+   "call": "memory.delete_all",
+   "params": {
+    "password": "${PASSWORD}"
+   }
+  },
+  {
+   "id": "secrets.generate",
+   "ui": "Secrets > Generate password",
+   "call": "secrets.generate",
+   "params": {
+    "length": 24
+   },
+   "expect": {
+    "has": [
+     "value"
+    ]
+   }
+  },
+  {
+   "id": "secrets.create",
+   "ui": "Secrets > Add",
+   "call": "secrets.create",
+   "params": {
+    "item": {
+     "title": "e2e secret",
+     "type": "api_key",
+     "value": "${CANARY}"
+    },
+    "bindings": []
+   },
+   "expect": {
+    "has": [
+     "id"
+    ],
+    "absent": [
+     "${CANARY}"
+    ]
+   },
+   "save": {
+    "SEC": "id"
+   },
+   "audit": [
+    "secret.created"
+   ]
+  },
+  {
+   "id": "secrets.list_hides_values",
+   "ui": "Secrets list never shows values",
+   "call": "secrets.list",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    },
+    "absent": [
+     "${CANARY}"
+    ]
+   }
+  },
+  {
+   "id": "secrets.reveal",
+   "ui": "Secrets > Reveal (re-auth)",
+   "call": "secrets.reveal",
+   "params": {
+    "id": "${SEC}"
+   },
+   "expect": {
+    "contains": {
+     "value": "CANARY-"
+    },
+    "has": [
+     "hide_after_seconds"
+    ]
+   },
+   "audit": [
+    "secret.revealed"
+   ],
+   "stepup": "secrets"
+  },
+  {
+   "id": "secrets.update",
+   "ui": "Secrets > Edit",
+   "call": "secrets.update",
+   "params": {
+    "id": "${SEC}",
+    "item": {
+     "title": "e2e secret v2",
+     "type": "api_key",
+     "value": "${CANARY}-v2"
+    }
+   },
+   "stepup": "secrets",
+   "audit": [
+    "secret.updated"
+   ]
+  },
+  {
+   "id": "secrets.versions",
+   "ui": "Secrets > Versions",
+   "call": "secrets.versions",
+   "params": {
+    "id": "${SEC}"
+   },
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   },
+   "save": {
+    "SECV": "0.id"
+   }
+  },
+  {
+   "id": "secrets.restore_version",
+   "ui": "Secrets > Restore version",
+   "call": "secrets.restore_version",
+   "params": {
+    "id": "${SEC}",
+    "version_id": "${SECV}"
+   },
+   "stepup": "secrets"
+  },
+  {
+   "id": "secrets.binding_targets",
+   "ui": "Secrets > Bindings (choices)",
+   "call": "secrets.binding_targets"
+  },
+  {
+   "id": "secrets.set_bindings",
+   "ui": "Secrets > Bind to tool",
+   "call": "secrets.set_bindings",
+   "params": {
+    "id": "${SEC}",
+    "bindings": []
+   },
+   "stepup": "secrets"
+  },
+  {
+   "id": "secrets.health",
+   "ui": "Secrets > Health check",
+   "call": "secrets.health"
+  },
+  {
+   "id": "secrets.copy",
+   "ui": "Secrets > Copy (auto-clears)",
+   "call": "secrets.copy",
+   "params": {
+    "id": "${SEC}",
+    "clear_after": 10
+   },
+   "stepup": "secrets"
+  },
+  {
+   "id": "secrets.import_csv",
+   "ui": "Secrets > Import CSV",
+   "call": "secrets.import_csv",
+   "params": {
+    "path": "${TMP}/import.csv",
+    "secure_delete": false
+   },
+   "stepup": "secrets"
+  },
+  {
+   "id": "secrets.export_encrypted",
+   "ui": "Secrets > Export (encrypted)",
+   "call": "secrets.export",
+   "params": {
+    "password": "${PASSWORD}",
+    "path": "${TMP}/secrets.export"
+   },
+   "expect": {
+    "file_exists": [
+     "${TMP}/secrets.export"
+    ]
+   },
+   "stepup": "export"
+  },
+  {
+   "id": "secrets.delete",
+   "ui": "Secrets > Delete",
+   "call": "secrets.delete",
+   "params": {
+    "id": "${SEC}"
+   },
+   "audit": [
+    "secret.deleted"
+   ],
+   "stepup": "secrets"
+  },
+  {
+   "id": "connectors.list",
+   "ui": "Settings > Connectors",
+   "call": "connectors.list",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "connectors.pause_all",
+   "ui": "Connectors > Pause all",
+   "call": "connectors.pause_all",
+   "params": {
+    "paused": true
+   },
+   "audit": [
+    "connector.pause_all"
+   ]
+  },
+  {
+   "id": "connectors.resume_all",
+   "ui": "Connectors > Resume all",
+   "call": "connectors.pause_all",
+   "params": {
+    "paused": false
+   }
+  },
+  {
+   "id": "connectors.enable_web",
+   "ui": "Connectors > Web on",
+   "call": "connectors.set",
+   "params": {
+    "connector": "web",
+    "enabled": true,
+    "use_chat": true
+   }
+  },
+  {
+   "id": "connectors.disable_web",
+   "ui": "Connectors > Web off",
+   "call": "connectors.set",
+   "params": {
+    "connector": "web",
+    "enabled": false
+   }
+  },
+  {
+   "id": "connectors.disconnect_web",
+   "ui": "Connectors > Disconnect",
+   "call": "connectors.disconnect",
+   "params": {
+    "connector": "web",
+    "delete_data": false
+   },
+   "stepup": "connectors"
+  },
+  {
+   "id": "tools.catalog",
+   "ui": "Settings > Tools & Skills",
+   "call": "tools.catalog",
+   "expect": {
+    "len_ge": {
+     "tools.$len": 5
+    }
+   }
+  },
+  {
+   "id": "skills.import",
+   "ui": "Tools & Skills > Import skill file",
+   "call": "skills.import",
+   "params": {
+    "path": "${TMP}/skill.json"
+   },
+   "expect": {
+    "has": [
+     "id"
+    ]
+   },
+   "save": {
+    "SKILL": "id"
+   },
+   "audit": [
+    "skill.proposed"
+   ]
+  },
+  {
+   "id": "skills.list",
+   "ui": "Tools & Skills > list",
+   "call": "skills.list",
+   "expect": {
+    "len_ge": {
+     "$len": 1
+    }
+   }
+  },
+  {
+   "id": "skills.activate",
+   "ui": "Tools & Skills > Activate (re-auth)",
+   "call": "skills.activate",
+   "params": {
+    "skill_id": "${SKILL}",
+    "password": "${PASSWORD}"
+   },
+   "stepup": "skills",
+   "audit": [
+    "skill.activated"
+   ]
+  },
+  {
+   "id": "skills.disable",
+   "ui": "Tools & Skills > Disable",
+   "call": "skills.set_status",
+   "params": {
+    "skill_id": "${SKILL}",
+    "status": "RETIRED"
+   },
+   "audit": [
+    "skill.status"
+   ]
+  },
+  {
+   "id": "activity.events",
+   "ui": "Activity > Security log",
+   "call": "activity.events",
+   "params": {
+    "filters": {},
+    "limit": 50
+   },
+   "expect": {
+    "len_ge": {
+     "events.$len": 5
+    }
+   }
+  },
+  {
+   "id": "activity.what_did_agent_do",
+   "ui": "Activity > What did the agent do?",
+   "call": "activity.what_did_agent_do",
+   "params": {
+    "since": "2000-01-01T00:00:00Z",
+    "until": "2100-01-01T00:00:00Z"
+   }
+  },
+  {
+   "id": "logs.verify",
+   "ui": "Logs > Verify integrity now",
+   "call": "logs.verify",
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   },
+   "audit": [
+    "log.verified"
+   ]
+  },
+  {
+   "id": "logs.status",
+   "ui": "Settings > Logs & SIEM",
+   "call": "logs.status"
+  },
+  {
+   "id": "logs.rotate",
+   "ui": "Logs > Rotate now",
+   "call": "logs.rotate",
+   "audit": [
+    "log.seal"
+   ]
+  },
+  {
+   "id": "logs.verify_after_rotate",
+   "ui": "Chain still verifies after rotation",
+   "call": "logs.verify",
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   }
+  },
+  {
+   "id": "logs.export",
+   "ui": "Logs > Export",
+   "call": "logs.export",
+   "params": {
+    "path": "${TMP}/log-export.jsonl"
+   },
+   "expect": {
+    "file_exists": [
+     "${TMP}/log-export.jsonl"
+    ]
+   },
+   "stepup": "export"
+  },
+  {
+   "id": "logs.siem_not_configured",
+   "ui": "Logs > Test SIEM (nothing configured)",
+   "call": "logs.siem_test",
+   "stepup": "security_settings"
+  },
+  {
+   "id": "killswitch.state",
+   "ui": "Emergency Stop page",
+   "call": "killswitch.state",
+   "expect": {
+    "falsy": [
+     "any"
+    ]
+   }
+  },
+  {
+   "id": "killswitch.activate",
+   "ui": "STOP ALL",
+   "call": "killswitch.activate",
+   "params": {
+    "level": "stop_all"
+   },
+   "expect": {
+    "truthy": [
+     "any"
+    ]
+   },
+   "audit": [
+    "killswitch.activated"
+   ]
+  },
+  {
+   "id": "killswitch.chat_blocked",
+   "ui": "While stopped: chat is refused",
+   "call": "chat.send",
+   "params": {
+    "chat_id": "${CHAT2}",
+    "text": "hi"
+   },
+   "expect": {
+    "error_code": "kill_switch_active"
+   }
+  },
+  {
+   "id": "killswitch.release_needs_password",
+   "ui": "Release without password refused",
+   "call": "killswitch.release",
+   "params": {},
+   "expect": {
+    "error_code": "password_required"
+   }
+  },
+  {
+   "id": "killswitch.release",
+   "ui": "Emergency Stop > Release (password)",
+   "call": "killswitch.release",
+   "params": {
+    "password": "${PASSWORD}"
+   },
+   "expect": {
+    "falsy": [
+     "any"
+    ]
+   },
+   "audit": [
+    "killswitch.released"
+   ]
+  },
+  {
+   "id": "killswitch.partial",
+   "ui": "Emergency Stop > single level",
+   "call": "killswitch.activate",
+   "params": {
+    "level": "disable_web"
+   }
+  },
+  {
+   "id": "killswitch.partial_release",
+   "ui": "Emergency Stop > release single level",
+   "call": "killswitch.release",
+   "params": {
+    "password": "${PASSWORD}",
+    "level": "disable_web"
+   }
+  },
+  {
+   "id": "killswitch.bad_level",
+   "ui": "Unknown level refused",
+   "call": "killswitch.activate",
+   "params": {
+    "level": "nuke"
+   },
+   "expect": {
+    "error_code": "invalid_request"
+   }
+  },
+  {
+   "id": "backup.status",
+   "ui": "Settings > Backup & Restore",
+   "call": "backup.status"
+  },
+  {
+   "id": "backup.run_now",
+   "ui": "Backup > Back up now",
+   "call": "backup.run_now",
+   "params": {
+    "folder": "${TMP}/bk",
+    "password": "${PASSWORD}"
+   },
+   "expect": {
+    "has": [
+     "file"
+    ]
+   },
+   "save": {
+    "BK": "file"
+   },
+   "audit": [
+    "backup.created"
+   ]
+  },
+  {
+   "id": "backup.wrong_password",
+   "ui": "Backup > wrong password refused",
+   "call": "backup.run_now",
+   "params": {
+    "folder": "${TMP}/bk",
+    "password": "Not-The-Password-1!"
+   },
+   "expect": {
+    "error_code": "auth_failed"
+   }
+  },
+  {
+   "id": "backup.verify",
+   "ui": "Backup > Verify",
+   "call": "backup.verify",
+   "params": {
+    "path": "${BK}",
+    "password": "${PASSWORD}"
+   },
+   "expect": {
+    "truthy": [
+     "ok"
+    ]
+   }
+  },
+  {
+   "id": "backup.enable_schedule",
+   "ui": "Backup > Enable schedule",
+   "call": "backup.enable_schedule",
+   "params": {
+    "password": "${PASSWORD}"
+   },
+   "audit": [
+    "backup.scheduled_enabled"
+   ]
+  },
+  {
+   "id": "privacy.data_map",
+   "ui": "Settings > Privacy & Data",
+   "call": "privacy.data_map"
+  },
+  {
+   "id": "privacy.export",
+   "ui": "Privacy > Export (encrypted)",
+   "call": "privacy.export",
+   "params": {
+    "password": "${PASSWORD}",
+    "folder": "${TMP}/bk"
+   },
+   "stepup": "export"
+  },
+  {
+   "id": "diagnostics.health",
+   "ui": "Settings > Diagnostics",
+   "call": "diagnostics.health",
+   "expect": {
+    "has": [
+     "gateway"
+    ]
+   }
+  },
+  {
+   "id": "diagnostics.bundle",
+   "ui": "Diagnostics > Export bundle (no secrets)",
+   "call": "diagnostics.bundle",
+   "params": {
+    "path": "${TMP}/diag.zip"
+   }
+  },
+  {
+   "id": "updates.status",
+   "ui": "Settings > Updates",
+   "call": "updates.status"
+  },
+  {
+   "id": "privacy.delete_wrong_confirm",
+   "ui": "Delete everything: wrong confirmation text",
+   "call": "privacy.delete_everything",
+   "params": {
+    "password": "${PASSWORD}",
+    "confirmation": "no"
+   },
+   "expect": {
+    "error_code": "confirmation_required"
+   }
+  },
+  {
+   "id": "privacy.delete_everything",
+   "ui": "Privacy > Delete everything",
+   "call": "privacy.delete_everything",
+   "params": {
+    "password": "${PASSWORD}",
+    "confirmation": "DELETE EVERYTHING"
+   }
+  },
+  {
+   "id": "meta.after_delete",
+   "ui": "App returns to the first-run wizard",
+   "call": "session.status",
+   "expect": {
+    "eq": {
+     "state": "SETUP_REQUIRED"
+    }
+   }
+  }
+ ]
+}

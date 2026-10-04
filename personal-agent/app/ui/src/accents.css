@@ -1,0 +1,12 @@
+/* Accent colour choice (Settings > Appearance). Overrides the theme's accent tokens; tuned per light/dark scheme so every
+   combination meets WCAG AA (tests/unit/test_theme_contrast.py). data-scheme is set by app.tsx from the active theme. */
+:root[data-accent="blue"][data-scheme="light"] { --accent: #135fec; --accent-2: #121cde; --accent-soft: #e7effd; --accent-text: #ffffff; }
+:root[data-accent="blue"][data-scheme="dark"] { --accent: #5a8ff2; --accent-2: #7178f4; --accent-soft: #112445; --accent-text: #0b0f14; }
+:root[data-accent="teal"][data-scheme="light"] { --accent: #0d776d; --accent-2: #0c576a; --accent-soft: #e8fcfa; --accent-text: #ffffff; }
+:root[data-accent="teal"][data-scheme="dark"] { --accent: #51ecdc; --accent-2: #68d3ee; --accent-soft: #114540; --accent-text: #0b0f14; }
+:root[data-accent="emerald"][data-scheme="light"] { --accent: #147949; --accent-2: #116b5c; --accent-soft: #e9fbf3; --accent-text: #ffffff; }
+:root[data-accent="emerald"][data-scheme="dark"] { --accent: #58e4a3; --accent-2: #6ee7d3; --accent-soft: #11452d; --accent-text: #0b0f14; }
+:root[data-accent="violet"][data-scheme="light"] { --accent: #6830e8; --accent-2: #9823e7; --accent-soft: #eee8fc; --accent-text: #ffffff; }
+:root[data-accent="violet"][data-scheme="dark"] { --accent: #9f7cf0; --accent-2: #cd93f3; --accent-soft: #211145; --accent-text: #0b0f14; }
+:root[data-accent="graphite"][data-scheme="light"] { --accent: #5a6a81; --accent-2: #545878; --accent-soft: #f0f2f5; --accent-text: #ffffff; }
+:root[data-accent="graphite"][data-scheme="dark"] { --accent: #8d9bb0; --accent-2: #9c9fba; --accent-soft: #242a33; --accent-text: #0b0f14; }

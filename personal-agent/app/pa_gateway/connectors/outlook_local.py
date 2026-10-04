@@ -120,6 +120,9 @@ class OutlookLocalConnector(ConnectorAdapter):
     def register_tools(self, tg) -> None:
         tg.register("outlook_local.list_folders", lambda a, c: self._simple("list_folders", a))
         tg.register("outlook_local.search", lambda a, c: self._simple("search", a))
+        tg.register("outlook_local.digest", lambda a, c: self._simple("digest", a))
+        tg.register("outlook_local.mail_stats", lambda a, c: self._simple("mail_stats", a))
+        tg.register("outlook_local.awaiting_reply", lambda a, c: self._simple("awaiting_reply", a))
         tg.register("outlook_local.get_message", lambda a, c: self._simple("get_message", a))
         tg.register("outlook_local.calendar_read", lambda a, c: self._simple("calendar_read", a))
         tg.register("outlook_local.get_attachment", self.get_attachment)

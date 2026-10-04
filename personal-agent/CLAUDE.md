@@ -28,9 +28,12 @@ in code comments refer to it). Security components are built before the capabili
 15. Skills are declarative JSON; never execute code from a skill. No self-modifying skills.
 16. Skills, summaries and sub-agents can never widen rights or drop limits.
 
+## Start here in a new session
+Read `docs/HANDOFF.md` first (state, the user's PC, open items, gotchas), then PENDING_WORK.md.
+
 ## Layout
 ```
-app/pa_common/     shared, no secrets: protocol framing, paths, sensitivity, dev-mode flags, pipe client
+app/pa_common/     shared, no secrets: protocol framing, paths, sensitivity, dev-mode flags, portable layout, pipe client
 app/pa_gateway/    SECURITY CORE (the only process with keys + network)
   app.py           Gateway object: wiring, sign-in state machine, scheduler, core supervisor, kill switch effects
   vault/           crypto wrappers, key hierarchy (vault.py), TPM/software PIN protector, recovery key
@@ -46,13 +49,18 @@ app/pa_gateway/    SECURITY CORE (the only process with keys + network)
   agentdata/       runs+steps, session log, tasks, missions/schedules, reminders, memory, skills, history, home
   ipc/             dispatcher (roles, validation), api_ui.py, api_core.py, named-pipe server, local client
   settings*.py     settings schema + tighten/loosen service
+  netlog.py        network log (every outbound request: web, Microsoft 365, model incl. localhost)
+  sysmon.py        GPU meter (Windows PDH counters)
+  localfiles.py    local files and FOLDERS read in place (per-chat AND per-session grants, separate subfolder approval, localfile.* tools; reader = pa_workers/parser/tables.py)
+  vision.py        pictures and scanned PDFs read by the vision model (llm/audio.py has the speech helpers and test clips)
+  agentdata/email_skills.py  Outlook email-monitoring skills (read-only routine templates, prefetch of tool calls)
   approvals.py budgets.py killswitch.py secrets_store.py sandbox.py backup.py posture.py workers.py
 app/pa_core/       agent loop, context builder (from session log only), prompts, JSON action parser
-app/pa_workers/    parser (documents), outlook (COM), sandbox/appcontainer (AppContainer launcher)
+app/pa_workers/    parser (documents + large tables), outlook (COM: mailops.py, mailscan.py), sandbox/appcontainer (AppContainer launcher)
 app/ui/            React + TypeScript (src/) and Tauri 2 Rust shell (src-tauri/)
 tests/             unit/, integration/, windows/ (Windows-only), redteam/ (deterministic gate)
 installer/windows/ firewall rules, dev install, uninstall
-scripts/           build.ps1 (bundle), check_env.py, pyinstaller/
+scripts/           build.ps1 (PyInstaller bundle), build-portable.ps1 (copy-and-run folder), check_env.py, laptop_smoke.py, pyinstaller/
 ```
 
 ## How to run things
@@ -63,7 +71,15 @@ scripts/           build.ps1 (bundle), check_env.py, pyinstaller/
 - Lint: `ruff check app tests --select E,F,W,B --ignore E501,B905,B007,B904`.
 - UI: `cd app/ui && npm install && npm run build` (type-check + bundle); `npm run dev` for a browser
   preview with the mock gateway (`src/api/mock.ts`); `npx tauri dev` for the real shell on Windows.
+- **Never run tests or experiments against the real TPM** (`PA_FORCE_SOFTWARE_PROTECTOR=1` is set by conftest). Wrong PINs
+  exhaust the TPM's per-user budget and block key creation for hours. `scripts/laptop_smoke.py` is the only thing
+  that uses it, and its wrong-PIN step is opt-in.
+- Portable (no admin): `scripts/build-portable.ps1`; signed embeddable Python + app sources; see docs/ARCHITECTURE.md 7.
+- Smart App Control blocks unsigned PyInstaller `.exe` files on some PCs: use the portable build or dev mode there.
 - CI (GitHub Actions, windows-latest): see `.github/workflows/`. Check it after every push.
+
+## Local file access rules (do not weaken)
+Only the UI role may create or widen a grant. A grant belongs to one chat and one app session (`session.nonce`); a folder grant covers its direct files only; subfolders need a separate explicit approval; every path is resolved and must stay inside the root; AppData / system / credential / network paths are refused. The four model kinds (chat, stt, vision, embedding) never mix (`ROLE_KIND`).
 
 ## Conventions
 - Python 3.12, type hints, small functions, docstrings that cite the spec section.
@@ -79,8 +95,18 @@ scripts/           build.ps1 (bundle), check_env.py, pyinstaller/
   register it, add policy tests and a red-team case if it has side effects.
 - New connector: subclass `ConnectorAdapter`, declare a manifest, register tools, register in `Gateway._open`.
 - DB change: append a new migration in `db/schema.py`; never edit released ones; update docs/DATABASE.md.
+- Every new RPC needs an e2e scenario (or a manual-only reason) and a UI control entry: `tests/e2e/`, regenerate with
+  `python scripts/gen_action_catalog.py`; run `python scripts/e2e_runner.py` (it must stay all-PASS).
+- Themes are token blocks in `app/ui/src/themes.css`; animation must honour `data-bg="off"` / Reduce motion.
 - UI: every RPC goes through `useApp().call()` which handles step-up and password prompts. Keep the mock
   (`src/api/mock.ts`) roughly in sync so browser previews keep working.
+
+- Outlook worker: dates in Outlook filters follow the Windows regional format (use `mailops.ol_date`); prefer `GetTable` over item loops; mail flags (approval/deadline/urgent/question) are deterministic code in `mailscan.py`, not the model.
+- Email skills: a template in `email_skills.py` = schedule + instruction + READ-ONLY tools + `pre` (tool calls the app makes before the model starts). A test asserts they never contain write tools.
+- Agent loop: Ollama gets `reasoning_effort: none` and a JSON schema; empty / placeholder answers are errors; never show raw model JSON to the user.
+- UI additions need: a Guide entry (`guideData.ts`, test `test_guide_coverage.py`), mock support in `api/mock.ts`, an entry in `tests/e2e/ui_actions.json`; colours only through tokens (`themes.css`/`accents.css`, contrast test); warnings orange / errors red (`Notice`, `Button tone`).
+- Developer/test seams (dev mode only, never in release): `PA_FORCE_SOFTWARE_PROTECTOR`, `PA_SKIP_DEFENDER`, `PA_DEBUG_DUMP`; dev gateways with `--data-dir` use their own single-instance lock.
+- Assistant tooling gotchas (backslashes in scripts, CRLF, commit identity): see docs/HANDOFF.md section 6.
 
 ## Keep these docs current
 Update PROGRESS.md, PENDING_WORK.md, VERSION_HISTORY.md and TESTS.md in the same change as the code.

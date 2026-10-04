@@ -1,0 +1,13 @@
+{
+ "backup.restore": "destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1",
+ "backup.restore_signed_out": "needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1",
+ "connectors.m365_sign_in": "opens the browser and needs a Microsoft tenant: checklist D4",
+ "llm.complete": "core-role RPC (pa-core only): exercised by every chat.send; UI role is refused (tests/integration/test_agent_security.py)",
+ "run.step": "core-role RPC: written by pa-core during chat.send; see runs.get steps",
+ "session.append": "core-role RPC: pa-core logs every message before a model call (rule 14); see runs.transcript",
+ "task.context": "core-role RPC: pa-core reads it at task start (chat.send)",
+ "task.finish": "core-role RPC: pa-core ends each task (chat.send)",
+ "task.heartbeat": "core-role RPC: pa-core lease heartbeat during long tasks",
+ "tools.invoke": "core-role RPC: the only way tools run; policy/red-team tests: tests/unit/test_policy.py, tests/redteam",
+ "work.next": "core-role RPC: pa-core long-poll for tasks (chat.send)"
+}

@@ -87,7 +87,7 @@ class FilesService:
     def ingest(self, *, name: str, data: bytes, source: str, sensitivity: int | None = None, folder: str = "/",
                tags: list[str] | None = None, derived_from: str | None = None, run_async: bool = True,
                on_done: Callable[[dict], None] | None = None) -> dict[str, Any]:
-        name = Path(name.replace("\\", "/")).name[:200] or "file"
+        name = checks.safe_filename(name)
         max_mb = int(self.gw.settings.get("files.max_upload_mb"))
         if len(data) > max_mb * 1024 * 1024:
             raise PAError(f"file is larger than {max_mb} MB", code="too_large")
@@ -116,7 +116,7 @@ class FilesService:
         self.db.update("files", "id", fid, changes)
         self.gw.emit("files.changed", {"file_id": fid, "status": changes.get("status")})
 
-    def _process(self, fid: str, data: bytes, on_done: Callable[[dict], None] | None) -> None:
+    def _process(self, fid: str, data: bytes, on_done: Callable[[dict], None] | None, unscanned_ok: bool = False) -> None:
         row = self.get(fid)
         assert row
         self._set(fid, status=PROCESSING)
@@ -133,19 +133,28 @@ class FilesService:
             finally:
                 shutil.rmtree(work, ignore_errors=True)
             scan_info["antivirus"] = av
+            if not av.get("clean") and av.get("unavailable") and (unscanned_ok or self.gw.settings.get("files.accept_unscanned")):
+                av = {"clean": True, "engine": "none", "unscanned": True, "released_by": "user" if unscanned_ok else "setting",
+                      "note": "no antivirus could scan this file"}
+                scan_info["antivirus"] = av
             if not av.get("clean"):
+                if av.get("unavailable"):
+                    raise checks.Rejected(f"not scanned: {av['error']}")
                 raise checks.Rejected(f"malware detected: {av.get('threat') or av.get('error') or 'unknown'}")
             parsed = self._parse(row["name"], info["family"], data)
             hidden = parsed.get("hidden", [])
             if info["active_content"]:
                 hidden.append({"kind": "active_content_removed", "text": ", ".join(info["active_content"])})
             text = parsed.get("text", "")
+            text, vision_note = self._read_visually(info["family"], data, parsed, text, int(row["sensitivity"]), scan_info)
+            reasons = (["active content removed: " + ", ".join(info["active_content"])] if info["active_content"] else []) + ([vision_note] if vision_note else []) \
+                + (["NOT antivirus-scanned (no antivirus could scan it)"] if av.get("unscanned") else [])
             self._set(fid, status=READY, sniffed_type=info["family"], scan_json=scan_info, text_content=text,
-                      hidden_json=hidden, status_reason=("active content removed: " + ", ".join(info["active_content"]))
-                      if info["active_content"] else None)
+                      hidden_json=hidden, status_reason="; ".join(reasons) or None)
             self.gw.history.index("file", fid, row["name"], text[:200_000], row["created_at"])
             self.gw.audit.write("file.ready", "file", file_id=fid, family=info["family"], engine=av.get("engine"),
                                 active_content=info["active_content"])
+            self.gw.insights.schedule(fid)          # background: summary, keywords, memory (setting files.auto_summary)
         except (checks.Rejected, PAError, OSError, ValueError) as e:
             self._set(fid, status=REJECTED, status_reason=str(e)[:500], scan_json=scan_info)
             self.gw.audit.write("file.quarantined", "file", file_id=fid, reason=str(e)[:200], severity="medium")
@@ -156,6 +165,64 @@ class FilesService:
                     on_done(self.get(fid) or {})
                 except Exception:  # noqa: BLE001
                     pass
+
+    def _read_visually(self, family: str, data: bytes, parsed: dict[str, Any], text: str, sens: int, scan_info: dict[str, Any]) -> tuple[str, str | None]:
+        """Pictures and scanned PDFs are read by the vision model (if one is set up); everything else is returned unchanged."""
+        from ..vision import is_scanned_pdf
+        v = self.gw.vision
+        kind = None
+        if family in ("png", "jpeg", "gif") or (family == "riff" and data[8:12] == b"WEBP"):
+            kind = "image"
+        elif family == "pdf" and is_scanned_pdf(text, int(parsed.get("pages") or 0)):
+            kind = "scan"
+        if kind is None:
+            return text, None
+        try:
+            if kind == "image":
+                got, note = v.read_image(data, "webp" if family == "riff" else family, sens, "upload")
+            else:
+                got, note = v.read_scanned_pdf(sens, data=data)
+        except PAError as e:
+            got, note = "", f"could not be read visually ({e.code})"
+        scan_info["vision"] = {"kind": kind, "state": "read" if got else "unavailable", "note": note}
+        if got:
+            head = "[Picture read by the vision model]" if kind == "image" else "[Scanned document read by the vision model]"
+            return f"{head}\n{got}" if kind == "image" else got, note
+        return text, note
+
+    def release_unscanned(self, fid: str) -> dict[str, Any]:
+        """The user explicitly accepts ONE quarantined file that no antivirus could scan (never a file with a malware detection)."""
+        row = self.get(fid)
+        if not row or row["deleted"]:
+            raise PAError("file not found", code="not_found")
+        scan = json.loads(row["scan_json"] or "{}") if isinstance(row["scan_json"], str) else (row["scan_json"] or {})
+        av = scan.get("antivirus") or {}
+        if row["status"] != REJECTED or not av.get("unavailable"):
+            raise PAError("only files that were held because no antivirus could scan them can be released", code="invalid_state")
+        self.gw.audit.write("file.released_unscanned", "file", file_id=fid, name=row["name"], severity="high")
+        self._process(fid, self.read_bytes(fid), None, unscanned_ok=True)
+        return self.public(self.get(fid))
+
+    def reread(self, fid: str) -> dict[str, Any]:
+        """'Read again' after a vision model was added (or after the setting was switched on)."""
+        row = self.get(fid)
+        if not row or row["deleted"]:
+            raise PAError("file not found", code="not_found")
+        if row["status"] != READY:
+            raise PAError("only files that are ready can be read again", code="file_not_ready")
+        data = self.read_bytes(fid)
+        fam = row["sniffed_type"] or ""
+        info = json.loads(row["scan_json"] or "{}") if isinstance(row["scan_json"], str) else (row["scan_json"] or {})
+        parsed = self._parse(row["name"], fam, data) if fam == "pdf" else {}
+        base = parsed.get("text", row["text_content"] or "")
+        text, note = self._read_visually(fam, data, parsed, base, int(row["sensitivity"]), info)
+        if info.get("vision", {}).get("state") != "read":
+            raise PAError(note or "nothing to read visually in this file", code="no_vision_model")
+        self._set(fid, text_content=text, scan_json=info, status_reason=note)
+        self.gw.history.index("file", fid, row["name"], text[:200_000], row["created_at"])
+        self.gw.audit.write("file.reread_visually", "file", file_id=fid)
+        self.gw.insights.schedule(fid, force=False)
+        return self.public(self.get(fid))
 
     def _parse(self, name: str, family: str, data: bytes) -> dict[str, Any]:
         header = json.dumps({"name": name, "family": family}).encode() + b"\n"
@@ -215,7 +282,7 @@ class FilesService:
         if in_knowledge is not None:
             changes["in_knowledge"] = int(in_knowledge)
         if name:
-            changes["name"] = Path(name).name[:200]
+            changes["name"] = checks.safe_filename(name)
         if changes:
             self._set(fid, **changes)
 
@@ -249,6 +316,7 @@ class FilesService:
         self.db.update("files", "id", fid, {"deleted": 1, "text_content": None, "wrapped_key": b""})
         self.gw.history.remove("file", fid)
         self.gw.memory.delete_by_source_ref(fid)
+        self.gw.insights.remove(fid)
         self.gw.audit.write("file.deleted", "file", file_id=fid, reason=reason)
         self.gw.emit("files.changed", {"file_id": fid, "status": "DELETED"})
         return n

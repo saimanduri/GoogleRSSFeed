@@ -55,3 +55,13 @@ and retries automatically (`app.tsx::call`). `password_required` prompts for the
 pa-parser, pa-outlook-worker and the sandbox do **not** connect to the pipe. They talk only to the gateway
 over their own stdin/stdout (one JSON request per line / one response), started with a scrubbed environment
 inside a Job Object.
+
+## Additions (0.1.2 - 0.1.4)
+- Client identity in **portable** builds: `ui` must be `<root>\pa-ui.exe`; `core` must be `<root>\python\python.exe` and
+  the exact pid the gateway spawned. Dev (source) runs from a venv start the core from the base interpreter so the
+  exact-pid rule still holds; release (frozen) builds are unchanged.
+- `chat.update` accepts `pinned` (bool) and `folder` (text, max 40, no control characters or `<`/`>`).
+- `session.status.ui` also carries `ui.background`, `ui.day_starts`, `ui.night_starts`.
+
+Added methods (role `ui`, see docs/ACTION_CATALOG.md for the generated list): `emailskills.list/set/run`, `network.logs`, `system.usage`, `localfiles.grant/list/revoke`.
+`task.context` (role core) now also carries `local_files` (id, name, kind, size, label - never paths), `now_local`, and `mission.prefetch`. `llm.complete` accepts `action_schema`.

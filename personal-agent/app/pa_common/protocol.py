@@ -23,7 +23,8 @@ class FrameError(Exception):
 
 
 def encode_frame(msg: dict[str, Any]) -> bytes:
-    body = json.dumps(msg, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    # errors="replace": text with a lone UTF-16 surrogate (pasted/model text) must never make a reply impossible to encode
+    body = json.dumps(msg, separators=(",", ":"), ensure_ascii=False).encode("utf-8", errors="replace")
     if len(body) > MAX_FRAME:
         raise FrameError("frame too large")
     return HEADER.pack(len(body)) + body
@@ -48,8 +49,8 @@ class FrameDecoder:
             del self._buf[:HEADER.size + n]
             try:
                 msg = json.loads(body.decode("utf-8"))
-            except (UnicodeDecodeError, json.JSONDecodeError) as e:
-                raise FrameError(f"bad json: {e}") from e
+            except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as e:
+                raise FrameError(f"bad json: {type(e).__name__}") from e
             if not isinstance(msg, dict) or "type" not in msg:
                 raise FrameError("bad message")
             out.append(msg)

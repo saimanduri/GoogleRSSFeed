@@ -1,0 +1,944 @@
+{
+ "about": "Every UI control, the backend RPC(s) it triggers (see scenarios.json for the checked backend behaviour), and what must be visible afterwards. Claude can walk this file with the browser tools: run the UI in preview (cd app/ui; npm run dev; open http://127.0.0.1:5173/?demo - mock gateway) or in the real app. 'find' is how to locate the control (accessible name / title / visible text).",
+ "how_to_test": [
+  "1. Backend truth: python scripts/e2e_runner.py (175 steps against a throwaway gateway; must be all PASS).",
+  "2. UI wiring: for each entry, locate the control with 'find', click it, confirm 'expect_ui', and (real gateway only) confirm the 'rpc' was audited as listed in scenarios.json.",
+  "3. Console must stay free of errors (read_console_messages onlyErrors). Mock-only limits: no mic, no native dialogs, no TPM."
+ ],
+ "controls": [
+  {
+   "screen": "Top bar",
+   "find": "button 'Collapse navigation' (icon)",
+   "rpc": [],
+   "expect_ui": "left navigation collapses to icons / expands again"
+  },
+  {
+   "screen": "Top bar",
+   "find": "status pill ('Idle · ready' / 'Running · N tasks' / 'Stopped')",
+   "rpc": [],
+   "expect_ui": "opens Tasks (or Settings > Emergency Stop when stopped)"
+  },
+  {
+   "screen": "Top bar",
+   "find": "button 'Search / commands (Ctrl+K)'",
+   "rpc": [
+    "history.search"
+   ],
+   "expect_ui": "command palette opens; typing 3+ chars lists history hits; Esc closes; Enter runs the selected item"
+  },
+  {
+   "screen": "Top bar",
+   "find": "button 'Lock' (Ctrl+Shift+L)",
+   "rpc": [
+    "auth.lock"
+   ],
+   "scenario": "auth.lock",
+   "expect_ui": "lock screen '<assistant> is locked' with PIN box, 'Unlock', 'Use password'"
+  },
+  {
+   "screen": "Top bar",
+   "find": "button 'STOP ALL'",
+   "rpc": [],
+   "expect_ui": "Emergency stop dialog with 'STOP ALL - halt everything now' and 5 level buttons (Pause agent, Stop all tasks, Disable all connectors, Disable web access, Disable Python sandbox)"
+  },
+  {
+   "screen": "Emergency dialog",
+   "find": "'STOP ALL - halt everything now' and each level button",
+   "rpc": [
+    "killswitch.activate"
+   ],
+   "scenario": "killswitch.activate",
+   "expect_ui": "toast 'STOP ALL activated', pill shows 'Stopped (emergency stop)', level shows a check mark"
+  },
+  {
+   "screen": "Left nav",
+   "find": "Home, Chat, History, Missions & Routines, Reminders, Tasks, Approvals, My Files, Memory, Secrets, Activity, Settings",
+   "rpc": [],
+   "expect_ui": "page changes; the item is highlighted; Approvals shows a red count when approvals wait"
+  },
+  {
+   "screen": "Wizard",
+   "find": "button 'Continue' (step 1)",
+   "rpc": [
+    "setup.preflight"
+   ],
+   "scenario": "setup.preflight",
+   "expect_ui": "step 2 'Create your account'; TPM/BitLocker/sandbox/GPU facts shown in step 1"
+  },
+  {
+   "screen": "Wizard",
+   "find": "button 'Restore from a backup instead'",
+   "rpc": [
+    "backup.restore_signed_out"
+   ],
+   "expect_ui": "restore panel asks for a .pabk file and the backup password"
+  },
+  {
+   "screen": "Wizard step 2",
+   "find": "Password field + strength meter",
+   "rpc": [
+    "setup.check_password"
+   ],
+   "scenario": "setup.weak_password / setup.strong_password",
+   "expect_ui": "meter shows score + feedback; 'Continue' stays disabled until the password is strong, confirmed, and the name/username are filled"
+  },
+  {
+   "screen": "Wizard step 3",
+   "find": "PIN + Confirm PIN, 'Allow letters' toggle",
+   "rpc": [
+    "setup.check_pin"
+   ],
+   "scenario": "setup.trivial_pin / setup.good_pin",
+   "expect_ui": "errors listed for 123456-style PINs; 'Create account' enabled only for a good matching PIN"
+  },
+  {
+   "screen": "Wizard step 3",
+   "find": "button 'Create account'",
+   "rpc": [
+    "setup.create"
+   ],
+   "scenario": "setup.create",
+   "expect_ui": "recovery key screen (8 groups of 5 characters)"
+  },
+  {
+   "screen": "Wizard recovery",
+   "find": "Save as PDF / Copy buttons",
+   "rpc": [
+    "setup.recovery_pdf"
+   ],
+   "scenario": "setup.recovery_pdf",
+   "expect_ui": "file saved / copied (clipboard clears after 30 s)"
+  },
+  {
+   "screen": "Wizard recovery",
+   "find": "type back the 2 asked groups + 'Continue'",
+   "rpc": [
+    "setup.confirm_recovery"
+   ],
+   "scenario": "setup.confirm_wrong / setup.confirm_recovery",
+   "expect_ui": "wrong groups show 'group N does not match'; correct groups continue to the model/finish steps (real gateway only: the mock skips these)"
+  },
+  {
+   "screen": "Lock screen",
+   "find": "PIN box + 'Unlock'",
+   "rpc": [
+    "auth.quick_unlock"
+   ],
+   "scenario": "auth.quick_unlock",
+   "expect_ui": "unlocks to the last screen; wrong PIN shows an error and a remaining-tries hint (never repeat wrong PINs on a real TPM)"
+  },
+  {
+   "screen": "Lock screen",
+   "find": "'Use password' / 'Use PIN' toggle, 'Unlock with password'",
+   "rpc": [
+    "auth.sign_in"
+   ],
+   "scenario": "auth.sign_in",
+   "expect_ui": "switches the input; password unlock works"
+  },
+  {
+   "screen": "Sign-in",
+   "find": "username + password + 'Sign in'; 'Forgot password?'",
+   "rpc": [
+    "auth.sign_in",
+    "auth.forgot_password"
+   ],
+   "scenario": "auth.sign_in / auth.forgot_password",
+   "expect_ui": "forgot flow asks PIN + recovery key + new password and then shows a NEW recovery key"
+  },
+  {
+   "screen": "Re-auth dialog",
+   "find": "dialog 'please confirm it's you' (password or PIN)",
+   "rpc": [
+    "auth.step_up"
+   ],
+   "scenario": "auth.stepup_password / auth.stepup_pin",
+   "expect_ui": "the blocked action retries automatically after success"
+  },
+  {
+   "screen": "Home",
+   "find": "four summary cards (Approvals waiting, Completed, Failed/waiting, Upcoming reminders)",
+   "rpc": [
+    "home.summary"
+   ],
+   "scenario": "home.summary",
+   "expect_ui": "each card opens its screen"
+  },
+  {
+   "screen": "Home",
+   "find": "button 'Dismiss' on an update",
+   "rpc": [
+    "home.dismiss"
+   ],
+   "scenario": "home.dismiss",
+   "expect_ui": "the update disappears"
+  },
+  {
+   "screen": "Chat",
+   "find": "button 'New chat'",
+   "rpc": [
+    "chat.create"
+   ],
+   "scenario": "chat.create",
+   "expect_ui": "empty chat with suggestion buttons; composer focused"
+  },
+  {
+   "screen": "Chat",
+   "find": "chat list item",
+   "rpc": [
+    "chat.get"
+   ],
+   "scenario": "chat.reply_arrives",
+   "expect_ui": "opens at the latest message"
+  },
+  {
+   "screen": "Chat",
+   "find": "hover buttons 'Pin' / 'Unpin' and 'Move to folder'",
+   "rpc": [
+    "chat.update"
+   ],
+   "scenario": "chat.update / chat.list_pinned",
+   "expect_ui": "chat moves to PINNED or to a folder group; list regroups"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Filter chats' box",
+   "rpc": [],
+   "expect_ui": "list filters by title"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Show archived' / 'Show active'",
+   "rpc": [
+    "chat.list"
+   ],
+   "scenario": "chat.list_archived",
+   "expect_ui": "list switches"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Allow tools in this chat' toggle",
+   "rpc": [
+    "chat.update"
+   ],
+   "scenario": "chat.update",
+   "expect_ui": "toggle flips; agent may/may not use tools"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Archive chat' / 'Delete chat' (confirm)",
+   "rpc": [
+    "chat.update",
+    "chat.delete"
+   ],
+   "scenario": "chat.archive / chat.delete",
+   "expect_ui": "chat leaves the list; deleted chat is also gone from History"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Steps' button and per-answer 'Steps'",
+   "rpc": [
+    "runs.get"
+   ],
+   "scenario": "runs.get",
+   "expect_ui": "step timeline panel opens for the run"
+  },
+  {
+   "screen": "Chat",
+   "find": "suggestion buttons on an empty chat",
+   "rpc": [
+    "chat.send"
+   ],
+   "scenario": "chat.send",
+   "expect_ui": "message sent; typing dots then a streamed answer"
+  },
+  {
+   "screen": "Chat",
+   "find": "composer + Send (Enter), Shift+Enter newline",
+   "rpc": [
+    "chat.send"
+   ],
+   "scenario": "chat.send / chat.reply_arrives",
+   "expect_ui": "user bubble then assistant bubble with source badges and local time"
+  },
+  {
+   "screen": "Chat",
+   "find": "type '/' in the composer",
+   "rpc": [],
+   "expect_ui": "slash menu (/new /remind /mission /search /history /steps /pin /theme /lock /help); Up/Down/Tab/Enter select; /theme ocean changes the theme at once"
+  },
+  {
+   "screen": "Chat",
+   "find": "'Speak (voice input)' mic button",
+   "rpc": [
+    "voice.transcribe"
+   ],
+   "scenario": "voice.no_stt",
+   "expect_ui": "records, sends text; without an STT model shows a clear message (real mic only)"
+  },
+  {
+   "screen": "Chat",
+   "find": "floating 'Scroll to top' / 'Jump to latest' buttons (appear when the chat scrolls)",
+   "rpc": [],
+   "expect_ui": "scrolls smoothly; jump button shows a count of new messages while scrolled up"
+  },
+  {
+   "screen": "Chat",
+   "find": "approval card buttons (Confirm / Reject / Edit)",
+   "rpc": [
+    "approvals.decide"
+   ],
+   "scenario": "approvals.approve / approvals.bad_hash",
+   "expect_ui": "card resolves; tampered or reused approvals are refused"
+  },
+  {
+   "screen": "Chat",
+   "find": "token meter under the composer",
+   "rpc": [
+    "home.summary"
+   ],
+   "scenario": "home.summary",
+   "expect_ui": "shows today's tokens / daily budget"
+  },
+  {
+   "screen": "History",
+   "find": "tabs All / Chats / Work, 'Include archived', search box",
+   "rpc": [
+    "chat.list",
+    "runs.list",
+    "history.search"
+   ],
+   "scenario": "history.search",
+   "expect_ui": "groups Today / Yesterday / Previous 7 days...; search lists hits; clicking opens the chat or the run"
+  },
+  {
+   "screen": "Missions",
+   "find": "'Describe in plain words'",
+   "rpc": [
+    "missions.describe",
+    "missions.parse_schedule"
+   ],
+   "scenario": "missions.describe / missions.parse_schedule",
+   "expect_ui": "dialog turns a sentence into a draft mission with a schedule preview"
+  },
+  {
+   "screen": "Missions",
+   "find": "'New' (form), Save",
+   "rpc": [
+    "missions.create",
+    "missions.update"
+   ],
+   "scenario": "missions.create / missions.update",
+   "expect_ui": "mission appears as DRAFT"
+  },
+  {
+   "screen": "Missions",
+   "find": "'Activate', 'Run now', 'Pause', 'Cancel'",
+   "rpc": [
+    "missions.activate",
+    "missions.run_now",
+    "missions.set_status"
+   ],
+   "scenario": "missions.activate / run_now / pause / cancel",
+   "expect_ui": "status badge changes; run now creates a task"
+  },
+  {
+   "screen": "Missions",
+   "find": "tabs All / Routines / Missions",
+   "rpc": [
+    "missions.list"
+   ],
+   "scenario": "missions.list",
+   "expect_ui": "list filters"
+  },
+  {
+   "screen": "Reminders",
+   "find": "'Ask by voice'",
+   "rpc": [],
+   "expect_ui": "opens Chat with the voice input"
+  },
+  {
+   "screen": "Reminders",
+   "find": "'Show all' / 'Hide done'",
+   "rpc": [
+    "reminders.list"
+   ],
+   "scenario": "reminders.show_done",
+   "expect_ui": "list includes/excludes finished reminders"
+  },
+  {
+   "screen": "Reminders",
+   "find": "Snooze / Cancel / Dismiss on a reminder",
+   "rpc": [
+    "reminders.action"
+   ],
+   "scenario": "reminders.snooze / reminders.cancel",
+   "expect_ui": "reminder updates; Windows toast + banner at the due time (checklist C5)"
+  },
+  {
+   "screen": "Tasks",
+   "find": "task rows, 'Stop', 'Resume'",
+   "rpc": [
+    "tasks.list",
+    "tasks.stop",
+    "tasks.resume"
+   ],
+   "scenario": "tasks.list / tasks.resume_invalid",
+   "expect_ui": "running tasks stop; only paused/suspended tasks can resume"
+  },
+  {
+   "screen": "Approvals",
+   "find": "tabs Waiting / History; card buttons",
+   "rpc": [
+    "approvals.list",
+    "approvals.decide"
+   ],
+   "scenario": "approvals.pending / approvals.history / approvals.approve",
+   "expect_ui": "waiting cards decide in place; history lists past decisions"
+  },
+  {
+   "screen": "My Files",
+   "find": "'Upload' (and drag-and-drop)",
+   "rpc": [
+    "files.upload"
+   ],
+   "scenario": "files.upload / files.ready",
+   "expect_ui": "file shows 'checking' then READY; bad files go to Quarantine (real dialog only)"
+  },
+  {
+   "screen": "My Files",
+   "find": "tabs Files / Quarantine (N)",
+   "rpc": [
+    "files.list"
+   ],
+   "scenario": "files.list",
+   "expect_ui": "list switches"
+  },
+  {
+   "screen": "My Files",
+   "find": "file row: preview, rename/tags/knowledge, set label, Save a copy, Delete",
+   "rpc": [
+    "files.preview",
+    "files.update",
+    "files.set_label",
+    "files.save_copy",
+    "files.delete"
+   ],
+   "scenario": "files.preview / update / label / save_copy / delete",
+   "expect_ui": "preview text; label badge changes; copy saved; row removed"
+  },
+  {
+   "screen": "Memory",
+   "find": "tabs About me / All / Proposed / Weekly review",
+   "rpc": [
+    "memory.list",
+    "memory.about_me",
+    "memory.review"
+   ],
+   "scenario": "memory.list / memory.about_me / memory.review",
+   "expect_ui": "panels switch"
+  },
+  {
+   "screen": "Memory",
+   "find": "add box + Add; item buttons (Confirm, Edit, Disable/Enable, Reject, Delete)",
+   "rpc": [
+    "memory.add",
+    "memory.action"
+   ],
+   "scenario": "memory.add / memory.edit / memory.disable / memory.enable / memory.delete",
+   "expect_ui": "item appears/changes; inferred items wait in Proposed"
+  },
+  {
+   "screen": "Memory",
+   "find": "'Delete all memory' (asks password)",
+   "rpc": [
+    "memory.delete_all"
+   ],
+   "scenario": "memory.delete_all",
+   "expect_ui": "list empties after the password check"
+  },
+  {
+   "screen": "Secrets",
+   "find": "'Add' dialog, Generate",
+   "rpc": [
+    "secrets.create",
+    "secrets.generate"
+   ],
+   "scenario": "secrets.create / secrets.generate",
+   "expect_ui": "secret listed without its value"
+  },
+  {
+   "screen": "Secrets",
+   "find": "Reveal / Copy (re-auth)",
+   "rpc": [
+    "secrets.reveal",
+    "secrets.copy"
+   ],
+   "scenario": "secrets.reveal / secrets.copy",
+   "expect_ui": "value shown for 20 s then hidden; window blacks out in screenshots; clipboard cleared after N s"
+  },
+  {
+   "screen": "Secrets",
+   "find": "Edit, Versions, Restore version, Bindings, Delete, Health",
+   "rpc": [
+    "secrets.update",
+    "secrets.versions",
+    "secrets.restore_version",
+    "secrets.set_bindings",
+    "secrets.binding_targets",
+    "secrets.delete",
+    "secrets.health"
+   ],
+   "scenario": "secrets.*",
+   "expect_ui": "each action re-auths when needed and updates the list"
+  },
+  {
+   "screen": "Secrets",
+   "find": "'Import CSV' / 'Export'",
+   "rpc": [
+    "secrets.import_csv",
+    "secrets.export"
+   ],
+   "scenario": "secrets.import_csv / secrets.export_encrypted",
+   "expect_ui": "imported items listed; export file is encrypted (real dialogs only)"
+  },
+  {
+   "screen": "Activity",
+   "find": "tabs Requests & steps / Security log / What did the agent do? / Search history",
+   "rpc": [
+    "runs.list",
+    "activity.events",
+    "activity.what_did_agent_do",
+    "history.search"
+   ],
+   "scenario": "runs.list / activity.events / activity.what_did_agent_do / history.search",
+   "expect_ui": "each tab loads; selecting a request shows its steps"
+  },
+  {
+   "screen": "Activity",
+   "find": "transcript / replay for a request (re-auth)",
+   "rpc": [
+    "runs.transcript",
+    "runs.replay"
+   ],
+   "scenario": "runs.transcript / runs.replay",
+   "expect_ui": "full prompt/answer log; replay shows 'replayed' vs 'original'"
+  },
+  {
+   "screen": "Settings > Account & Security",
+   "find": "tabs Profile / Locking & sessions / Password, PIN & recovery / Security posture / Sign-in history",
+   "rpc": [
+    "account.set_profile",
+    "account.change_username",
+    "account.change_password",
+    "account.set_pin",
+    "account.new_recovery_key",
+    "account.signin_history",
+    "posture.run",
+    "posture.fix"
+   ],
+   "scenario": "account.* / posture.*",
+   "expect_ui": "profile names update the sidebar and title at once; posture lists checks with Fix buttons"
+  },
+  {
+   "screen": "Settings > Connectors",
+   "find": "per-connector on/off, use in chat/missions, 'Pause all connectors', Disconnect, 'Sign in with Microsoft'",
+   "rpc": [
+    "connectors.list",
+    "connectors.set",
+    "connectors.pause_all",
+    "connectors.disconnect",
+    "connectors.m365_sign_in",
+    "web.test_search"
+   ],
+   "scenario": "connectors.*",
+   "expect_ui": "state changes immediately; M365 opens the browser (checklist D4)"
+  },
+  {
+   "screen": "Settings > AI Model",
+   "find": "provider cards, Discover, Add model, Test model, default per role, remove",
+   "rpc": [
+    "llm.discover",
+    "llm.inspect",
+    "llm.add",
+    "llm.test",
+    "llm.set_role",
+    "llm.remove",
+    "llm.models"
+   ],
+   "scenario": "llm.*",
+   "expect_ui": "model listed; a model must pass 'Test model' before it can be a default; remote endpoints ask for the password"
+  },
+  {
+   "screen": "Settings (any group)",
+   "find": "toggles, selects, number and text fields",
+   "rpc": [
+    "settings.classify",
+    "settings.apply",
+    "settings.begin_loosen"
+   ],
+   "scenario": "settings.* / ui.open_link_*",
+   "expect_ui": "tightening applies at once ('Saved'); loosening opens the dialog with risk text, 10-second delay and password"
+  },
+  {
+   "screen": "Settings > Autonomy",
+   "find": "profile buttons (cautious / balanced)",
+   "rpc": [
+    "settings.profile_preview"
+   ],
+   "scenario": "settings.profile_preview",
+   "expect_ui": "shows exactly what would change"
+  },
+  {
+   "screen": "Settings > Rules & Safety",
+   "find": "plain-language rules, settings history",
+   "rpc": [
+    "settings.rules_plain",
+    "settings.history"
+   ],
+   "scenario": "settings.rules_plain / settings.history",
+   "expect_ui": "readable rules list; history of changes"
+  },
+  {
+   "screen": "Settings > Tools & Skills",
+   "find": "tool toggles, 'Import skill file', skill activate/disable",
+   "rpc": [
+    "tools.catalog",
+    "skills.import",
+    "skills.list",
+    "skills.activate",
+    "skills.set_status"
+   ],
+   "scenario": "tools.catalog / skills.*",
+   "expect_ui": "skill shows checks; activation re-auths; disabled skills stop being used"
+  },
+  {
+   "screen": "Settings > Web Access",
+   "find": "allowlist chips (add/remove), 'Fetch any site'",
+   "rpc": [
+    "settings.apply",
+    "settings.begin_loosen"
+   ],
+   "scenario": "settings.begin_loosen / settings.loosen_needs_password",
+   "expect_ui": "adding a domain is a loosening change: dialog + password"
+  },
+  {
+   "screen": "Settings > Logs & SIEM",
+   "find": "'Verify integrity now', 'Export', 'Test SIEM', rotate",
+   "rpc": [
+    "logs.verify",
+    "logs.export",
+    "logs.siem_test",
+    "logs.rotate",
+    "logs.status"
+   ],
+   "scenario": "logs.*",
+   "expect_ui": "'chain OK' message; export file created; SIEM test reports not configured"
+  },
+  {
+   "screen": "Settings > Backup & Restore",
+   "find": "'Back up now', 'Enable schedule', 'Choose .pabk file' (password dialogs), Verify",
+   "rpc": [
+    "backup.run_now",
+    "backup.verify",
+    "backup.enable_schedule",
+    "backup.restore",
+    "backup.status"
+   ],
+   "scenario": "backup.*",
+   "expect_ui": "backup file listed; verify says OK; wrong password refused"
+  },
+  {
+   "screen": "Settings > Emergency Stop",
+   "find": "'Activate' per level, 'Release' (password)",
+   "rpc": [
+    "killswitch.activate",
+    "killswitch.release",
+    "killswitch.state"
+   ],
+   "scenario": "killswitch.*",
+   "expect_ui": "level becomes active within 2 s; release needs the password"
+  },
+  {
+   "screen": "Settings > Updates",
+   "find": "update status",
+   "rpc": [
+    "updates.status"
+   ],
+   "scenario": "updates.status",
+   "expect_ui": "shows current version / channel not configured"
+  },
+  {
+   "screen": "Settings > Privacy & Data",
+   "find": "data map, 'Export (encrypted)', 'Delete everything...'",
+   "rpc": [
+    "privacy.data_map",
+    "privacy.export",
+    "privacy.delete_everything"
+   ],
+   "scenario": "privacy.*",
+   "expect_ui": "delete needs the password and the text DELETE EVERYTHING, then the app returns to the first-run wizard"
+  },
+  {
+   "screen": "Settings > Diagnostics & About",
+   "find": "health, 'Preview' / export bundle",
+   "rpc": [
+    "diagnostics.health",
+    "diagnostics.bundle",
+    "about"
+   ],
+   "scenario": "diagnostics.* / meta.about",
+   "expect_ui": "health cards; bundle contains no secrets"
+  },
+  {
+   "screen": "Settings > Appearance & Voice",
+   "find": "8 theme cards (System, Day & night, Light, Dark, Aurora, Ocean, Forest, Sunset)",
+   "rpc": [
+    "settings.apply"
+   ],
+   "scenario": "settings.apply_theme",
+   "expect_ui": "page root data-theme changes at once and the card shows a check"
+  },
+  {
+   "screen": "Settings > Appearance & Voice",
+   "find": "background chips (Off, Aurora glow, Bubbles, Waves, Starfield)",
+   "rpc": [
+    "settings.apply"
+   ],
+   "scenario": "settings.apply_theme",
+   "expect_ui": "animated layer changes; Off removes it; Reduce motion turns it off"
+  },
+  {
+   "screen": "Settings > Appearance & Voice",
+   "find": "text size, reduce motion, day/night start times, voice, default reminder time",
+   "rpc": [
+    "settings.apply"
+   ],
+   "scenario": "settings.apply_theme",
+   "expect_ui": "applied and persisted across restart"
+  },
+  {
+   "screen": "Notification / link",
+   "find": "personalagent:// links and toast clicks",
+   "rpc": [
+    "ui.open_link"
+   ],
+   "scenario": "ui.open_link_screen / ui.open_link_cannot_change_settings / ui.open_link_unknown",
+   "expect_ui": "only opens a screen; never changes a setting"
+  },
+  {
+   "screen": "(background, no button)",
+   "find": "app start, every few seconds, any click/keypress",
+   "rpc": [
+    "session.status",
+    "session.touch"
+   ],
+   "scenario": "meta.status_*, meta.touch",
+   "expect_ui": "state machine (wizard / sign-in / lock / app), names, theme, approvals badge stay current; idle timer resets on activity"
+  },
+  {
+   "screen": "Settings (all)",
+   "find": "opening any Settings section",
+   "rpc": [
+    "settings.describe"
+   ],
+   "scenario": "settings.describe",
+   "expect_ui": "sections and controls render from the gateway schema"
+  },
+  {
+   "screen": "Reminders / Chat",
+   "find": "'New reminder' form and reminder confirmation card",
+   "rpc": [
+    "reminders.create"
+   ],
+   "scenario": "reminders.create",
+   "expect_ui": "reminder listed with its time in local clock"
+  },
+  {
+   "screen": "Secrets",
+   "find": "Secrets page load",
+   "rpc": [
+    "secrets.list"
+   ],
+   "scenario": "secrets.list_hides_values",
+   "expect_ui": "titles/types only - never values"
+  },
+  {
+   "screen": "Tasks / Activity",
+   "find": "opening a task or a task link",
+   "rpc": [
+    "tasks.get"
+   ],
+   "scenario": "tasks.get_missing",
+   "expect_ui": "task detail with steps/limits; missing task shows a clear message"
+  },
+  {
+   "screen": "Left nav",
+   "find": "nav item 'Guide'",
+   "rpc": [],
+   "expect_ui": "opens the searchable Guide"
+  },
+  {
+   "screen": "Guide",
+   "find": "search box 'Search the guide'",
+   "rpc": [],
+   "expect_ui": "typing 'lock' lists only matching entries (Lock, Auto-lock...), with a result count; clearing shows all areas"
+  },
+  {
+   "screen": "Guide",
+   "find": "entry title (e.g. 'Lock')",
+   "rpc": [],
+   "expect_ui": "expands to its explanation; 'Open it' navigates to that screen/section"
+  },
+  {
+   "screen": "Settings > Appearance & Voice",
+   "find": "radio group 'Accent colour'",
+   "rpc": [
+    "settings.apply"
+   ],
+   "expect_ui": "six choices (Theme default, Blue, Teal, Emerald, Violet, Graphite); selecting recolours buttons/links immediately and persists"
+  },
+  {
+   "screen": "Chat",
+   "find": "button 'Show chats' (menu icon in chat header)",
+   "rpc": [
+    "chat.list"
+   ],
+   "expect_ui": "chat list drawer opens on the left; choosing a chat closes it; hidden by default"
+  },
+  {
+   "screen": "Chat",
+   "find": "button 'New chat' (+ icon in chat header)",
+   "rpc": [
+    "chat.create"
+   ],
+   "expect_ui": "new empty chat opens"
+  },
+  {
+   "screen": "Left nav",
+   "find": "nav item 'Outlook' (above Guide; can be hidden in Settings > Email monitoring)",
+   "rpc": [
+    "emailskills.list"
+   ],
+   "expect_ui": "opens the Outlook screen; badge shows results not yet seen"
+  },
+  {
+   "screen": "Outlook",
+   "find": "skill card toggle + 'Run now'",
+   "rpc": [
+    "emailskills.set",
+    "emailskills.run"
+   ],
+   "expect_ui": "skill switches on/off; Run now starts it and the result appears on the card"
+  },
+  {
+   "screen": "Settings > Email monitoring",
+   "find": "toggle per skill, VIP names, 'Show Outlook button'",
+   "rpc": [
+    "emailskills.list",
+    "emailskills.set",
+    "settings.apply"
+   ],
+   "expect_ui": "ten skills with their schedule; switching on needs Local Outlook connected (orange hint with a button to Connectors)"
+  },
+  {
+   "screen": "Activity > Network Logs",
+   "find": "tab 'Network Logs' (next to 'Search history')",
+   "rpc": [
+    "network.logs"
+   ],
+   "expect_ui": "summary tiles, requests per day, destinations table, every request with time / result / destination / purpose / bytes; filters by period, website, use, result; 'Copy as CSV'"
+  },
+  {
+   "screen": "Left nav",
+   "find": "GPU meter box above Settings",
+   "rpc": [
+    "system.usage"
+   ],
+   "expect_ui": "live GPU % chart; 'AI working...' while a task runs; hidden when counters are unavailable or switched off in Appearance"
+  },
+  {
+   "screen": "Settings > Appearance & Voice",
+   "find": "'Choose picture...' (Assistant icon / Your picture) and 'Remove'",
+   "rpc": [
+    "settings.apply"
+   ],
+   "expect_ui": "picture is shrunk to 128 px, shown in the top bar / next to your name; only PNG/JPEG/WebP accepted"
+  },
+  {
+   "screen": "Left nav",
+   "find": "keyboard shortcuts Alt+H/C/I/M/R/T/A/F/E/S/L/O/G/comma, Alt+N, F1",
+   "rpc": [],
+   "expect_ui": "each opens its screen; the key is shown beside the menu item"
+  },
+  {
+   "screen": "Chat",
+   "find": "paperclip button 'Attach a file from this PC' / '/attach' / drag a file onto the window",
+   "rpc": [
+    "localfiles.grant",
+    "localfiles.list"
+   ],
+   "expect_ui": "a chip with the file name appears above the message box; the file is read in place (not uploaded or copied)"
+  },
+  {
+   "screen": "Chat",
+   "find": "x on an attached-file chip",
+   "rpc": [
+    "localfiles.revoke"
+   ],
+   "expect_ui": "chip disappears; the assistant can no longer read that file"
+  },
+  {
+   "screen": "Chat",
+   "find": "folder button 'Share a folder', /folder, drag a folder; approval dialog with 'Also include subfolders'; chips 'Allow again'; subfolder cards",
+   "rpc": [
+    "localfiles.folder_info",
+    "localfiles.grant_folder",
+    "localfiles.reapprove",
+    "localfiles.allow_subfolders",
+    "localfiles.requests",
+    "localfiles.deny_request"
+   ],
+   "scenario": "localfiles.*",
+   "expect_ui": "a folder chip appears; subfolders only if ticked; after sign-out the chip says 'Allow again'; the assistant's request for a subfolder shows a card"
+  },
+  {
+   "screen": "My Files",
+   "find": "file details > 'Read with vision model'",
+   "rpc": [
+    "files.reread"
+   ],
+   "scenario": "files.reread",
+   "expect_ui": "pictures and scanned PDFs are read again after a vision model was added"
+  },
+  {
+   "screen": "My Files > Quarantine",
+   "find": "banner 'files are held because no antivirus could scan them', 'Allow without antivirus scan', 'Accept all'",
+   "rpc": [
+    "files.release_unscanned"
+   ],
+   "scenario": "files.release_unscanned",
+   "expect_ui": "the file leaves quarantine, marked 'NOT antivirus-scanned'; asks for your password first"
+  },
+  {
+   "screen": "My Files",
+   "find": "file details > Summary (automatic): Edit, Save, Summarise again; kind badge and summary line in the list",
+   "rpc": [
+    "files.meta_update",
+    "files.analyse"
+   ],
+   "scenario": "files.meta_update / files.analyse",
+   "expect_ui": "the summary is editable; ID-like values are refused; a memory about the file follows the edit"
+  },
+  {
+   "screen": "Home",
+   "find": "widgets board, Refresh, Widgets panel with switches and arrows",
+   "rpc": [
+    "home.widgets",
+    "home.widgets_set"
+   ],
+   "scenario": "home.widgets / home.widgets_set",
+   "expect_ui": "only switched-on widgets are shown; order follows the arrows; the choice is remembered"
+  }
+ ]
+}

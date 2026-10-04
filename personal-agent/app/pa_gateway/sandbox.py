@@ -14,6 +14,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+
+from pa_common.winpaths import system32
 import sys
 import threading
 import time
@@ -79,7 +81,7 @@ class SandboxService:
             p.kill()
         if sys.platform == "win32":
             for name in ("WindowsSandboxClient.exe", "WindowsSandboxRemoteSession.exe", "WindowsSandbox.exe"):
-                subprocess.run(["taskkill", "/F", "/IM", name], capture_output=True, check=False,
+                subprocess.run([system32("taskkill.exe"), "/F", "/IM", name], capture_output=True, check=False,
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
     # ------------------------------------------------------------------ tool

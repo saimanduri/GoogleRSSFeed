@@ -17,7 +17,7 @@ import secrets
 import sys
 from typing import Any
 
-from pa_common.devmode import dev_mode, fast_kdf_for_tests
+from pa_common.devmode import dev_mode, fast_kdf_for_tests, force_software_protector
 
 from .crypto import Argon2Params, CryptoError, aead_decrypt, aead_encrypt, argon2id, b64d, b64e
 
@@ -36,6 +36,16 @@ class TpmLockedOut(ProtectorError):
 
 class ProtectorUnavailable(ProtectorError):
     pass
+
+
+def tpm_friendly_message(e: Exception) -> str:
+    """Plain-language text for a TPM failure. 0x80290409: Windows blocks this user's TPM commands after too many recent
+    authorization failures (wrong PINs/passwords or repeated failed attempts); it heals by itself with time."""
+    if "0x80290409" in str(e):
+        return ("Your PC's security chip (TPM) is temporarily blocking new keys for your Windows user after too many recent "
+                "failed attempts. Nothing is wrong with what you entered. Close the app and try again in 10-30 minutes "
+                "(it can take up to 24 hours); retrying sooner will not help.")
+    return f"Your PC's security chip (TPM) could not be used: {e}"
 
 
 class KeyProtector:
@@ -265,6 +275,8 @@ class TpmProtector(KeyProtector):
 def tpm_status() -> dict[str, Any]:
     if sys.platform != "win32":
         return {"present": False, "usable": False, "detail": "not Windows"}
+    if force_software_protector():
+        return {"present": False, "usable": False, "detail": "real TPM disabled (PA_FORCE_SOFTWARE_PROTECTOR, dev mode)"}
     try:
         ok = TpmProtector().available()
         return {"present": ok, "usable": ok, "detail": "Microsoft Platform Crypto Provider available" if ok else "provider unavailable"}

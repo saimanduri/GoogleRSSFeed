@@ -17,6 +17,7 @@ from pa_common.timeutil import now_iso, parse_iso, to_iso, utcnow
 
 from ..policy.tools_registry import BY_NAME, EXTERNAL_WRITE
 from . import schedule as sch
+from .email_skills import BY_ID as EMAIL_TEMPLATES
 
 STATUSES = ("DRAFT", "ACTIVE", "PAUSED", "SUSPENDED", "WAITING_APPROVAL", "COMPLETED", "FAILED", "CANCELLED")
 MISSED = ("SKIP", "RUN_ONCE", "RUN_ALL")
@@ -29,6 +30,19 @@ def local_tz() -> str:
         return get_localzone_name()
     except Exception:  # noqa: BLE001
         return "UTC"
+
+
+# what the user can pick as the result format; the key is stored, the text goes into the model's instructions
+OUTPUT_FORMATS = {
+    "markdown": "Markdown with a short title, headings and bullet points",
+    "plain": "plain text, no formatting symbols",
+    "bullets": "a short bulleted list of the key points",
+    "digest": "a digest: one-line headline, then at most 3 bullet points, then sources",
+    "table": "a Markdown table with one row per item",
+    "detailed": "a detailed report with sections, key findings and a sources list",
+    "email": "a short email-style message: greeting, 3-5 sentence summary, bullets, sign-off",
+    "json": "a single valid JSON object (no text outside it)",
+}
 
 
 class MissionService:
@@ -65,7 +79,7 @@ class MissionService:
         return {"name": str(d.get("name") or "Untitled")[:120], "objective": str(d.get("objective") or "")[:8000],
                 "schedule_json": schedule, "timezone": tz, "allowed_tools_json": tools, "allowed_connectors_json": connectors,
                 "overnight": int(bool(d.get("overnight", True))), "budget_json": budget, "model_id": d.get("model_id") or None,
-                "output_format": d.get("output_format", "markdown")[:40], "notification_level": d.get("notification_level", "notify")[:20],
+                "output_format": d.get("output_format") if d.get("output_format") in OUTPUT_FORMATS else "markdown", "notification_level": d.get("notification_level", "notify")[:20],
                 "missed_run_policy": missed, "resource_wait_minutes": int(d.get("resource_wait_minutes", 60)),
                 "kind": "routine" if d.get("kind") == "routine" else "mission"}
 
@@ -73,6 +87,7 @@ class MissionService:
         if not str(d.get("objective") or "").strip():
             raise PAError("objective is required", code="invalid_request")
         row = self._normalize(d)
+        row["template_id"] = d.get("template_id") if d.get("template_id") in EMAIL_TEMPLATES else None
         mid = new_id("msn")
         row.update({"id": mid, "status": "DRAFT", "proposed_by": proposed_by, "created_at": now_iso(), "updated_at": now_iso()})
         self.db.insert("missions", row)
@@ -129,6 +144,9 @@ class MissionService:
             ok, reason = self.gw.connectors.usable(c, "mission")
             if not ok:
                 w.append(reason)
+        if "web.search" in m["allowed_tools"] and not self.gw.connectors.web.status()["search_ready"]:
+            w.append("Web search needs a search provider and its API key (Settings > Web Access / Secrets). Without it this "
+                     "mission cannot search and will report an error each time it runs.")
         return w
 
     def uses_write_tools(self, m: dict[str, Any]) -> bool:
@@ -141,6 +159,12 @@ class MissionService:
         self.gw.audit.write("mission.status", "mission", mission_id=mid, status=status, reason=reason[:200])
         if status == "ACTIVE":
             self._schedule_next(mid)
+            try:
+                self.gw.memory_learner.learn_routine(self.get(mid))
+            except Exception:  # noqa: BLE001 - learning is a convenience, never a reason to fail
+                pass
+        elif status in ("CANCELLED", "PAUSED", "COMPLETED"):
+            self.gw.memory_learner.forget_routine(mid)
         self.gw.emit("missions.changed", {"mission_id": mid})
 
     def activate(self, mid: str) -> None:
@@ -158,8 +182,19 @@ class MissionService:
     # ------------------------------------------------------------------ running
     def run_now(self, mid: str, trigger: str = "SCHEDULE", note: str = "") -> str:
         m = self.get(mid)
+        if "web.search" in json.loads(m["allowed_tools_json"]) and not self.gw.connectors.web.status()["search_ready"]:
+            # Do not start a run that can only fail: tell the user what is missing instead.
+            msg = ("Web search needs a search provider and its API key. Open Settings > Web Access to choose one "
+                   "(Exa, Brave, Tavily or SearXNG) and store the key under Secrets.")
+            self.gw.audit.write("mission.not_run", "mission", mission_id=mid, reason="web search provider not configured")
+            if trigger == "USER":
+                raise PAError(msg, code="needs_setup")
+            self.gw.home_event("mission_blocked", "warn", f"'{m['name']}' could not run", msg, mid)
+            return ""
         run_id = self.gw.runs.start("mission", f"{m['name']}" + (f" ({note})" if note else ""), mission_id=mid)
-        objective = m["objective"] + (f"\n\nOutput format: {m['output_format']}." if m["output_format"] else "")
+        fmt = OUTPUT_FORMATS.get(m["output_format"], m["output_format"])
+        base = self.gw.emailskills.render(m) if m.get("template_id") else m["objective"]
+        objective = base + (f"\n\nWrite the result as {fmt}." if fmt else "")
         self.gw.sessionlog.append(run_id, "user.message", objective, role="user", source="user", trust="TRUSTED")
         t = self.gw.tasks.create(objective=objective, trigger=trigger, run_id=run_id, mission_id=mid,
                                  allowed_tools=json.loads(m["allowed_tools_json"]), budget=json.loads(m["budget_json"]),

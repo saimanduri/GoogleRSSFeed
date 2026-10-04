@@ -15,9 +15,24 @@ from .dispatch import CORE, ClientInfo, P, rpc
 ALLOWED_APPEND_KINDS = {"summary", "plan", "skill.used", "note"}
 
 
+def chat_title(gw, chat_id: str) -> str | None:
+    row = gw.db.one("SELECT title FROM chats WHERE id=?", (chat_id,))
+    return row["title"] if row else None
+
+
 def _worker(p: P, client: ClientInfo) -> str:
     wid = p.str("worker", max_len=100)
     return f"{client.client_id}:{wid}"
+
+
+def _local_now() -> str:
+    """The user's wall-clock time with weekday, zone name and UTC offset - models must write reminder times in this zone."""
+    from datetime import datetime  # noqa: PLC0415
+
+    from ..agentdata.missions import local_tz  # noqa: PLC0415
+    d = datetime.now().astimezone()
+    off = d.strftime("%z")
+    return f"{d.strftime('%A %Y-%m-%d %H:%M')} ({local_tz()}, UTC{off[:3]}:{off[3:]})"
 
 
 @rpc("work.next", roles=(CORE,), state="keys", touch=False)
@@ -25,6 +40,21 @@ def work_next(gw, p: P, c: ClientInfo) -> Any:
     slots = int(gw.settings.get("budget.concurrent_tasks"))
     t = gw.tasks.claim(_worker(p, c), slots, gw.killswitch.agent_blocked(), timeout=float(p.int("wait", False, 0, 30, 20)))
     return {"task_id": t["id"]} if t else None
+
+
+def _memories_for_prompt(gw, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Recent stated/learned memories plus the ones most relevant to what the user just asked (e.g. where a document is)."""
+    out = [{"content": m["content"], "trust": m["trust"]} for m in gw.memory.preferences_for_prompt()]
+    seen = {m["content"] for m in out}
+    last = next((e["content"] for e in reversed(events) if e["role"] == "user"), "")
+    if last and gw.settings.get("memory.auto_learn"):
+        try:
+            for h in gw.memory.search(str(last)[:500], limit=5):
+                if h["score"] > 0.25 and h["content"] not in seen:
+                    out.append({"content": h["content"], "trust": h["trust"]})
+        except Exception:  # noqa: BLE001
+            pass
+    return out
 
 
 @rpc("task.context", roles=(CORE,), state="keys", touch=False)
@@ -35,7 +65,7 @@ def task_context(gw, p: P, c: ClientInfo) -> Any:
     mission = None
     if t.get("mission_id"):
         m = gw.missions.get(t["mission_id"])
-        mission = {"name": m["name"], "output_format": m["output_format"], "kind": m["kind"]}
+        mission = {"name": m["name"], "output_format": m["output_format"], "kind": m["kind"], "prefetch": gw.emailskills.prefetch(m)}
     limits = gw.budgets.task_limits(t)
     return {
         "task": {"id": t["id"], "objective": t["objective"], "trigger": t["trigger_type"], "chat_id": t.get("chat_id"),
@@ -44,12 +74,13 @@ def task_context(gw, p: P, c: ClientInfo) -> Any:
         "events": [{"seq": e["seq"], "kind": e["kind"], "role": e["role"], "content": e["content"], "source": e["source"],
                     "trust": e["trust"], "sensitivity": Sensitivity(int(e["sensitivity"])).name, "meta": e["meta"]} for e in events],
         "tools": gw.tools.available_tools(t),
-        "preferences": [{"content": m["content"], "trust": m["trust"]} for m in gw.memory.preferences_for_prompt()]
-        if gw.settings.get("memory.enabled") else [],
+        "preferences": _memories_for_prompt(gw, events) if gw.settings.get("memory.enabled") else [],
         "skills": gw.skills.active_for_prompt(),
         "mission": mission,
         "limits": {"steps": int(limits.get("steps", 25)), "context_tokens": int(gw.settings.get("llm.context_tokens"))},
+        "local_files": gw.localfiles.for_prompt(t.get("chat_id")),
         "now": now_iso(),
+        "now_local": _local_now(),
         "profile": gw.vault.profile,
     }
 
@@ -65,7 +96,7 @@ def llm_complete(gw, p: P, c: ClientInfo) -> Any:
     run_id = t.get("run_id")
     gw.runs.step(run_id, "llm", f"Thinking ({role} model)", "done", {"messages": len(messages)})
     res = gw.llm.complete(task=t, session_ids=[t["session_id"]], messages=messages, role=role,
-                          json_mode=p.bool("json_mode"), max_tokens=p.int("max_tokens", False, 16, 16000, 2048),
+                          json_mode=p.bool("json_mode"), action_schema=p.bool("action_schema"), max_tokens=p.int("max_tokens", False, 16, 16000, 2048),
                           stream_to_run=run_id if p.bool("stream") else None, interactive=bool(t.get("chat_id")),
                           purpose="summary" if p.str("purpose", False, 20) == "summary" else "agent")
     gw.budgets.add(t["id"], "steps")
@@ -147,14 +178,23 @@ def finish_task(gw, t: dict[str, Any], status: str, result: str, reason: str) ->
             merged = sorted(set(json.loads(chat["sources_json"] or "[]")) | set(sources))
             gw.db.update("chats", "id", t["chat_id"], {"updated_at": now_iso(), "hwm": max(int(chat["hwm"]), hwm), "sources_json": merged})
             gw.history.index("chat", mid, "Assistant reply", result, now_iso())
+            gw.memory_learner.schedule_chat(t["chat_id"])        # learns from what the USER typed (background, never blocks the answer)
             gw.emit("chat.message", {"chat_id": t["chat_id"], "message_id": mid, "run_id": run_id})
-        if t.get("mission_id") and not t.get("parent_task_id"):
+            # a toast named after the chat; the window suppresses it while it is in front, so it only shows when you are elsewhere
+            gw.notify("chat", "Answer ready", None, 0, "chat", t["chat_id"], subject=chat_title(gw, t["chat_id"]), status="Answer ready", record=False)
+        if t.get("mission_id") and not t.get("parent_task_id") and gw.missions.get(t["mission_id"]).get("template_id"):
+            m = gw.missions.get(t["mission_id"])
+            if result.strip() != "NOTHING_NEW" and m["notification_level"] != "silent":
+                gw.notify("mission", f"{m['name'].removeprefix('Email: ')}", result[:200], hwm, "outlook", m["id"],
+                          subject=m["name"].removeprefix("Email: "), status="New results")
+            gw.emit("emailskills.changed", {})
+        elif t.get("mission_id") and not t.get("parent_task_id"):
             m = gw.missions.get(t["mission_id"])
             f = gw.files.ingest(name=f"{m['name']} {now_iso()[:16].replace(':', '')}.md", data=result.encode("utf-8"),
                                 source="agent", sensitivity=hwm, folder="/Mission outputs", run_async=False)
             gw.home_event("mission_done", "info", f"{m['name']} finished", "Output saved to My Files.", f["id"])
             if m["notification_level"] != "silent":
-                gw.notify("mission", f"{m['name']} finished", result[:200], hwm, "missions", m["id"])
+                gw.notify("mission", f"{m['name']} finished", result[:200], hwm, "missions", m["id"], subject=m["name"], status="Finished")
     if status in ("FAILED", "WAITING_FOR_RESOURCE") and t.get("chat_id") and not t.get("parent_task_id"):
         from pa_common.ids import new_id
         mid = new_id("msg")

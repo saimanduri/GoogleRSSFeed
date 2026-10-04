@@ -9,11 +9,15 @@ import json
 import os
 import socket
 import subprocess
+
+from pa_common.winpaths import powershell, system32
 import sys
 from datetime import timedelta
 from typing import Any
 
+from pa_common.buildinfo import RELEASE_BUILD
 from pa_common.devmode import dev_mode
+from pa_common.portable import portable_root
 from pa_common.paths import looks_cloud_synced
 from pa_common.timeutil import now_iso, parse_iso, utcnow
 
@@ -26,7 +30,7 @@ NOWIN = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 def _ps(cmd: str, timeout: int = 20) -> str:
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd], capture_output=True,
+        r = subprocess.run([powershell(), "-NoProfile", "-NonInteractive", "-Command", cmd], capture_output=True,
                            timeout=timeout, creationflags=NOWIN)
         return r.stdout.decode(errors="ignore").strip()
     except (OSError, subprocess.TimeoutExpired):
@@ -61,6 +65,37 @@ def firewall_rules_present() -> dict[str, bool]:
     return {p: f"{FIREWALL_RULE_PREFIX}{p}" in names for p in BLOCKED_PROGRAMS}
 
 
+_FW_CACHE: dict[str, Any] = {"at": 0.0, "missing": []}
+
+
+def firewall_enforced() -> bool:
+    """Spec 14.2 layer 1: only packaged release builds can have per-program rules, and only they enforce them."""
+    return bool(RELEASE_BUILD and getattr(sys, "frozen", False) and sys.platform == "win32")
+
+
+def missing_firewall_rules(max_age: float = 30.0) -> list[str]:
+    """Programs whose outbound-block rule is missing (cached briefly; a failed lookup counts as missing)."""
+    import time
+    now = time.monotonic()
+    if now - _FW_CACHE["at"] < max_age and _FW_CACHE["at"] > 0:
+        return list(_FW_CACHE["missing"])
+    present = firewall_rules_present()
+    missing = [p for p in BLOCKED_PROGRAMS if not present.get(p)]
+    _FW_CACHE.update(at=now, missing=missing)
+    return list(missing)
+
+
+def require_firewall_rules() -> None:
+    """Fail closed (spec 8/35): refuse to start pa-core or a worker while a block rule is missing."""
+    if not firewall_enforced():
+        return
+    missing = missing_firewall_rules()
+    if missing:
+        from pa_common.errors import PAError
+        raise PAError("Firewall rules are missing (" + ", ".join(missing) + "). Use Security Posture > Repair.",
+                      code="firewall_missing")
+
+
 def live_outbound_test() -> dict[str, Any]:
     """Start pa-core.exe in self-test mode: it tries to connect out and must FAIL (packaged builds only)."""
     if not getattr(sys, "frozen", False):
@@ -77,7 +112,7 @@ def data_acl_ok(path: str) -> dict[str, Any]:
     if sys.platform != "win32":
         return {"ok": None, "detail": "not Windows"}
     try:
-        r = subprocess.run(["icacls", path], capture_output=True, timeout=15, creationflags=NOWIN)
+        r = subprocess.run([system32("icacls.exe"), path], capture_output=True, timeout=15, creationflags=NOWIN)
     except (OSError, subprocess.TimeoutExpired):
         return {"ok": None, "detail": "icacls failed"}
     out = r.stdout.decode(errors="ignore")
@@ -95,6 +130,11 @@ def run_posture(gw) -> list[dict[str, Any]]:
     if dev_mode():
         add("dev_mode", "Developer mode", "high", "Developer mode is ON: software key protector, unsigned components and the "
             "mock model may be used. Never use developer mode with real data.")
+    if portable_root() is not None:
+        add("portable", "Portable mode: no firewall isolation", "high",
+            "Running from a copied folder without administrator rights. Windows is NOT blocking pa-core and the workers from "
+            "the network (that needs firewall rules). Only the gateway has network code paths and egress is filtered, but "
+            "install with the firewall rules for full isolation.")
     tpm = tpm_status()
     prot = gw.vault.header.data.get("reset", {}).get("protector", {}).get("kind") if gw.vault.header.data else None
     add("tpm", "TPM 2.0", "ok" if tpm["usable"] and prot == "tpm" else "high",
@@ -106,8 +146,10 @@ def run_posture(gw) -> list[dict[str, Any]]:
     dfd = defender_status()
     add("defender", "Microsoft Defender", "ok" if dfd.get("RealTimeProtectionEnabled") else ("warn" if dfd.get("available") else "unknown"),
         "Real-time protection on." if dfd.get("RealTimeProtectionEnabled") else "Real-time protection is off or unknown.")
-    fw = firewall_rules_present()
-    if fw:
+    fw = firewall_rules_present() if portable_root() is None else {}
+    if portable_root() is not None:
+        add("firewall", "Firewall rules", "high", "Not available in portable mode (needs administrator).")
+    elif fw:
         missing = [k for k, v in fw.items() if not v]
         add("firewall", "Firewall rules (only the gateway may go online)", "ok" if not missing else "high",
             "All outbound-block rules present." if not missing else f"Missing rules for: {', '.join(missing)}", "repair_firewall" if missing else None)

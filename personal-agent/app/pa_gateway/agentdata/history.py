@@ -10,8 +10,9 @@ from typing import Any
 
 
 def fts_query(q: str) -> str:
+    """Every word matches by its beginning (so 'expl' finds 'explain'), in any letter case; all words must be present."""
     tokens = re.findall(r"[\w@.\-]+", q, flags=re.UNICODE)[:20]
-    return " ".join('"' + t.replace('"', "") + '"' for t in tokens) or '""'
+    return " ".join('"' + t.replace('"', "") + '"' + ("*" if len(t) >= 2 else "") for t in tokens) or '""'
 
 
 class HistoryService:
@@ -38,4 +39,31 @@ class HistoryService:
             params += kinds
         sql += " ORDER BY score LIMIT ?"
         params.append(limit)
-        return self.db.all(sql, tuple(params))
+        try:
+            rows = self.db.all(sql, tuple(params))
+        except Exception:  # noqa: BLE001 - a malformed query must never break the screen
+            rows = []
+        if len(rows) < limit and (not kinds or "chat" in kinds):
+            rows += self._like_fallback(query, limit - len(rows), {r["ref_id"] for r in rows})
+        return rows
+
+    def _like_fallback(self, query: str, limit: int, seen: set[str]) -> list[dict[str, Any]]:
+        """Safety net: plain substring search over chat messages, for text the index does not have (older chats, interrupted indexing)."""
+        words = [w for w in re.findall(r"\w+", query, flags=re.UNICODE) if len(w) >= 2][:5]
+        if not words:
+            return []
+        cond = " AND ".join("m.content LIKE ? ESCAPE '\\'" for _ in words)
+        like = [f"%{w.replace(chr(92), '').replace('%', '').replace('_', chr(92) + '_')}%" for w in words]
+        rows = self.db.all(f"SELECT m.id AS ref_id, c.title AS title, m.content AS content, m.created_at AS created_at FROM chat_messages m "
+                           f"JOIN chats c ON c.id=m.chat_id WHERE c.deleted=0 AND {cond} ORDER BY m.created_at DESC LIMIT ?", tuple(like) + (limit * 2,))
+        out = []
+        for r in rows:
+            if r["ref_id"] in seen:
+                continue
+            body = r["content"]
+            i = body.lower().find(words[0].lower())
+            out.append({"kind": "chat", "ref_id": r["ref_id"], "title": r["title"], "snippet": ("... " if i > 40 else "") + body[max(0, i - 40):i + 120],
+                        "created_at": r["created_at"], "score": 0})
+            if len(out) >= limit:
+                break
+        return out

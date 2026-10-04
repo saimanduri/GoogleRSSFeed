@@ -37,7 +37,8 @@ export function ConnectorSettings({ generic }: { generic: ReactNode }) {
               <div className="small faint">Uses your organisation's (or your own) Entra ID app registration: public client, redirect URI http://localhost. Enter its Client ID and Tenant ID below.</div>
             </div>
           )}
-          {c.id === "web" && <div className="small" style={{ marginTop: 8 }}>Search provider: <b>{c.search_provider}</b> {c.search_ready ? <Badge tone="ok">ready</Badge> : <Badge tone="warn">needs a provider + API key bound to web.search (Secrets)</Badge>}</div>}
+          {c.id === "web" && <div className="small" style={{ marginTop: 8 }}>Search provider: <b>{c.search_provider}</b> {c.search_ready ? <Badge tone="ok">ready</Badge> : <Badge tone="warn">needs a provider + API key bound to web.search (Secrets)</Badge>}
+            <Button small onClick={async () => { try { const r = await call<any>("web.test_search", {}); toast(`Web search works (${r.provider}, ${r.results} result, ${r.ms} ms)`, "ok"); } catch (e: any) { toast(errText(e), "danger"); } }}>Test web search</Button></div>}
           {c.dependent_missions?.length > 0 && <div className="small faint">Used by missions: {c.dependent_missions.map((m: any) => m.name).join(", ")}</div>}
         </Card>
       ))}

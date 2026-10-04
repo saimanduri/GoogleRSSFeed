@@ -30,6 +30,9 @@ class WebConnector(ConnectorAdapter):
     def __init__(self, gw, client: EgressClient | None = None):
         super().__init__(gw)
         self.client = client or EgressClient()
+        self.client.on_event = lambda i: gw.netlog.record("web", i["method"], i["url"], i.get("status"), outcome=i.get("outcome"),
+                                                         reason=i.get("reason", ""), bytes_out=i.get("bytes_out", 0), bytes_in=i.get("bytes_in", 0),
+                                                         duration_ms=i.get("duration_ms", 0), ip=i.get("ip"))
 
     def connection_valid(self) -> tuple[bool, str]:
         return True, ""

@@ -11,7 +11,11 @@ import pytest
 
 os.environ["PA_DEV_MODE"] = "1"
 os.environ["PA_TEST_FAST_KDF"] = "1"
+# Automated tests must never use the real TPM: wrong-PIN tests would exhaust its authorization budget.
+os.environ["PA_FORCE_SOFTWARE_PROTECTOR"] = "1"
 os.environ["PA_CORE_INPROCESS"] = "1"
+# Automated tests must never use the real TPM: wrong-PIN tests would exhaust its authorization budget.
+os.environ["PA_FORCE_SOFTWARE_PROTECTOR"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
 
 PASSWORD = "Correct-Horse-Battery-9!x"
@@ -88,3 +92,12 @@ def env_nocore(tmp_path):
     e = Env(tmp_path / "data", start_core=False)
     yield e
     e.close()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_defender_in_tests(monkeypatch):
+    """Tests must not depend on whether Microsoft Defender is the active antivirus on this PC (another AV, or Defender
+    switched off, makes every scan fail closed). The built-in EICAR check still runs. Set PA_TEST_REAL_DEFENDER=1 to use it."""
+    if os.environ.get("PA_TEST_REAL_DEFENDER") != "1":
+        from pa_gateway.files import checks
+        monkeypatch.setattr(checks, "find_defender", lambda: None)

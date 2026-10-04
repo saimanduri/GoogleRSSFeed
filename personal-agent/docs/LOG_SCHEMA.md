@@ -36,7 +36,7 @@ completions and tool payloads live only in the encrypted Transcript Store (`sess
 ## Event types (main)
 | Category | event_type |
 |---|---|
-| lifecycle | gateway.started/stopping, core.started/crashed, scheduler.error, tasks.recovered |
+| lifecycle | gateway.started/stopping, core.started/crashed, core.start_blocked (release build, firewall rule missing - severity high), scheduler.error, tasks.recovered |
 | authentication | setup.completed, auth.signin / signin_failed / quick_unlock / pin_failed / pin_tpm_lockout / locked / unlocked / signout / stepup / stepup_failed / recovery_failed / password_reset / password_changed / pin_changed / recovery_key_rotated / username_changed, recovery_key.confirmed / saved_to_file |
 | authorization | policy.decision, tool.denied, tool.unknown, tool.caller_rejected |
 | execution | tool.execute (about to execute), tool.result, tool.result_discarded |
@@ -59,3 +59,6 @@ completions and tool payloads live only in the encrypted Transcript Store (`sess
 Settings > Logs & SIEM: HTTPS (JSON array POST) or syslog over TLS (RFC 5425 octet counting), server
 certificate pinned by SHA-256 fingerprint, JSON or CEF, background queue with backoff, lag shown in the UI.
 Any shipper (Splunk UF, Elastic Agent, Fluent Bit, Wazuh, Sentinel AMA) can also tail the file.
+
+Added 0.1.6/0.1.7: `setup.protector_failed` (TPM could not create the key; severity medium), `mission.not_run` (routine needs web search but no provider), `emailskill.enabled` / `emailskill.disabled`,
+`localfile.granted` (name, size, label - never the folder), `localfile.read` (grant id, name, op), `localfile.revoked`. Network requests are in the separate `net_log` table (see DATABASE.md), not in this log.

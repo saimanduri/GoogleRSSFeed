@@ -71,7 +71,8 @@ class ReminderService:
             self.db.update("reminders", "id", r["id"], {"status": "FIRED", "fired_at": now_iso()})
             late = (utcnow() - parse_iso(r["due_at"])).total_seconds() > 600
             # Reminder text is the user's own words -> shown in the toast only if the content level allows it
-            self.gw.notify("reminder", "Reminder" + (" (missed while away)" if late else ""), r["text"], 1, "reminders", r["id"])
+            self.gw.notify("reminder", "Reminder" + (" (missed while away)" if late else ""), r["text"], 1, "reminders", r["id"],
+                           subject=r["text"], status="Reminder - missed while you were away" if late else "Reminder")
             self.gw.home_event("reminder", "info", f"Reminder: {r['text'][:120]}", "", r["id"])
             self.gw.emit("reminder.fired", {"id": r["id"], "text": r["text"], "late": late})
             self.gw.audit.write("reminder.fired", "reminder", reminder_id=r["id"], late=late)

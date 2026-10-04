@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 from urllib.parse import urljoin, urlsplit
@@ -104,6 +105,14 @@ class EgressClient:
     def __init__(self, resolver: Resolver | None = None, transport: httpx.BaseTransport | None = None):
         self.resolver = resolver or system_resolver
         self.transport = transport
+        self.on_event = None  # callable(dict) set by the web connector: feeds the network log
+
+    def _emit(self, **info) -> None:
+        if self.on_event:
+            try:
+                self.on_event(info)
+            except Exception:  # noqa: BLE001
+                pass
 
     def check_url(self, url: str, pol: EgressPolicy) -> tuple[str, int, str, str]:
         """Returns (scheme, port, host, pinned_ip) or raises EgressDenied."""
@@ -149,9 +158,25 @@ class EgressClient:
 
     def fetch(self, url: str, pol: EgressPolicy, method: str = "GET", headers: dict[str, str] | None = None,
               body: bytes | None = None) -> FetchResult:
+        cur = [url]  # the URL of the hop in progress (a redirect target can be the one that gets blocked)
+        started = time.time()
+        try:
+            return self._fetch(url, pol, method, headers, body, cur)
+        except httpx.HTTPError as e:
+            self._emit(method=method, url=cur[0], status=None, outcome="error", reason=f"{type(e).__name__}: {str(e)[:120]}",
+                       bytes_out=len(body or b""), duration_ms=int((time.time() - started) * 1000))
+            raise
+        except EgressDenied as e:
+            self._emit(method=method, url=cur[0], status=None, outcome="blocked", reason=f"{e.code}: {e}",
+                       bytes_out=len(body or b""), duration_ms=int((time.time() - started) * 1000))
+            raise
+
+    def _fetch(self, url: str, pol: EgressPolicy, method: str, headers: dict[str, str] | None, body: bytes | None, cur: list) -> FetchResult:
         redirects: list[str] = []
         current = url
         for _hop in range(pol.max_redirects + 1):
+            hop_started = time.time()
+            cur[0] = current
             scheme, port, host, ip = self.check_url(current, pol)
             parts = urlsplit(current)
             ip_host = f"[{ip}]" if ":" in ip else ip
@@ -174,6 +199,8 @@ class EgressClient:
                         loc = resp.headers.get("location")
                         if not loc:
                             raise EgressDenied("redirect without location", "bad_redirect")
+                        self._emit(method=method, url=current, status=resp.status_code, outcome="ok", reason="redirect",
+                                   bytes_out=len(body or b""), duration_ms=int((time.time() - hop_started) * 1000), ip=ip)
                         current = urljoin(current, loc)
                         redirects.append(current)
                         if resp.status_code == 303:
@@ -190,6 +217,8 @@ class EgressClient:
                         buf.extend(chunk)
                         if len(buf) > pol.max_bytes:
                             raise EgressDenied("response too large", "too_large")
+                    self._emit(method=method, url=current, status=resp.status_code, outcome="ok" if resp.status_code < 400 else "error",
+                               bytes_out=len(body or b""), bytes_in=len(buf), duration_ms=int((time.time() - hop_started) * 1000), ip=ip)
                     return FetchResult(url, current, resp.status_code, ctype, bytes(buf), redirects, ip)
                 finally:
                     resp.close()

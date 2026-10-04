@@ -3,11 +3,15 @@ text only when it contains no JSON at all; malformed JSON gets one corrective no
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 
 class ActionError(ValueError):
     pass
+
+
+_TOOL_NAME = re.compile(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*")
 
 
 def parse_action(text: str) -> dict[str, Any]:
@@ -31,14 +35,29 @@ def parse_action(text: str) -> dict[str, Any]:
         ans = obj.get("answer")
         if not isinstance(ans, str):
             raise ActionError("final action needs an 'answer' string")
+        if ans.strip() in ("", "...", "\u2026", "<answer>"):
+            raise ActionError("the answer is empty - write the complete answer, not a placeholder")
         return obj
-    if act == "tool":
-        if not isinstance(obj.get("tool"), str):
-            raise ActionError("tool action needs a 'tool' name")
-        if not isinstance(obj.get("args", {}), dict):
+    # Small models often vary the shape: {"action": "reminders.propose", "tool": "reminders.propose", ...},
+    # {"tool": "x.y", "arguments": {...}} or {"action": "x.y", "args": {...}}. Accept those as tool calls.
+    tool = obj.get("tool") if isinstance(obj.get("tool"), str) else obj.get("tool_name") if isinstance(obj.get("tool_name"), str) else None
+    if tool is None and isinstance(act, str) and _TOOL_NAME.fullmatch(act):
+        tool = act
+    if tool is not None and (act in (None, "tool", "call", "tool_call", "use_tool", "invoke") or act == tool or isinstance(act, str)):
+        args = obj.get("args", obj.get("arguments", obj.get("parameters", {})))
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError as e:
+                raise ActionError("'args' must be an object") from e
+        if not isinstance(args, dict):
             raise ActionError("'args' must be an object")
-        obj.setdefault("args", {})
-        return obj
+        out = {"action": "tool", "tool": tool, "args": args}
+        if "thought" in obj:
+            out["thought"] = obj["thought"]
+        return out
+    if act == "tool":
+        raise ActionError("tool action needs a 'tool' name")
     if "answer" in obj and isinstance(obj["answer"], str):
         return {"action": "final", "answer": obj["answer"]}
     raise ActionError("action must be 'tool' or 'final'")

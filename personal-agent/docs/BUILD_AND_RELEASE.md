@@ -30,6 +30,17 @@ PersonalAgent\
   [optional] llama-server.exe   sandbox-python\python.exe
 ```
 
+## Portable (copy-and-run, no admin) - 0.1.3
+```powershell
+cd app\ui; npx tauri build --no-bundle; cd ..\..
+.\scripts\build-portable.ps1 -OutDir dist\PersonalAgent-Portable   # downloads + verifies python.org embeddable Python
+```
+Copy the folder anywhere and double-click `pa-ui.exe` (it starts the gateway itself). The bundled `python.exe` is signed
+by the Python Software Foundation, so Windows Smart App Control accepts it; the PyInstaller `pa-gateway.exe` etc. are
+unsigned and ARE blocked by Smart App Control (observed on Windows 11 Home). Release-strict flags apply (no mock model,
+TPM required). Limitation: no firewall rules without admin; Posture shows a High finding. Third-party `.pyd` wheels are
+unsigned too and can be blocked on some SAC machines (reputation based) - signing everything remains PENDING_WORK 2.
+
 ## Install
 `installer\install-dev.ps1` (elevated): copies to `C:\Program Files\PersonalAgent` (write-protected for
 standard users), creates outbound-block firewall rules for every component except pa-gateway, and registers
@@ -41,3 +52,11 @@ two per-user logon tasks (gateway, tray UI). Uninstall: `installer\uninstall.ps1
 3. Tauri WiX MSI with custom actions (firewall rules, logon tasks), signed.
 4. SBOM (CycloneDX) + dependency audit attached to the release.
 5. Signed update manifest (Ed25519) published; app verifies before offering the update.
+
+## Installing a new bundle over a running install (learned 2026-10-01)
+Latest bundle (2026-10-02, includes pa-ui.exe): `dist\PersonalAgent-0.1.10` - build it into a NEW folder (`scriptsuild.ps1 -OutDir dist\PersonalAgent-0.1.10`) so a folder you are installing from is never overwritten.
+The logon tasks restart a killed gateway/tray after one minute and Windows keeps DLLs locked briefly, so a plain `Stop-Process` can leave `libcrypto-3.dll` in use (`Copy-Item` fails). Do, in an administrator PowerShell:
+`Stop-ScheduledTask` + `Disable-ScheduledTask` for "PersonalAgent Gateway" and "PersonalAgent Tray"; kill `pa-ui pa-gateway pa-core pa-outlook-worker pa-parser`; wait 5 s and check none is left;
+`.\installer\install-dev.ps1` from `dist\PersonalAgent` (it re-registers both tasks enabled); `Start-ScheduledTask "PersonalAgent Gateway"`; start `pa-ui.exe`.
+Build order: `npx tauri build --no-bundle` (needs Smart App Control off), `scripts\build.ps1 -OutDir dist\PersonalAgent` (copy `pa-ui.exe` into it), `scripts\build-portable.ps1`.
+Hidden imports for the PyInstaller spec now include `win32pdh` and `pypdf`.

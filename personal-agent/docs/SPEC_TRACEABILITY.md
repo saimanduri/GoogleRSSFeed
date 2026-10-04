@@ -59,3 +59,13 @@ Spec: `docs/spec/personal_desktop_agent_spec_v1_1.txt`. Status per item: see PRO
 | User | Voice (STT via Ollama/vLLM/Run:ai-compatible endpoint) + reminders after confirmation | `llm/service.py::transcribe`, `VoiceButton.tsx`, `agentdata/reminders.py` | selftest (reminder), laptop C4/C5 |
 | User | Any LLM (Ollama / vLLM / Run:ai / built-in), add/modify any time | `llm/service.py`, `ModelSettings.tsx` | laptop C1-C3 |
 | User | Routines like Claude Routines | `agentdata/missions.py` (kind=routine), `Missions.tsx` | mission tests |
+| 14.2 | Firewall rules enforced at start (release builds) | `posture.require_firewall_rules`, `CoreSupervisor._spawn_and_wait`, `workers.popen_limited` | `test_firewall_gate.py` |
+| 29 | Supply chain: locks, audits, SBOM, CodeQL | `requirements*.lock`, `.github/workflows/security.yml`, `dependabot.yml` | CI `personal-agent-security` |
+| 2.5 | Install alternative: portable folder (no admin) | `scripts/build-portable.ps1`, `pa_common/portable.py`, `pipe_server._image_ok` | `test_portable_mode.py`, manual start test |
+| User | History, themes, animated backgrounds, slash commands, pinned/folder chats, usage meter | `History.tsx`, `ThemePicker.tsx`, `Backdrop.tsx`, `Chat.tsx`, DB v2 | `test_chat_organise.py`, browser preview |
+| User | Every action + backend effect testable by Claude | `tests/e2e/scenarios.json`, `ui_actions.json`, `scripts/e2e_runner.py`, `docs/ACTION_CATALOG.md` | `test_action_catalog.py`, runner |
+| User | Mission proposals visible and user-activated | `builtin.missions_propose`, `Approvals.tsx`, status `proposals_pending` | `test_missions_setup.py` |
+| User | Outlook email-monitoring skills (read-only, switchable) | `email_skills.py`, `mailops.py`, `mailscan.py`, `Outlook.tsx`, `EmailMonitoring.tsx` | `test_email_skills.py`, `test_mailscan.py`, `live_outlook_check.py` |
+| User | Local files read in place | `localfiles.py`, `pa_workers/parser/tables.py`, Chat paperclip | `test_local_files.py`, `test_tables.py`, `perf_tables.py` |
+| User | Network observability | `netlog.py`, `egress/http.py` callback, `NetworkLogs.tsx` | `test_network_log.py` |
+| User | GPU meter, pictures, shortcuts, Guide, accents | `sysmon.py`, `IconUpload.tsx`, `shortcuts.ts`, `Guide.tsx`, `accents.css` | `test_sysmon.py`, `test_settings_rules.py`, `test_guide_coverage.py`, `test_theme_contrast.py` |

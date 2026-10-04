@@ -1,0 +1,69 @@
+# Supply-chain checks (spec 29): dependency audits, SBOMs (CycloneDX), CodeQL. Runs on push, PRs and weekly.
+name: personal-agent-security
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-and-sbom:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Python - audit locked dependencies
+        run: |
+          pip install pip-audit cyclonedx-bom
+          pip-audit -r requirements-dev.lock --require-hashes --progress-spinner off
+      - name: Python - SBOM
+        run: cyclonedx-py requirements requirements.lock --of JSON -o sbom-python.cdx.json
+      - name: UI - npm audit and SBOM
+        working-directory: app/ui
+        run: |
+          npm ci --no-fund
+          npm audit --audit-level=high
+          npx --yes @cyclonedx/cyclonedx-npm --output-file ../../sbom-ui.cdx.json
+      - name: Rust - cargo audit and SBOM
+        working-directory: app/ui/src-tauri
+        run: |
+          cargo install cargo-audit cargo-cyclonedx --locked
+          cargo audit
+          cargo cyclonedx --format json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom-python.cdx.json
+            sbom-ui.cdx.json
+            app/ui/src-tauri/*.cdx.json
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    strategy:
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3

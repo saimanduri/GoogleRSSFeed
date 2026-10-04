@@ -10,6 +10,8 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes as wt
 import subprocess
+
+from pa_common.winpaths import system32
 from pathlib import Path
 
 PROFILE_NAME = "PersonalAgent.Sandbox"
@@ -90,7 +92,7 @@ def container_sid() -> tuple[ctypes.c_void_p, str]:
 def grant(path: Path, sid_str: str, write: bool) -> None:
     """Grant the container SID access to one folder (icacls, inheritable)."""
     perm = "(OI)(CI)M" if write else "(OI)(CI)RX"
-    subprocess.run(["icacls", str(path), "/grant", f"*{sid_str}:{perm}", "/T", "/Q"], capture_output=True,
+    subprocess.run([system32("icacls.exe"), str(path), "/grant", f"*{sid_str}:{perm}", "/T", "/Q"], capture_output=True,
                    creationflags=CREATE_NO_WINDOW, check=False)
 
 

@@ -1,0 +1,4007 @@
+[
+ {
+  "rpc": "about",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [],
+  "scenarios": [
+   "meta.about"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.change_password",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "current",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "new",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:67"
+  ],
+  "scenarios": [
+   "account.change_password"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.change_username",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "username",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:66"
+  ],
+  "scenarios": [
+   "account.username"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.new_recovery_key",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:70"
+  ],
+  "scenarios": [
+   "account.new_recovery_key"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.set_pin",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "recovery_key",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:68"
+  ],
+  "scenarios": [
+   "account.set_pin"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.set_profile",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "display_name",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "assistant_name",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:29"
+  ],
+  "scenarios": [
+   "account.profile"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "account.signin_history",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:99"
+  ],
+  "scenarios": [
+   "account.signin_history"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "activity.events",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "filters",
+    "type": "dict",
+    "required": true
+   },
+   {
+    "name": "limit",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "since",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "until",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:106"
+  ],
+  "scenarios": [
+   "activity.events"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "activity.what_did_agent_do",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "since",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "until",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:146"
+  ],
+  "scenarios": [
+   "activity.what_did_agent_do"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "approvals.decide",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "approval_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "approve",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "edited_payload",
+    "type": "dict",
+    "required": true
+   },
+   {
+    "name": "payload_hash",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "opened_at_ms",
+    "type": "int",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/ApprovalCard.tsx:23"
+  ],
+  "scenarios": [
+   "approvals.bad_hash",
+   "approvals.approve",
+   "approvals.single_use"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "approvals.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "status",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Approvals.tsx:13"
+  ],
+  "scenarios": [
+   "approvals.pending",
+   "approvals.history"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.forgot_password",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "recovery_key",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "new_password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/SignIn.tsx:104"
+  ],
+  "scenarios": [
+   "auth.forgot_password"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.lock",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "reason",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:213",
+   "Shell.tsx:41",
+   "Shell.tsx:104",
+   "Shell.tsx:159"
+  ],
+  "scenarios": [
+   "auth.lock"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.quick_unlock",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/SignIn.tsx:33"
+  ],
+  "scenarios": [
+   "auth.quick_unlock"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.sign_in",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "username",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/SignIn.tsx:34"
+  ],
+  "scenarios": [
+   "auth.sign_in_wrong",
+   "auth.sign_in",
+   "auth.sign_in_after_reset"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.sign_out",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "reason",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [
+   "auth.sign_out"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "auth.step_up",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "category",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "method",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "secret",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "app.tsx:228",
+   "screens/Onboarding.tsx:298"
+  ],
+  "scenarios": [
+   "auth.stepup_password",
+   "auth.stepup_pin"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "backup.enable_schedule",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:300",
+   "screens/settings/Misc.tsx:23"
+  ],
+  "scenarios": [
+   "backup.enable_schedule"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "backup.restore",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "backup_restore",
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:29",
+   "screens/settings/Misc.tsx:33"
+  ],
+  "scenarios": [],
+  "manual_reason": "destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1"
+ },
+ {
+  "rpc": "backup.restore_signed_out",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/SignIn.tsx:146"
+  ],
+  "scenarios": [],
+  "manual_reason": "needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1"
+ },
+ {
+  "rpc": "backup.run_now",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "folder",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:22"
+  ],
+  "scenarios": [
+   "backup.run_now",
+   "backup.wrong_password"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "backup.status",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:10"
+  ],
+  "scenarios": [
+   "backup.status"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "backup.verify",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:28"
+  ],
+  "scenarios": [
+   "backup.verify"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.create",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "title",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "allow_tools",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:137",
+   "screens/Chat.tsx:233"
+  ],
+  "scenarios": [
+   "chat.create",
+   "approvals.create_via_chat"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.delete",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:310"
+  ],
+  "scenarios": [
+   "chat.delete"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.get",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:79"
+  ],
+  "scenarios": [
+   "chat.reply_arrives",
+   "chat.canary_never_returned"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "archived",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:78",
+   "screens/History.tsx:29"
+  ],
+  "scenarios": [
+   "auth.locked_blocks",
+   "chat.list_pinned",
+   "chat.list_archived",
+   "chat.deleted_gone"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.send",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "text",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "voice",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:238"
+  ],
+  "scenarios": [
+   "chat.send",
+   "approvals.ask",
+   "killswitch.chat_blocked"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "chat.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "title",
+    "type": "opt",
+    "required": false
+   },
+   {
+    "name": "allow_tools",
+    "type": "opt",
+    "required": false
+   },
+   {
+    "name": "archived",
+    "type": "opt",
+    "required": false
+   },
+   {
+    "name": "pinned",
+    "type": "opt",
+    "required": false
+   },
+   {
+    "name": "folder",
+    "type": "opt",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:83",
+   "screens/Chat.tsx:215",
+   "screens/Chat.tsx:277",
+   "screens/Chat.tsx:281",
+   "screens/Chat.tsx:300",
+   "screens/Chat.tsx:306",
+   "screens/Chat.tsx:309",
+   "screens/History.tsx:86",
+   "screens/History.tsx:90"
+  ],
+  "scenarios": [
+   "chat.update",
+   "chat.update_bad_folder",
+   "chat.archive"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "connectors.disconnect",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "connectors",
+  "params": [
+   {
+    "name": "connector",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "delete_data",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ConnectorSettings.tsx:35"
+  ],
+  "scenarios": [
+   "connectors.disconnect_web"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "connectors.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Missions.tsx:84",
+   "screens/Onboarding.tsx:242",
+   "screens/settings/ConnectorSettings.tsx:9"
+  ],
+  "scenarios": [
+   "connectors.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "connectors.m365_sign_in",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "connectors",
+  "params": [
+   {
+    "name": "custom_scheme",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "opens the browser and needs a Microsoft tenant: checklist D4"
+ },
+ {
+  "rpc": "connectors.pause_all",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "paused",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ConnectorSettings.tsx:17"
+  ],
+  "scenarios": [
+   "connectors.pause_all",
+   "connectors.resume_all"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "connectors.set",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "connector",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:252",
+   "screens/settings/ConnectorSettings.tsx:11"
+  ],
+  "scenarios": [
+   "connectors.enable_web",
+   "connectors.disable_web"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "diagnostics.bundle",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:97",
+   "screens/settings/Misc.tsx:101"
+  ],
+  "scenarios": [
+   "diagnostics.bundle"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "diagnostics.health",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:85"
+  ],
+  "scenarios": [
+   "diagnostics.health"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "emailskills.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mark_seen",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/EmailSkillList.tsx:18"
+  ],
+  "scenarios": [
+   "emailskills.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "emailskills.run",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "skill",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/EmailSkillList.tsx:46"
+  ],
+  "scenarios": [
+   "emailskills.run_needs_setup"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "emailskills.set",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "skill",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "enabled",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/EmailSkillList.tsx:41",
+   "screens/settings/EmailMonitoring.tsx:21"
+  ],
+  "scenarios": [
+   "emailskills.set_needs_setup",
+   "emailskills.set_off"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.analyse",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/FileMeta.tsx:19"
+  ],
+  "scenarios": [
+   "files.analyse"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.delete",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:114"
+  ],
+  "scenarios": [
+   "files.delete"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "folder",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "query",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:17"
+  ],
+  "scenarios": [
+   "files.ready"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.meta_update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "title",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "doc_type",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "summary",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "keywords",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/FileMeta.tsx:17"
+  ],
+  "scenarios": [
+   "files.meta_update",
+   "files.meta_update_rejects_ids"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.preview",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/FileMeta.tsx:13",
+   "screens/Files.tsx:68"
+  ],
+  "scenarios": [
+   "files.preview"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.release_unscanned",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "security_settings",
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:41"
+  ],
+  "scenarios": [
+   "files.release_unscanned"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.reread",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:112"
+  ],
+  "scenarios": [
+   "files.reread"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.save_copy",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:113"
+  ],
+  "scenarios": [
+   "files.save_copy"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.set_label",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "level",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:102"
+  ],
+  "scenarios": [
+   "files.label"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "file_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "folder",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "tags",
+    "type": "list",
+    "required": true
+   },
+   {
+    "name": "in_knowledge",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "name",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Files.tsx:105",
+   "screens/Files.tsx:107",
+   "screens/Files.tsx:109"
+  ],
+  "scenarios": [
+   "files.update"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "files.upload",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "name",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "sensitivity",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "folder",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "tags",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:184",
+   "screens/Files.tsx:22",
+   "screens/Files.tsx:33"
+  ],
+  "scenarios": [
+   "files.upload",
+   "files.missing_upload"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "history.search",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "query",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "limit",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "kinds",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:163",
+   "screens/History.tsx:41",
+   "Shell.tsx:168"
+  ],
+  "scenarios": [
+   "history.search"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "home.dismiss",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Home.tsx:75"
+  ],
+  "scenarios": [
+   "home.dismiss"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "home.summary",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "since",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/UsageMeter.tsx:9",
+   "screens/Activity.tsx:14",
+   "screens/Home.tsx:88"
+  ],
+  "scenarios": [
+   "home.summary"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "home.widgets",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "refresh",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Home.tsx:87"
+  ],
+  "scenarios": [
+   "home.widgets"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "home.widgets_set",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "enabled",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Home.tsx:97"
+  ],
+  "scenarios": [
+   "home.widgets_set"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "killswitch.activate",
+  "roles": [
+   "ui"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "level",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "source",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:46",
+   "screens/SignIn.tsx:78",
+   "Shell.tsx:62"
+  ],
+  "scenarios": [
+   "killswitch.activate",
+   "killswitch.partial",
+   "killswitch.bad_level"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "killswitch.release",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "level",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:47"
+  ],
+  "scenarios": [
+   "killswitch.release_needs_password",
+   "killswitch.release",
+   "killswitch.partial_release"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "killswitch.state",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [],
+  "scenarios": [
+   "killswitch.state"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.add",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "model",
+    "type": "dict",
+    "required": true
+   },
+   {
+    "name": "make_default",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "auto_test",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:118"
+  ],
+  "scenarios": [
+   "llm.add_mock",
+   "llm.add_second",
+   "llm.remote_needs_password"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.complete",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "messages",
+    "type": "list",
+    "required": true
+   },
+   {
+    "name": "role",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "json_mode",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "action_schema",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "max_tokens",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "stream",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "purpose",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC (pa-core only): exercised by every chat.send; UI role is refused (tests/integration/test_agent_security.py)"
+ },
+ {
+  "rpc": "llm.discover",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "provider",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "endpoint",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "api_key",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:143"
+  ],
+  "scenarios": [
+   "llm.discover_ollama"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.inspect",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "provider",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "endpoint",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "model_name",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "api_key",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:108"
+  ],
+  "scenarios": [
+   "llm.inspect_ollama"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.models",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:28"
+  ],
+  "scenarios": [
+   "llm.models_empty"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.remove",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:57"
+  ],
+  "scenarios": [
+   "llm.remove"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.set_role",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "role",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:61"
+  ],
+  "scenarios": [
+   "llm.set_role"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.test",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:41"
+  ],
+  "scenarios": [
+   "llm.test_mock"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.allow_subfolders",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "grant_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "confirm",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:88"
+  ],
+  "scenarios": [
+   "localfiles.allow_subfolders_unconfirmed",
+   "localfiles.allow_subfolders"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.deny_request",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "request_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:89"
+  ],
+  "scenarios": [
+   "localfiles.deny_request"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.folder_info",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:17"
+  ],
+  "scenarios": [
+   "localfiles.folder_info"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.grant",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "sensitivity",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:163"
+  ],
+  "scenarios": [
+   "localfiles.grant",
+   "localfiles.grant_blocked"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.grant_folder",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "include_subfolders",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "confirm_subfolders",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "sensitivity",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:22"
+  ],
+  "scenarios": [
+   "localfiles.grant_folder_subfolders_unconfirmed",
+   "localfiles.grant_folder",
+   "localfiles.grant_folder_drive_root"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Chat.tsx:156"
+  ],
+  "scenarios": [
+   "localfiles.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.reapprove",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "grant_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "include_subfolders",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "confirm_subfolders",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:21",
+   "components/LocalShare.tsx:54"
+  ],
+  "scenarios": [
+   "localfiles.reapprove"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.requests",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:78"
+  ],
+  "scenarios": [
+   "localfiles.requests"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "localfiles.revoke",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "grant_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/LocalShare.tsx:66"
+  ],
+  "scenarios": [
+   "localfiles.revoke"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "logs.export",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "export",
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:121"
+  ],
+  "scenarios": [
+   "logs.export"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "logs.rotate",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [],
+  "scenarios": [
+   "logs.rotate"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "logs.siem_test",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "security_settings",
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:122"
+  ],
+  "scenarios": [
+   "logs.siem_not_configured"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "logs.status",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:117"
+  ],
+  "scenarios": [
+   "logs.status"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "logs.verify",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Activity.tsx:119",
+   "screens/settings/Misc.tsx:120"
+  ],
+  "scenarios": [
+   "logs.verify",
+   "logs.verify_after_rotate"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.about_me",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Memory.tsx:20"
+  ],
+  "scenarios": [
+   "memory.about_me"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.action",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "action",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "content",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Home.tsx:61",
+   "screens/Memory.tsx:25",
+   "screens/Memory.tsx:34"
+  ],
+  "scenarios": [
+   "memory.edit",
+   "memory.disable",
+   "memory.enable",
+   "memory.bad_action",
+   "memory.delete"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.add",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "content",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "type",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Memory.tsx:44",
+   "screens/Memory.tsx:45"
+  ],
+  "scenarios": [
+   "memory.add"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.delete_all",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Memory.tsx:64"
+  ],
+  "scenarios": [
+   "memory.delete_all"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "status",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Memory.tsx:22"
+  ],
+  "scenarios": [
+   "memory.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "memory.review",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Memory.tsx:21"
+  ],
+  "scenarios": [
+   "memory.review"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.activate",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mission_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Approvals.tsx:28",
+   "screens/Missions.tsx:45"
+  ],
+  "scenarios": [
+   "missions.activate"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.create",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mission",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Missions.tsx:102"
+  ],
+  "scenarios": [
+   "missions.create"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.describe",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "text",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Missions.tsx:67"
+  ],
+  "scenarios": [
+   "missions.describe"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Approvals.tsx:10",
+   "screens/Missions.tsx:16"
+  ],
+  "scenarios": [
+   "missions.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.parse_schedule",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "text",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "timezone",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Missions.tsx:92"
+  ],
+  "scenarios": [
+   "missions.parse_schedule"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.run_now",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mission_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Missions.tsx:47"
+  ],
+  "scenarios": [
+   "missions.run_now"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.set_status",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "status",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "mission_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Approvals.tsx:30",
+   "screens/Missions.tsx:46",
+   "screens/Missions.tsx:49"
+  ],
+  "scenarios": [
+   "missions.pause",
+   "missions.bad_status",
+   "missions.cancel"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "missions.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mission_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "mission",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Missions.tsx:102"
+  ],
+  "scenarios": [
+   "missions.update"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "network.logs",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "days",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "host",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "component",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "outcome",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "limit",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "offset",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "include_local",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/NetworkLogs.tsx:40"
+  ],
+  "scenarios": [
+   "network.logs",
+   "network.logs_filtered"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "notifications.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [],
+  "scenarios": [
+   "notifications.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "notifications.mark_read",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [
+   "notifications.mark_read"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "posture.fix",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "security_settings",
+  "params": [
+   {
+    "name": "action",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:89"
+  ],
+  "scenarios": [
+   "posture.fix_unknown",
+   "posture.fix_verify_log"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "posture.run",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/AccountSettings.tsx:79"
+  ],
+  "scenarios": [
+   "posture.run"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "privacy.data_map",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:60"
+  ],
+  "scenarios": [
+   "privacy.data_map"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "privacy.delete_everything",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "confirmation",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:73"
+  ],
+  "scenarios": [
+   "privacy.delete_wrong_confirm",
+   "privacy.delete_everything"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "privacy.export",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "export",
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "folder",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:68"
+  ],
+  "scenarios": [
+   "privacy.export"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "reminders.action",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "action",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "minutes",
+    "type": "int",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Reminders.tsx:14"
+  ],
+  "scenarios": [
+   "reminders.snooze",
+   "reminders.cancel",
+   "reminders.bad_action"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "reminders.create",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "text",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "due_at",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "timezone",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Reminders.tsx:24"
+  ],
+  "scenarios": [
+   "reminders.create"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "reminders.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "include_done",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Reminders.tsx:12"
+  ],
+  "scenarios": [
+   "reminders.list",
+   "reminders.show_done"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "run.step",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "type",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "title",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "text",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: written by pa-core during chat.send; see runs.get steps"
+ },
+ {
+  "rpc": "runs.get",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "run_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/RunTimeline.tsx:17",
+   "components/RunTimeline.tsx:30"
+  ],
+  "scenarios": [
+   "runs.get"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "runs.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "limit",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "archived",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "chat_id",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:61",
+   "screens/History.tsx:30"
+  ],
+  "scenarios": [
+   "runs.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "runs.replay",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "event_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:96"
+  ],
+  "scenarios": [
+   "runs.replay"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "runs.transcript",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "run_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Activity.tsx:75"
+  ],
+  "scenarios": [
+   "runs.transcript",
+   "runs.transcript_event"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.binding_targets",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Secrets.tsx:72"
+  ],
+  "scenarios": [
+   "secrets.binding_targets"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.copy",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "clear_after",
+    "type": "int",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:28"
+  ],
+  "scenarios": [
+   "secrets.copy"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.create",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "item",
+    "type": "dict",
+    "required": true
+   },
+   {
+    "name": "bindings",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:77"
+  ],
+  "scenarios": [
+   "secrets.create"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.delete",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:83"
+  ],
+  "scenarios": [
+   "secrets.delete"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.export",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "export",
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:36"
+  ],
+  "scenarios": [
+   "secrets.export_encrypted"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.generate",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "length",
+    "type": "int",
+    "required": false
+   },
+   {
+    "name": "lower",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "upper",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "digits",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "symbols",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:95"
+  ],
+  "scenarios": [
+   "secrets.generate"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.health",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Secrets.tsx:19"
+  ],
+  "scenarios": [
+   "secrets.health"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.import_csv",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "secure_delete",
+    "type": "bool",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:35"
+  ],
+  "scenarios": [
+   "secrets.import_csv"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Secrets.tsx:18"
+  ],
+  "scenarios": [
+   "secrets.list_hides_values"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.restore_version",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "version_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [
+   "secrets.restore_version"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.reveal",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:22",
+   "screens/Secrets.tsx:52"
+  ],
+  "scenarios": [
+   "secrets.reveal"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.set_bindings",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "bindings",
+    "type": "list",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:76"
+  ],
+  "scenarios": [
+   "secrets.set_bindings"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "secrets",
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "item",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Secrets.tsx:76"
+  ],
+  "scenarios": [
+   "secrets.update"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "secrets.versions",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [
+   "secrets.versions"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "session.append",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "kind",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "content",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "meta",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: pa-core logs every message before a model call (rule 14); see runs.transcript"
+ },
+ {
+  "rpc": "session.status",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "app.tsx:59"
+  ],
+  "scenarios": [
+   "meta.status_fresh",
+   "meta.status_unlocked",
+   "account.profile_check",
+   "meta.after_delete"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "session.touch",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "app.tsx:150"
+  ],
+  "scenarios": [
+   "meta.touch"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.apply",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "changes",
+    "type": "dict",
+    "required": true
+   },
+   {
+    "name": "loosen_token",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/IconUpload.tsx:27",
+   "components/LoosenDialog.tsx:18",
+   "components/ThemePicker.tsx:29",
+   "screens/Chat.tsx:219",
+   "screens/Memory.tsx:41",
+   "screens/Onboarding.tsx:299",
+   "screens/settings/EmailMonitoring.tsx:14",
+   "screens/settings/GenericGroup.tsx:18",
+   "screens/settings/Misc.tsx:184"
+  ],
+  "scenarios": [
+   "settings.apply_theme",
+   "settings.apply_bad",
+   "settings.apply_unknown",
+   "settings.loosen_needs_password",
+   "settings.picture_rejected"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.begin_loosen",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "changes",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "components/LoosenDialog.tsx:14"
+  ],
+  "scenarios": [
+   "settings.begin_loosen"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.classify",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "changes",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/GenericGroup.tsx:16"
+  ],
+  "scenarios": [
+   "settings.classify_tighten"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.describe",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Settings.tsx:20"
+  ],
+  "scenarios": [
+   "settings.describe"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.history",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:176"
+  ],
+  "scenarios": [
+   "settings.history"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.profile_preview",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "profile",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:265"
+  ],
+  "scenarios": [
+   "settings.profile_preview"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "settings.rules_plain",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:176"
+  ],
+  "scenarios": [
+   "settings.rules_plain"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.check_password",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "username",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:35",
+   "screens/SignIn.tsx:98"
+  ],
+  "scenarios": [
+   "setup.weak_password",
+   "setup.strong_password"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.check_pin",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "allow_letters",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:40"
+  ],
+  "scenarios": [
+   "setup.trivial_pin",
+   "setup.good_pin"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.confirm_recovery",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "answers",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:210"
+  ],
+  "scenarios": [
+   "setup.confirm_wrong",
+   "setup.confirm_recovery"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.create",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "username",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "password",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "pin",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "allow_letters",
+    "type": "bool",
+    "required": false
+   },
+   {
+    "name": "display_name",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "assistant_name",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:48"
+  ],
+  "scenarios": [
+   "setup.create"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.preflight",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Onboarding.tsx:32"
+  ],
+  "scenarios": [
+   "setup.preflight"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "setup.recovery_pdf",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Onboarding.tsx:205"
+  ],
+  "scenarios": [
+   "setup.recovery_pdf"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "skills.activate",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": "skills",
+  "params": [
+   {
+    "name": "skill_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:160"
+  ],
+  "scenarios": [
+   "skills.activate"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "skills.import",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "path",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:146"
+  ],
+  "scenarios": [
+   "skills.import"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "skills.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:135"
+  ],
+  "scenarios": [
+   "skills.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "skills.set_status",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "skill_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "status",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:158",
+   "screens/settings/Misc.tsx:159"
+  ],
+  "scenarios": [
+   "skills.disable"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "system.usage",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "components/GpuMeter.tsx:25"
+  ],
+  "scenarios": [
+   "system.usage"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "task.context",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: pa-core reads it at task start (chat.send)"
+ },
+ {
+  "rpc": "task.finish",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "status",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "result",
+    "type": "str",
+    "required": false
+   },
+   {
+    "name": "reason",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: pa-core ends each task (chat.send)"
+ },
+ {
+  "rpc": "task.heartbeat",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: pa-core lease heartbeat during long tasks"
+ },
+ {
+  "rpc": "tasks.get",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Tasks.tsx:23"
+  ],
+  "scenarios": [
+   "tasks.get_missing"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "tasks.list",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "states",
+    "type": "list",
+    "required": true
+   },
+   {
+    "name": "limit",
+    "type": "int",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "screens/Tasks.tsx:14"
+  ],
+  "scenarios": [
+   "tasks.list"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "tasks.resume",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Tasks.tsx:30"
+  ],
+  "scenarios": [
+   "tasks.resume_invalid"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "tasks.stop",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/Tasks.tsx:29"
+  ],
+  "scenarios": [
+   "tasks.stop"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "tools.catalog",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/Missions.tsx:89",
+   "screens/settings/Misc.tsx:135"
+  ],
+  "scenarios": [
+   "tools.catalog"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "tools.invoke",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "task_id",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "tool",
+    "type": "str",
+    "required": true
+   },
+   {
+    "name": "args",
+    "type": "dict",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: the only way tools run; policy/red-team tests: tests/unit/test_policy.py, tests/redteam"
+ },
+ {
+  "rpc": "ui.open_link",
+  "roles": [
+   "ui"
+  ],
+  "state": "any",
+  "stepup": null,
+  "params": [
+   {
+    "name": "url",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [
+   "ui.open_link_screen",
+   "ui.open_link_cannot_change_settings",
+   "ui.open_link_unknown"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "updates.status",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/Misc.tsx:110"
+  ],
+  "scenarios": [
+   "updates.status"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "voice.transcribe",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "mime",
+    "type": "str",
+    "required": false
+   }
+  ],
+  "ui_callers": [
+   "components/VoiceButton.tsx:48"
+  ],
+  "scenarios": [
+   "voice.no_stt"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "web.test_search",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "screens/settings/ConnectorSettings.tsx:41"
+  ],
+  "scenarios": [
+   "web.test_search_not_set_up"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "work.next",
+  "roles": [
+   "core"
+  ],
+  "state": "keys",
+  "stepup": null,
+  "params": [
+   {
+    "name": "wait",
+    "type": "int",
+    "required": false
+   }
+  ],
+  "ui_callers": [],
+  "scenarios": [],
+  "manual_reason": "core-role RPC: pa-core long-poll for tasks (chat.send)"
+ }
+]

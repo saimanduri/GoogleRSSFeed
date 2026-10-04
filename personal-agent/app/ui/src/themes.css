@@ -1,0 +1,100 @@
+/* Themes: scoped to [data-theme] so the Settings picker can preview them inside .theme-preview.
+   light/dark are the base themes (also reachable through "system" and "time of day"). */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7fb; --bg-elev: #ffffff; --bg-sunken: #eef0f6; --bg-hover: #eceef6; --border: #e2e5ef;
+  --text: #171a26; --text-2: #4a5068; --text-3: #636980; --accent: #5b4ce6; --accent-2: #7c3aed; --accent-soft: #ecebfd; --accent-text: #fff;
+  --ok-soft: #e7f7ec; --warn-soft: #fdf3e2; --danger-soft: #fde8e8; --info-soft: #e6effd;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 14px rgba(16, 24, 40, 0.06); --shadow-lg: 0 12px 40px rgba(16, 24, 40, 0.18);
+  --ok: #117d39;
+  --warn: #9e5f08;
+  --danger: #cd2121;
+  --info: #1e5eea;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1117; --bg-elev: #171a23; --bg-sunken: #0b0d12; --bg-hover: #1f2330; --border: #262b3a;
+  --text: #eceef5; --text-2: #b2b7c9; --text-3: #878da2; --accent: #8b7cff; --accent-2: #a78bfa; --accent-soft: #231f45; --accent-text: #0d0b24;
+  --ok-soft: #10271a; --warn-soft: #2b2110; --danger-soft: #2c1414; --info-soft: #12213c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35); --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  --ok: #16a34a;
+  --warn: #c9790a;
+  --danger: #e35454;
+  --info: #5888f0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #0f1117; --bg-elev: #171a23; --bg-sunken: #0b0d12; --bg-hover: #1f2330; --border: #262b3a;
+    --text: #eceef5; --text-2: #b2b7c9; --text-3: #878da2; --accent: #8b7cff; --accent-2: #a78bfa; --accent-soft: #231f45; --accent-text: #0d0b24;
+    --ok-soft: #10271a; --warn-soft: #2b2110; --danger-soft: #2c1414; --info-soft: #12213c;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35); --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+    --ok: #16a34a;
+    --warn: #c9790a;
+    --danger: #e35454;
+    --info: #5888f0;
+  }
+}
+/* Aurora - deep night blue with teal and violet glow */
+[data-theme="aurora"] {
+  color-scheme: dark;
+  --bg: #0a1022; --bg-elev: #121a33; --bg-sunken: #070c1a; --bg-hover: #1a2445; --border: #232f55;
+  --text: #e9f1ff; --text-2: #b0bedd; --text-3: #808eb2; --accent: #2dd4bf; --accent-2: #976df7; --accent-soft: #10343a; --accent-text: #04201c;
+  --ok-soft: #0f2a24; --warn-soft: #2b2110; --danger-soft: #2c1420; --info-soft: #12253f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.4); --shadow-lg: 0 14px 44px rgba(0, 0, 0, 0.65);
+  --ok: #16a54b;
+  --warn: #c9790a;
+  --danger: #e45656;
+  --info: #5d8bf0;
+}
+/* Ocean - airy light blue */
+[data-theme="ocean"] {
+  color-scheme: light;
+  --bg: #eaf5fb; --bg-elev: #ffffff; --bg-sunken: #dcedf6; --bg-hover: #e1f0f8; --border: #cfe4f0;
+  --text: #0c2233; --text-2: #3b5a70; --text-3: #506b7d; --accent: #026ea6; --accent-2: #047f94; --accent-soft: #d9f0fb; --accent-text: #fff;
+  --ok-soft: #e0f6ea; --warn-soft: #fdf3e2; --danger-soft: #fde8e8; --info-soft: #dbeafe;
+  --shadow: 0 1px 2px rgba(2, 60, 100, 0.07), 0 5px 16px rgba(2, 60, 100, 0.08); --shadow-lg: 0 12px 40px rgba(2, 60, 100, 0.2);
+  --ok: #117b38;
+  --warn: #9e5f08;
+  --danger: #cd2121;
+  --info: #1759ea;
+}
+/* Forest - dark green and lime */
+[data-theme="forest"] {
+  color-scheme: dark;
+  --bg: #0c1511; --bg-elev: #14201a; --bg-sunken: #08100c; --bg-hover: #1c2c24; --border: #26382e;
+  --text: #e8f3ec; --text-2: #aac2b3; --text-3: #7f9889; --accent: #4ade80; --accent-2: #a3e635; --accent-soft: #143222; --accent-text: #06210f;
+  --ok-soft: #12301f; --warn-soft: #2b2410; --danger-soft: #2c1414; --info-soft: #11262f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.4); --shadow-lg: 0 14px 44px rgba(0, 0, 0, 0.65);
+  --ok: #17aa4d;
+  --warn: #cc7b0b;
+  --danger: #e45959;
+  --info: #5b89f0;
+}
+/* Sunset - warm light orange and pink */
+[data-theme="sunset"] {
+  color-scheme: light;
+  --bg: #fff5ee; --bg-elev: #ffffff; --bg-sunken: #fde9dc; --bg-hover: #fdeadf; --border: #f4d9c8;
+  --text: #2a1710; --text-2: #6a4637; --text-3: #7e6355; --accent: #b24309; --accent-2: #d92474; --accent-soft: #ffe6d5; --accent-text: #fff;
+  --ok-soft: #e7f7ec; --warn-soft: #fdf0d8; --danger-soft: #fde1e1; --info-soft: #e6effd;
+  --shadow: 0 1px 2px rgba(120, 50, 10, 0.07), 0 5px 16px rgba(120, 50, 10, 0.09); --shadow-lg: 0 12px 40px rgba(120, 50, 10, 0.22);
+  --ok: #117d39;
+  --warn: #9b5e08;
+  --danger: #c62020;
+  --info: #1e5eea;
+}
+
+/* Settings > Appearance: theme cards (each card scopes its own theme tokens) */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.theme-card { border: 2px solid var(--border); border-radius: 14px; padding: 0; background: var(--bg-elev); cursor: pointer; overflow: hidden; text-align: left;
+  transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease); }
+.theme-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.theme-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+.theme-preview { background: var(--bg); color: var(--text); padding: 10px; height: 86px; position: relative; overflow: hidden; }
+.theme-preview .bar { height: 8px; width: 55%; border-radius: 6px; background: var(--bg-elev); border: 1px solid var(--border); margin-bottom: 6px; }
+.theme-preview .bubble { height: 14px; width: 70%; border-radius: 8px; background: var(--bg-elev); border: 1px solid var(--border); margin-bottom: 6px; }
+.theme-preview .bubble.me { margin-left: auto; width: 45%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: 0; }
+.theme-label { padding: 8px 10px; font-weight: 600; font-size: 0.92em; display: flex; justify-content: space-between; align-items: center; background: var(--bg-elev); color: var(--text); }
+.bg-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.chip-choice { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); cursor: pointer; font-weight: 550; }
+.chip-choice.selected { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }

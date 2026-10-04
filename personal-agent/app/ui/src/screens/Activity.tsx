@@ -1,22 +1,53 @@
 // Activity: the step timeline of the last requests (runs), the unified security log with integrity status,
 // and "What did the agent do between X and Y?".
+import { SearchBox } from "../components/SearchBox";
 import { useEffect, useState } from "react";
 import { onEvent } from "../api/gateway";
 import { errText, useApp } from "../app";
 import { RunTimeline } from "../components/RunTimeline";
+import { NetworkLogs } from "./NetworkLogs";
 import { Badge, Button, Card, Empty, Field, Modal, Sensitivity, Tabs, Time } from "../components/ui";
+
+function Usage() {
+  const { call, go } = useApp();
+  const [d, setD] = useState<any>(null);
+  useEffect(() => { call<any>("home.summary").then((x) => setD(x.budget)).catch(() => setD(false)); /* eslint-disable-next-line */ }, []);
+  if (d === null) return <div className="skeleton" style={{ height: 160 }} />;
+  if (!d) return <Empty icon="activity" title="Usage is not available right now" />;
+  const rows: [string, string, (n: number) => string][] = [
+    ["tokens", "Model tokens (AI answers)", (n) => n.toLocaleString()], ["web_requests", "Web requests", (n) => n.toLocaleString()],
+    ["egress_bytes", "Data sent out", (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.round(n / 1e3)} KB`)], ["tool_calls", "Tool calls", (n) => n.toLocaleString()],
+  ];
+  return (
+    <Card title="Today's usage and budgets" icon="activity">
+      <div className="small muted" style={{ marginBottom: 10 }}>Counted per day. Local models cost nothing, but the budget keeps runaway loops in check. Change the limits in Settings &gt; Autonomy &amp; Budgets.</div>
+      {rows.filter(([k]) => d.limits?.[k]).map(([k, label, fmt]) => {
+        const used = d.used?.[k] ?? 0, limit = d.limits[k], pct = Math.min(100, Math.round((used / limit) * 100));
+        return (
+          <div key={k} style={{ marginBottom: 12 }}>
+            <div className="row small"><span className="grow">{label}</span><span className="faint">{fmt(used)} of {fmt(limit)} · {pct}%</span></div>
+            <div className="meter"><div style={{ width: `${pct}%`, background: pct > 80 ? "var(--warn)" : "var(--accent)" }} /></div>
+          </div>
+        );
+      })}
+      <Button small onClick={() => go("settings", { section: "autonomy" })}>Change limits</Button>
+    </Card>
+  );
+}
 
 export function Activity() {
   const { call, route } = useApp();
-  const [tab, setTab] = useState<"runs" | "log" | "what" | "search">("runs");
+  const [tab, setTab] = useState<"runs" | "log" | "what" | "search" | "network" | "usage">((route.params?.tab as any) ?? "runs");
   return (
     <div className="page">
       <div className="page-header"><div><h1>Activity</h1><div className="muted">Every request and every step, plus the tamper-evident security log.</div></div></div>
-      <Tabs tabs={[["runs", "Requests & steps"], ["log", "Security log"], ["what", "What did the agent do?"], ["search", "Search history"]]} value={tab} onChange={setTab} />
+      <Tabs tabs={[["runs", "Requests & steps"], ["log", "Security log"], ["what", "What did the agent do?"], ["search", "Search history"], ["network", "Network Logs"], ["usage", "Usage & budgets"]]} value={tab} onChange={setTab} />
       {tab === "runs" && <Runs initial={route.params?.ref} />}
       {tab === "log" && <SecurityLog />}
       {tab === "what" && <WhatDid />}
       {tab === "search" && <SearchHistory call={call} />}
+      {tab === "network" && <NetworkLogs />}
+      {tab === "usage" && <Usage />}
     </div>
   );
 }
@@ -129,11 +160,12 @@ function WhatDid() {
 function SearchHistory({ call }: { call: any }) {
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<any[]>([]);
+  const run = async () => { if (q.trim().length >= 2) setHits(await call("history.search", { query: q.trim(), limit: 50 })); else setHits([]); };
+  useEffect(() => { const t = setTimeout(() => void run(), 250); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [q]);
   return (
     <Card>
-      <div className="row"><input className="input grow" placeholder="Search chats, results and files (encrypted full-text index)" value={q} onChange={(e) => setQ(e.target.value)}
-        onKeyDown={async (e) => e.key === "Enter" && setHits(await call("history.search", { query: q, limit: 50 }))} />
-        <Button kind="primary" onClick={async () => setHits(await call("history.search", { query: q, limit: 50 }))}>Search</Button></div>
+      <div className="row"><SearchBox className="grow" placeholder="Search chats, results and files (word beginnings work; results appear as you type)" value={q} onChange={setQ} onEnter={run} />
+        <Button kind="primary" onClick={run}>Search</Button></div>
       <div className="list" style={{ marginTop: 10 }}>{hits.map((h, i) => <div key={i} className="list-item"><Badge>{h.kind}</Badge><div className="grow"><b>{h.title}</b><div className="small muted">{h.snippet}</div></div><span className="small faint"><Time iso={h.created_at} /></span></div>)}</div>
       {!hits.length && q && <div className="faint small" style={{ marginTop: 10 }}>No results (deleted items are never shown).</div>}
     </Card>

@@ -118,6 +118,9 @@ SETTINGS: list[S] = [
     # ---------------- Web Access
     S("web.provider", "web", "Search provider", "enum", "none", None,
       options=("none", "brave", "searxng", "exa", "tavily"), stepup=True),
+    S("web.ask_per_chat", "web", "Ask before the web is used in a chat", "bool", True, "false",
+      help="The first time the assistant wants to search or open a website in a chat, you are asked once; the answer covers that chat until you sign out or restart.",
+      risk="The assistant may use web search in any chat without asking you first."),
     S("web.searxng_url", "web", "SearXNG URL (https)", "str", "", None, stepup=True),
     S("web.allowlist", "web", "Allowed domains", "list",
       ["wikipedia.org", "github.com", "arxiv.org", "huggingface.co", "python.org", "microsoft.com"], "list_add"),
@@ -131,6 +134,14 @@ SETTINGS: list[S] = [
     S("web.allow_http", "web", "Allow plain HTTP", "bool", False, "true", risk="Pages may be fetched without encryption."),
     # ---------------- Files & Storage
     S("files.quota_mb", "files", "Storage quota (MB)", "int", 10_240, None, 100, 1_048_576),
+    S("files.accept_unscanned", "files", "Accept files that no antivirus could scan", "bool", False, "true",
+      help="Normally a file that cannot be scanned (Microsoft Defender is off because another antivirus is active) stays in quarantine. Switching this on "
+           "lets such files in after all the built-in checks (type, structure, active content, isolated parsing); they are marked 'not antivirus-scanned'. "
+           "You can also release single files from the Quarantine list.",
+      risk="Malware that your other antivirus would have caught is not caught by this app. Keep your antivirus's real-time protection on."),
+    S("files.auto_summary", "files", "Summarise new files automatically", "bool", True, None,
+      help="After a file is ready, a local model writes a short summary, type and keywords (editable in the file's details) and adds a memory about where "
+           "the file is and what it is. Secret values such as a PAN or card number are never copied into the summary or the memory."),
     S("files.max_upload_mb", "files", "Max file size (MB)", "int", 100, "up", 1, 2048),
     S("retention.chats_days", "files", "Keep chats (days, 0 = forever)", "int", 0, None, 0, 36500),
     S("retention.transcripts_days", "files", "Keep transcripts (days)", "int", 30, None, 1, 3650),
@@ -139,11 +150,19 @@ SETTINGS: list[S] = [
     S("retention.runs_visible", "files", "Runs shown in the step timeline (older are archived)", "int", 100, None, 100, 5000),
     # ---------------- Memory
     S("memory.enabled", "memory", "Memory enabled", "bool", True, None),
+    S("memory.auto_learn", "memory", "Learn about me automatically", "bool", True, None,
+      help="The assistant notes lasting facts and preferences from what you type in chats, from routines you switch on and from files you add to My Files. "
+           "Nothing secret or ID-like is ever stored. Everything appears in Memory where you can edit or forget it; forgotten items are never learned again."),
+    S("memory.auto_learn_per_day", "memory", "Most facts learned per day", "int", 20, None, 1, 200),
     S("memory.auto_confirm_low", "memory", "Auto-confirm low-importance preferences", "bool", False, "true",
       risk="The agent may store small preferences without asking."),
     S("memory.retention_days", "memory", "Memory retention (days, 0 = forever)", "int", 0, None, 0, 36500),
     # ---------------- Notifications
     S("notifications.toasts", "notifications", "Windows notifications", "bool", True, None),
+    S("notifications.show_names", "notifications", "Show names in Windows notifications", "bool", True, "true",
+      help="The notification title is the name of the reminder, routine or chat it is about (like Claude's own notifications). Only names you or the "
+           "assistant gave - never the content of mail or documents.",
+      risk="Names of your reminders, routines and chats can be read on screen (and on the lock screen if Windows allows it)."),
     S("notifications.content_level", "notifications", "Notification content", "enum", "notify", ["notify", "summary"],
       options=("notify", "summary"), help="'summary' never includes CONFIDENTIAL content."),
     S("notifications.quiet_start", "notifications", "Quiet hours start", "time", "", None),
@@ -177,6 +196,11 @@ SETTINGS: list[S] = [
     S("llm.role.standard", "model", "Model for 'standard' role", "str", "", None),
     S("llm.role.reasoning", "model", "Model for 'reasoning' role", "str", "", None),
     S("llm.role.vision", "model", "Model for 'vision' role", "str", "", None),
+    S("vision.auto", "model", "Read images and scanned pages with the vision model", "bool", True, None,
+      help="When you upload or attach a picture, a photo of a document or a scanned PDF, the vision model transcribes it into text automatically. "
+           "Needs a vision model under Vision models above."),
+    S("vision.max_pages", "model", "Pages read per scanned PDF", "int", 12, "up", 1, 50,
+      help="Scans are read page by page; each page takes a few seconds to a minute on the local model."),
     S("llm.role.embedding", "model", "Embedding model", "str", "", None),
     S("llm.role.stt", "model", "Speech-to-text model", "str", "", None),
     S("llm.context_tokens", "model", "Context size (tokens)", "int", 8192, None, 1024, 262_144),
@@ -203,10 +227,34 @@ SETTINGS: list[S] = [
     S("outlook.enable_drafts", "connectors", "Allow Outlook drafts", "bool", False, "true",
       risk="The agent may create AI-marked drafts in classic Outlook."),
     # ---------------- UI
-    S("ui.theme", "ui", "Theme", "enum", "system", None, options=("system", "light", "dark")),
-    S("ui.text_scale", "ui", "Text size (%)", "int", 100, None, 80, 160),
+    S("ui.theme", "ui", "Theme", "enum", "system", None,
+      options=("system", "time_of_day", "light", "dark", "aurora", "ocean", "forest", "sunset"),
+      help="system = follow Windows light/dark; time_of_day = light by day, dark at night (PC clock)."),
+    S("ui.background", "ui", "Animated background", "enum", "off", None,
+      options=("off", "aurora", "bubbles", "waves", "stars"), help="Subtle animation behind the app (off by default). Always off with Reduce motion."),
+    S("ui.accent", "ui", "Accent colour", "enum", "theme", None,
+      options=("theme", "blue", "teal", "emerald", "violet", "graphite"), help="Highlight colour for buttons and links. 'theme' = the theme's own colour."),
+    S("ui.show_outlook_nav", "ui", "Show the Outlook button in the left menu", "bool", True, None,
+      help="The Outlook screen shows the results of your email monitoring skills. Also switchable under Email monitoring."),
+    S("emailskills.vips", "emailmon", "VIP names for the VIP alert skill", "list", [], None,
+      help="People whose mail you never want to miss (part of the sender name, e.g. 'Anita Rao')."),
+    S("home.widgets", "ui", "Home widgets", "list", ["updates", "mail_unread", "mail_to_me", "mail_approvals", "mail_deadlines", "reminders", "approvals", "attention",
+                                                      "routines_next", "recent_files", "models_health", "activity_today"], None, hidden=True,
+      help="Which widgets the Home screen shows (choose them with the Widgets button on Home)."),
+    S("ui.show_gpu_meter", "ui", "Show the live GPU meter in the left menu", "bool", True, None,
+      help="A small chart above Settings that shows GPU activity, so you can see the AI model working."),
+    S("ui.assistant_icon", "ui", "Assistant icon", "image", "", None, hidden=True),
+    S("ui.user_icon", "ui", "Your picture", "image", "", None, hidden=True),
+    S("ui.day_starts", "ui", "Day starts at (time_of_day theme)", "time", "07:00", None),
+    S("ui.night_starts", "ui", "Night starts at (time_of_day theme)", "time", "19:00", None),
+    S("ui.font", "ui", "Font", "enum", "windows", None, options=('windows', 'segoe_ui', 'calibri', 'aptos', 'arial', 'verdana', 'tahoma', 'trebuchet', 'georgia', 'times', 'cambria', 'candara', 'corbel', 'constantia', 'franklin', 'century_gothic', 'garamond', 'book_antiqua', 'palatino', 'bahnschrift', 'nirmala'),
+      help="The typeface of the whole app. Only fonts installed on this PC can show; the picker marks the others.", hidden=True),
+    S("ui.font_size", "ui", "Text size", "enum", "medium", None, options=("small", "medium", "large"),
+      help="Small, Medium or Large text for the whole app. Use the percentage below to fine-tune.", hidden=True),
+    S("ui.text_scale", "ui", "Fine-tune text size (%)", "int", 100, None, 80, 160,
+      help="Multiplies the Small/Medium/Large choice."),
     S("ui.reduce_motion", "ui", "Reduce motion", "bool", False, None),
-    S("chat.show_steps", "ui", "Show agent steps live in chat", "bool", True, None),
+    S("chat.show_steps", "ui", "Open the agent steps panel automatically in chat", "bool", False, None),
     S("voice.enabled", "ui", "Voice input", "bool", True, None),
     S("voice.language", "ui", "Voice language (ISO code, blank = auto)", "str", "", None),
     S("reminders.default_time", "ui", "Default reminder time", "time", "09:00", None),
@@ -220,7 +268,7 @@ GROUPS = [
     ("tools", "Tools & Skills"), ("web", "Web Access"), ("files", "Files & Storage"), ("memory", "Memory"),
     ("notifications", "Notifications"), ("logs", "Logs & SIEM"), ("backup", "Backup & Restore"),
     ("emergency", "Emergency Stop"), ("updates", "Updates"), ("privacy", "Privacy & Data"),
-    ("diagnostics", "Diagnostics & About"), ("ui", "Appearance & Voice"),
+    ("diagnostics", "Diagnostics & About"), ("ui", "Appearance & Voice"), ("emailmon", "Email monitoring"),
 ]
 
 # Balanced profile raises these defaults (only applied when the user switches profile).
@@ -229,6 +277,33 @@ BALANCED_OVERRIDES = {
     "budget.task.egress_kb": 500, "budget.daily.runtime_hours": 8, "budget.daily.tokens": 4_000_000,
     "budget.daily.web_requests": 300, "budget.daily.egress_kb": 4096,
 }
+
+
+_IMAGE_MAGIC = {"image/png": b"\x89PNG\r\n\x1a\n", "image/jpeg": b"\xff\xd8\xff", "image/webp": b"RIFF"}
+MAX_ICON_BYTES = 64 * 1024
+
+
+def coerce_image(spec: S, value: Any) -> str:
+    """A small picture as a data URL. PNG/JPEG/WebP only (never SVG: it can carry scripts), real image bytes, at most 64 KB."""
+    import base64
+    import binascii
+    if value in ("", None):
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"{spec.label}: expected a picture")
+    head, _, payload = value.partition(",")
+    mime = head[5:].split(";")[0] if head.startswith("data:") and head.endswith(";base64") else ""
+    if mime not in _IMAGE_MAGIC:
+        raise ValueError(f"{spec.label}: use a PNG, JPEG or WebP picture")
+    try:
+        raw = base64.b64decode(payload, validate=True)
+    except (binascii.Error, ValueError) as e:
+        raise ValueError(f"{spec.label}: the picture is damaged") from e
+    if len(raw) > MAX_ICON_BYTES:
+        raise ValueError(f"{spec.label}: the picture is too large (max {MAX_ICON_BYTES // 1024} KB; it is shrunk automatically when you choose it)")
+    if not raw.startswith(_IMAGE_MAGIC[mime]) or (mime == "image/webp" and raw[8:12] != b"WEBP"):
+        raise ValueError(f"{spec.label}: the file is not really a {mime.split('/')[1].upper()} picture")
+    return value
 
 
 def coerce(spec: S, value: Any) -> Any:
@@ -256,6 +331,8 @@ def coerce(spec: S, value: Any) -> Any:
         if t == "time" and value and not _is_hhmm(value):
             raise ValueError(f"{spec.label}: expected HH:MM")
         return value.strip()
+    if t == "image":
+        return coerce_image(spec, value)
     if t == "list":
         if not isinstance(value, list) or not all(isinstance(x, str) and len(x) <= 512 for x in value) or len(value) > 500:
             raise ValueError(f"{spec.label}: expected a list of text items")

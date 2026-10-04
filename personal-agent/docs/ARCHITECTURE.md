@@ -117,3 +117,33 @@ See [DATABASE.md](DATABASE.md) and [SECRETS_HANDLING.md](SECRETS_HANDLING.md).
 `%LOCALAPPDATA%\PersonalAgent\` (ACL: you + SYSTEM): `vault.header`, `db\agent.db` (SQLCipher),
 `files\*.bin` (AES-GCM chunks), `logs\agent-security*.jsonl`, `state\auth_state.json`, `run\gateway.json`
 (per-launch rendezvous, deleted on exit), `tmp\` (wiped per run), `snapshots\` (pre-update).
+
+## 7. Portable layout (0.1.3, no installer / no admin)
+```
+PersonalAgent-Portable\
+  pa-ui.exe                  Tauri shell; starts the gateway when none is running
+  python\python.exe          python.org embeddable 3.12 (PSF-signed), python312._pth = ".", "..\app", Lib\site-packages, import site
+  python\Lib\site-packages\ hash-pinned wheels from requirements.lock
+  app\pa_common|pa_gateway|pa_core|pa_workers   sources; buildinfo.py has RELEASE_BUILD and PORTABLE_BUILD = True
+```
+`pa_common/portable.py::portable_root()` is only non-None when PORTABLE_BUILD is set **and** the interpreter is
+`<root>\python\python.exe`. The IPC server then accepts the UI only as `<root>\pa-ui.exe` and the core only as
+`<root>\python\python.exe` with the exact spawned pid. Firewall enforcement does not apply (no admin); Posture
+reports it. Dev runs from a venv start workers from the base interpreter (the venv `python.exe` is a launcher
+that would break the exact-pid check).
+
+## 8. UI structure additions (0.1.4)
+`themes.css` (tokens per `[data-theme]`), `extras.css` (backdrop, floating buttons, slash menu, meter, history),
+`components/Backdrop.tsx` (CSS-only animation), `ThemePicker.tsx`, `UsageMeter.tsx`, `screens/History.tsx`.
+Settings `ui.theme`, `ui.background`, `ui.day_starts`, `ui.night_starts`; chats have `pinned` and `folder` (DB v2).
+
+## 9. Added in 0.1.7
+- `pa_gateway/netlog.py` - central network log (web egress client callback, Microsoft 365 token/Graph calls, model calls); contextvar carries the tool/task.
+- `pa_gateway/sysmon.py` - GPU meter (Windows PDH counters, sampled only while the window polls `system.usage`).
+- `pa_gateway/localfiles.py` + `pa_workers/parser/tables.py` - local files read in place: grant per chat, isolated reader, SQLite index, declarative queries (no SQL from the model).
+- `pa_gateway/agentdata/email_skills.py` + `pa_workers/outlook/mailops.py|mailscan.py` - Outlook skills and deterministic mail flags; dates are formatted with the Windows short-date pattern.
+
+### Agent loop details (0.1.6-0.1.7)
+Chat/mission task -> `pa-core` AgentLoop: (1) mission `prefetch` tool calls run first when present (deterministic data gathering through the normal tool gate), (2) model call with a JSON action schema
+(`reasoning_effort: none` for Ollama), (3) lenient parse (`actions.py`; tool call shapes, rejects empty/placeholder answers), (4) tool via the gateway, (5) final answer. Empty model replies raise `model_empty`.
+The network log context (`netlog.context(tool, task, run)`) wraps tool execution so every request is attributed.

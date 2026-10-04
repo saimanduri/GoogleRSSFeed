@@ -1,0 +1,76 @@
+/* Animated backdrop, floating scroll buttons, slash menu, usage meter, history, grouped chat list.
+   Everything animated is switched off by data-bg="off" (Reduce motion sets it) and prefers-reduced-motion. */
+
+.backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.shell { position: relative; z-index: 1; }
+:root:not([data-bg="off"]) .topbar, :root:not([data-bg="off"]) .nav, :root:not([data-bg="off"]) .chat-list,
+:root:not([data-bg="off"]) .chat-head, :root:not([data-bg="off"]) .settings-nav, :root:not([data-bg="off"]) .composer {
+  background: color-mix(in srgb, var(--bg-elev) 78%, transparent); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+:root:not([data-bg="off"]) .card, :root:not([data-bg="off"]) .msg.assistant { background: color-mix(in srgb, var(--bg-elev) 90%, transparent); }
+
+/* aurora: three drifting blurred blobs */
+.backdrop.aurora .blob { position: absolute; width: 46vw; height: 46vw; border-radius: 50%; filter: blur(90px); opacity: 0.32; animation: drift 26s ease-in-out infinite alternate; }
+.backdrop.aurora .blob:nth-child(1) { background: var(--accent); top: -14%; left: -8%; }
+.backdrop.aurora .blob:nth-child(2) { background: var(--accent-2); bottom: -18%; right: -10%; animation-duration: 32s; animation-delay: -8s; }
+.backdrop.aurora .blob:nth-child(3) { background: var(--info); width: 30vw; height: 30vw; top: 38%; left: 42%; opacity: 0.18; animation-duration: 38s; animation-delay: -15s; }
+@keyframes drift { 0% { transform: translate(0, 0) scale(1); } 50% { transform: translate(8vw, 6vh) scale(1.15); } 100% { transform: translate(-6vw, 10vh) scale(0.95); } }
+
+/* bubbles: soft circles rising */
+.backdrop.bubbles .bub { position: absolute; bottom: -80px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--accent) 45%, transparent), color-mix(in srgb, var(--accent-2) 12%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); animation: rise linear infinite; opacity: 0; }
+@keyframes rise { 0% { transform: translateY(0) translateX(0); opacity: 0; } 10% { opacity: 0.8; } 90% { opacity: 0.6; } 100% { transform: translateY(-115vh) translateX(40px); opacity: 0; } }
+
+/* waves: layered sine bands sliding sideways */
+.backdrop.waves svg { position: absolute; left: 0; bottom: 0; width: 200%; height: 38vh; }
+.backdrop.waves .w1 { fill: color-mix(in srgb, var(--accent) 16%, transparent); animation: slide 28s linear infinite; }
+.backdrop.waves .w2 { fill: color-mix(in srgb, var(--accent-2) 14%, transparent); animation: slide 40s linear infinite reverse; }
+.backdrop.waves .w3 { fill: color-mix(in srgb, var(--accent) 10%, transparent); animation: slide 55s linear infinite; }
+@keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* stars: twinkling dots */
+.backdrop.stars .star { position: absolute; border-radius: 50%; background: var(--text); animation: twinkle ease-in-out infinite; opacity: 0.1; }
+@keyframes twinkle { 0%, 100% { opacity: 0.08; transform: scale(0.8); } 50% { opacity: 0.55; transform: scale(1.3); } }
+
+:root[data-bg="off"] .backdrop { display: none; }
+@media (prefers-reduced-motion: reduce) { .backdrop * { animation: none !important; } }
+
+/* floating scroll buttons */
+.scroll-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.scroll-wrap .messages { flex: 1; }
+.float-btns { position: absolute; right: 18px; bottom: 14px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+.float-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-elev); color: var(--text); cursor: pointer; display: grid; place-items: center;
+  box-shadow: var(--shadow); animation: fadein var(--dur) var(--ease); transition: transform 100ms var(--ease), background var(--dur) var(--ease); }
+.float-btn:hover { background: var(--accent-soft); color: var(--accent); transform: translateY(-1px); }
+.float-btn .count { position: absolute; top: -4px; right: -4px; min-width: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 0.7em; font-weight: 700; }
+
+/* slash command menu */
+.slash-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); overflow: hidden; z-index: 6; }
+.slash-item { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; cursor: pointer; }
+.slash-item.active { background: var(--accent-soft); color: var(--accent); }
+.slash-item b { font-family: var(--mono); min-width: 96px; }
+.composer-box { position: relative; }
+
+/* usage meter */
+.meter { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82em; color: var(--text-2); }
+.meter-bar { width: 70px; height: 6px; border-radius: 999px; background: var(--bg-sunken); overflow: hidden; border: 1px solid var(--border); }
+.meter-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width 400ms var(--ease); }
+.meter-bar.warn > i { background: var(--warn); } .meter-bar.danger > i { background: var(--danger); }
+
+/* grouped chat list */
+.group-title { font-size: 0.74em; letter-spacing: 0.07em; font-weight: 700; color: var(--text-3); padding: 12px 8px 4px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+.list-item .row-actions { display: none; gap: 2px; }
+.list-item:hover .row-actions, .list-item.selected .row-actions { display: flex; }
+.pin-on { color: var(--accent); }
+
+/* history */
+.history-layout { max-width: 920px; }
+.history-group { margin-bottom: 18px; }
+.history-item { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+.history-item:hover { background: var(--bg-hover); border-color: var(--border); }
+.history-item .when { min-width: 92px; color: var(--text-3); font-size: 0.86em; }
+.chat-head .grow { min-width: 120px; }
+.meter { white-space: nowrap; flex: none; }
+.history-item .row-actions { display: none; gap: 2px; }
+.history-item:hover .row-actions, .history-item:focus-within .row-actions { display: flex; }
+.inline-rename { width: 100%; padding: 4px 8px; font-weight: 600; }

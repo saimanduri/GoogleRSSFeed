@@ -33,6 +33,11 @@ cd app\ui; npm run build                  # UI type-check + production build
 | Files, backup, misc | `tests/integration/test_files_backup_misc.py` | 15: EICAR quarantined, masquerading .exe, zip bomb, docx hidden text + macro flag, PDF parse, XXE rejected, blobs encrypted at rest; 27: backup verify, wrong password, **restore to a new PC** (needs new PIN), tamper detection; 22/39.6 skill checks + signature; 21 memory trust; 16 cron/DST/plain words, missed-run policy; reminders fire; session-log chain; connector toggle suspends missions; secret export encrypted |
 | Red team | `tests/redteam/test_redteam.py` + `corpus.json` | 32: 13 attack cases × N runs with a fully malicious "model": forward mail, exfil via URL/search, SSRF (metadata, localhost), memory poisoning, planted mission/skill, unknown tool, settings change, self-approval, kill-switch release, external draft. Gate: no unauthorised action, no protected data out, no state change from untrusted content |
 | Windows platform | `tests/windows/test_windows_platform.py` | 2.4 named pipe handshake (good/bad token, unexpected core), **pipe squatting detection**, **pipe DACL** (NETWORK denied, no Everyone/Users), Job Object memory limit, parser under Job Object, **AppContainer has no network**, clipboard excluded from history, data-folder ACL, posture runs, TPM probe, Defender detects EICAR, firewall script parses, **real gateway + pa-core processes over named pipes** |
+| E2E action catalogue | `scripts/e2e_runner.py` + `tests/e2e/scenarios.json` (175 steps), `tests/e2e/ui_actions.json` (80 UI controls), `tests/e2e/test_action_catalog.py` | every UI action -> backend RPC -> response + security-log events; coverage report in docs/ACTION_CATALOG.md |
+| Chat organisation / themes | `tests/integration/test_chat_organise.py` | pinned + folder (DB v2), folder validation, theme/background settings |
+| Bundle data | `tests/unit/test_bundle_data.py` | password/PIN lists load; the PyInstaller spec ships them |
+| Portable mode | `tests/unit/test_portable_mode.py` | exact-path checks for UI/core in the portable folder; a source checkout is never portable |
+| Firewall gate | `tests/unit/test_firewall_gate.py` | 14.2/35.8: missing rule or failed lookup blocks pa-core/worker start in release builds |
 | End-to-end | `python -m pa_gateway --selftest` | setup → chat → reminder approval → scheduled → log verifies |
 | UI | `npm run build` (tsc strict) + Playwright script used during development | type safety; screenshots in `docs/screenshots` |
 
@@ -46,6 +51,22 @@ and real gateway + pa-core over named pipes); `ui` passed (pa-ui.exe compiled); 
 executables. pa-core's firewall self-test reports "outbound NOT blocked" on CI (no firewall rules there) -
 that check is laptop item B1 after `install-dev.ps1`.
 
+Laptop session 2026-09-30/10-01 (Windows 11 Home, Intel PTT TPM): 162 automated tests pass locally; ruff clean;
+`npm run build` and `tauri build --no-bundle` OK; selftest OK; release bundle built (`dist\PersonalAgent`).
+Laptop checklist A-G/P: NOT yet run - waiting for the user (TPM auth throttle must clear first; B5 impossible on Home).
+
+### UI features (v0.1.4) - manual
+- [ ] H1 Settings > Appearance & Voice: each theme card applies at once; light/dark text stays readable in all eight.
+- [ ] H2 Each animated background runs smoothly (Aurora, Bubbles, Waves, Starfield); "Reduce motion" stops it.
+- [ ] H3 "Day & night" switches at the times you set (change the day/night times to 2 minutes from now to see it).
+- [ ] H4 Long chat: floating up/down buttons appear; down shows the count of new messages while scrolled up.
+- [ ] H5 Type `/` in chat: menu opens; `/theme sunset`, `/remind call mum tomorrow 9`, `/history` work.
+- [ ] H6 History: groups Today/Yesterday/…; search finds an old chat; click opens it.
+- [ ] H7 Pin a chat (stays on top) and move one to a folder; both survive restart.
+- [ ] H8 Times in chat/history use your PC's 12/24-hour setting.
+- [ ] H9 Portable: copy `dist\PersonalAgent-Portable` to another folder, double-click `pa-ui.exe` only; the window opens and
+      connects; Posture shows the "Portable mode" High finding.
+
 ### Profile names (v0.1.1) - laptop
 - [ ] P1 Setup: enter "Your name" + "Name your assistant" → Home says "Good …, <your name>", sidebar and window
       title show the assistant name.
@@ -55,18 +76,20 @@ that check is laptop item B1 after `install-dev.ps1`.
       "what is your name?" → the model answers with the new name.
 
 ## Laptop test checklist (manual / `-m laptop`)
+`python scripts/laptop_smoke.py` runs the automated subset (throwaway dev vault, real TPM + Ollama, 21 checks, all passed
+once on 2026-10-01; options `--software` (no TPM), `--wrong-pin` (one wrong PIN - never repeat runs: TPM budget). Items ticked below say how they were verified; unticked items still need a person.
 Run these on your Windows 11 laptop after installing the bundle (or from source with `PA_DEV_MODE` **off**).
 Tick them off in this file or in an issue.
 
 ### A. First run & keys
 - [ ] A1 Wizard step 1 shows TPM **ready**, BitLocker status, sandbox strength, GPU.
-- [ ] A2 Create account; weak passwords and 123456-style PINs are rejected.
-- [ ] A3 Security Posture: "TPM 2.0 … PIN protector: tpm" is **OK** (not software).
+- [x] A2 (automated, scripts/laptop_smoke.py 2026-10-01) Create account; weak passwords and 123456-style PINs are rejected.
+- [x] A3 (automated, scripts/laptop_smoke.py 2026-10-01) Security Posture: "TPM 2.0 … PIN protector: tpm" is **OK** (not software).
 - [ ] A4 Recovery key: Save as PDF works; Copy clears after 30 s; typing back 2 groups is enforced.
-- [ ] A5 Lock (button, Ctrl+Shift+L, Windows+L) → PIN unlock works; 5 wrong PINs disable the PIN until password.
+- [x] A5 (PIN unlock + 1 wrong PIN automated; Ctrl+Shift+L/Win+L manual, lockout A6 NOT tested to protect the TPM) Lock (button, Ctrl+Shift+L, Windows+L) → PIN unlock works; 5 wrong PINs disable the PIN until password.
 - [ ] A6 TPM lockout: after several wrong PINs Windows TPM lockout message is shown (no crash).
-- [ ] A7 Reboot → password required (cold start). Idle auto-lock after the configured minutes.
-- [ ] A8 Forgot password with PIN + recovery key → new password works → **new** recovery key shown, old one fails.
+- [x] A7 (password path only, scripts/laptop_smoke.py 2026-10-01) Reboot → password required (cold start). Idle auto-lock after the configured minutes.
+- [x] A8 (automated, scripts/laptop_smoke.py 2026-10-01) Forgot password with PIN + recovery key → new password works → **new** recovery key shown, old one fails.
 - [ ] A9 Copy `%LOCALAPPDATA%\PersonalAgent` to another PC/user → cannot be opened with PIN + recovery key.
 - [ ] A10 Sleep with BitLocker off → keys wiped (password needed); with BitLocker on and default setting → UI lock only.
 
@@ -80,7 +103,7 @@ Tick them off in this file or in an issue.
 - [ ] B7 Built-in runtime: put `llama-server.exe` + a GGUF model; the model loads only if its SHA-256 matches; `curl http://127.0.0.1:<port>/v1/models` without the key → 401; five bad keys → restart on a new port + Home event.
 
 ### C. Models & voice
-- [ ] C1 Ollama: add, Discover, Test model passes; exposure check says not reachable from the network.
+- [x] C1 (automated, scripts/laptop_smoke.py 2026-10-01) Ollama: add, Discover, Test model passes; exposure check says not reachable from the network.
 - [ ] C2 vLLM / LM Studio / Run:ai (OpenAI-compatible) endpoint: add, test, chat.
 - [ ] C3 Remote endpoint requires the password and shows "REMOTE" on Posture.
 - [ ] C4 Speech-to-text (e.g. faster-whisper-server / vLLM Whisper, OpenAI-compatible `/v1/audio/transcriptions`): mic button records, text is sent, "remind me …" produces a confirmation card.
@@ -98,12 +121,12 @@ Tick them off in this file or in an issue.
 ### E. Autonomy
 - [ ] E1 Routine "every weekday at 7:30 …" runs with the window closed and Windows locked; output appears in My Files and a toast.
 - [ ] E2 PC off overnight → at next sign-in the missed run policy (RUN_ONCE) catches up once.
-- [ ] E3 STOP ALL (button, tray, Ctrl+Alt+Shift+S) stops everything within 2 s; release needs the password.
+- [x] E3 (automated (API), scripts/laptop_smoke.py 2026-10-01) STOP ALL (button, tray, Ctrl+Alt+Shift+S) stops everything within 2 s; release needs the password.
 - [ ] E4 Approvals accepted in < 2 s three times → fatigue warning on Home.
 
 ### F. Data
-- [ ] F1 Back up now to an external drive; Verify; restore on a second PC (new PIN + recovery key required).
-- [ ] F2 Delete everything → app returns to the first-run wizard; old data unreadable.
+- [x] F1 (automated (backup+verify; restore on 2nd PC still manual), scripts/laptop_smoke.py 2026-10-01) Back up now to an external drive; Verify; restore on a second PC (new PIN + recovery key required).
+- [x] F2 (automated, scripts/laptop_smoke.py 2026-10-01) Delete everything → app returns to the first-run wizard; old data unreadable.
 - [ ] F3 SIEM: HTTPS endpoint with pinned fingerprint receives events; wrong fingerprint → error shown.
 
 ### G. UI
@@ -111,3 +134,87 @@ Tick them off in this file or in an issue.
 - [ ] G2 Copy secret → Windows clipboard history (Win+V) does not contain it.
 - [ ] G3 Keyboard-only navigation, dark/light theme, text size 140 %.
 - [ ] G4 External link in an answer asks before opening the browser; remote images are never loaded.
+
+### Button audit (2026-10-01, browser preview with the mock gateway)
+Every button on Home, Chat, History, Missions, Reminders, Tasks, Approvals, My Files, Memory, Secrets, Activity and all
+18 Settings sections, the theme cards / background chips, the top bar (search palette, STOP ALL menu, Lock), the lock
+screen and wizard steps 1-3 was clicked by script: no JavaScript errors, every control produced a visible change, dialog,
+toast or navigation (the only "no effect" cases were already-active tabs and empty lists). Not testable in the mock:
+wizard steps 4-9 (recovery key etc.), microphone, native file dialogs, tray/hotkey, anything needing the real gateway.
+
+### End-to-end action catalogue (2026-10-01)
+`python scripts/e2e_runner.py` runs 175 scenario steps against a throwaway developer gateway (software protector, mock
+model; Ollama steps run when it is reachable; `--tpm` uses the real TPM) and checks for every UI action the response
+(`expect`), values that must never be returned (`absent`) and the security-log events it must write (`audit`). Result
+2026-10-01: **175 passed, 0 failed**. It found two real bugs (K11 pipe accept loop, K12 low-memory error text).
+`tests/e2e/ui_actions.json` maps every UI control to its RPC and expected visible result (walk it with the browser
+tools in the `?demo` preview or the real app). `python scripts/gen_action_catalog.py` regenerates
+`docs/ACTION_CATALOG.md` (137 RPCs: 126 covered, 11 manual-only with reasons, 0 gaps) and `test_action_catalog.py`
+fails CI if a new RPC has neither a scenario nor a manual-only reason.
+
+### H10 Motion and accessibility review (manual, in the real window)
+- [ ] Open/close Emergency stop, Ctrl+K palette, `/` menu in chat: each fades/springs in AND out; reopening mid-close is fine.
+- [ ] Dialog grows from the button that opened it (e.g. STOP ALL, a file row).
+- [ ] Delete a chat / file / memory / cancel a mission: item disappears, "Undo" toast for 8 s; Undo brings it back;
+      without Undo it is really gone (also after Lock and after closing the window within 8 s).
+- [ ] Windows Settings > Accessibility > Visual effects > Animation off (and Contrast themes): UI uses short fades only, no pulsing.
+- [ ] Every theme: read faint text, buttons, badges - nothing hard to read. Settings > Appearance: background Off by default.
+- [ ] Breadcrumb in the top bar and window title follow the screen; restart keeps the last screen.
+
+### H11 Dev-mode walkthrough (scripts\run-dev.ps1, no TPM)
+- [ ] Chats list closed by default; menu button opens it; picking a chat closes it; + starts a new chat.
+- [ ] Steps panel closed by default; Steps button opens it.
+- [ ] Guide (below Activity log): search 'lock', 'undo', 'theme colour', 'STOP ALL' show relevant entries; Open buttons navigate.
+- [ ] Settings > Appearance: 5 accent colours + theme default recolour buttons in every theme (light and dark).
+- [ ] 'Remind me in an hour' shows the local time (compare with the taskbar clock).
+
+### H12-H16 Real-window checks for the 2026-10-01 evening features
+- [ ] H12 Outlook: Settings > Connectors > Local Outlook on (use in missions) > Settings > Email monitoring: switch on "Hourly inbox check" and
+      "Emails waiting for my approval", press Run now on each: results appear on the Outlook screen within ~1-2 minutes; badge counts unseen results;
+      switch off -> they stop; "Show the Outlook button" off hides the menu button.
+- [ ] H13 Chat: "how many emails did I receive today and in how many am I in To?" gives numbers that match Outlook (mail_stats), "emails waiting for my approval" lists real ones.
+- [ ] H14 Attach a big Excel file with the paperclip (or drag it from the Desktop): chip appears; ask "total of <column> per <column>"; first answer may take 1-2 minutes
+      (indexing), later answers seconds; Remove on the chip stops access; delete the chat -> access gone. File on disk unchanged.
+- [ ] H15 Activity log > Network Logs: web fetches, blocked sites (red), model calls (this PC) with times in local time; Copy as CSV works.
+- [ ] H16 GPU meter above Settings moves when the model answers; Alt+C/H/I/M/R/T/A/F/E/S/L/O/G/comma and F1 navigate; picture upload shows in the top bar / next to your name.
+- [ ] H17 Voice with the real microphone (needs the speech model added: Settings > AI Model > Discover > frozenlab/qwen3-asr:1.7b > Add model, wait for "tested"): Chat > mic, speak 5 s, stop -> text appears; speak 2 minutes -> text appears (pieces joined); Windows microphone permission prompt handled.
+- [ ] H19 Add model: Discover > click a chat model > Add model: row shows "testing..." then "tested" without pressing Test model; it can be used in chat at once. A model that fails stays "not tested" and gets a warning toast.
+Automated: `tests/unit/test_audio.py`, `tests/integration/test_stt_models.py` (fake Ollama: auto-test, default only if unset, chunking, WAV-only, inspect), `scripts/live_asr_check.py` (REAL Ollama + Qwen3-ASR + a clip spoken by Windows: passed 2026-10-02, 6 s test, 0.4 s transcript).
+- [ ] H21 Network Logs > Copy as CSV, paste into Excel: no cell is evaluated as a formula (cells that start with = + - @ show a leading apostrophe).
+Security tests (2026-10-02, details docs/SECURITY_AUDIT_2026-10-02.md): `scripts/corpus_dast.py <corpus>` (217 files, expect 0 FAIL, 0 benign false positives), `scripts/pentest_rpc.py` (expect FINDINGS: none),
+`tests/integration/test_{upload_hardening,ipc_robustness,role_matrix}.py`, `tests/unit/test_{winpaths,egress_exotic,audio}.py`.
+- [ ] H22 Rename/pin: hover a chat > pencil (or double-click the title / F2 / `/rename Budget`): name changes in list, header and History; Esc cancels; empty name is refused; pin in header moves the chat to "Pinned".
+- [ ] H23 Notifications (needs rebuilt pa-ui.exe): create a reminder "Call the dentist" for 1 minute ahead and minimise the window: the Windows toast title is "Call the dentist", text "Reminder"; a routine "Run now" toast is titled with the routine name; with the chat window in front no toast appears for answers, with another app in front a toast titled with the chat name appears; Settings > Notifications > Show names off -> generic titles.
+- [ ] H24 Position rail: open a chat with 5+ questions: thin lines at the right edge, dark one follows the scrolling; hover opens the list, click jumps, Up/Down move; hidden when the window is narrow; works in every theme. (Checked in the browser preview 2026-10-02: 20 ticks, hover list, click-jump, scroll tracking matched the visible question.)
+- [ ] H25 Settings > AI Model: four cards. Add `frozenlab/qwen3-asr:1.7b` under Voice models (Discover shows only voice models there; trying it under Chat models is refused), add `qwen2.5vl:7b` or `qwen3-vl` under Vision models; each becomes "tested" by itself and the default of its own kind only.
+- [ ] H26 Pictures/scans: attach a photo or screenshot of text (paperclip, drag, Ctrl+V) and a scanned PDF: the text is read; without a vision model you get the hint and "Read with vision model" in My Files after adding one.
+- [ ] H27 Folder sharing: folder button > dialog shows file/subfolder counts, subfolders unticked; ask "what is in the folder?" works; ask for a file in a subfolder: card "Allow subfolders" appears; sign out and in: chip says "Allow again"; a new chat has no access; AppData / C:\ / your user folder are refused.
+- [ ] H28 Live voice: dictate for 2-10 minutes (the counter shows pieces transcribed); text appears while speaking; press Stop: only the last piece is awaited; close the window mid-way and reopen: unsent text is restored.
+- [ ] H29 Fonts: Settings > Appearance & Voice > pick several fonts and Small/Medium/Large: every screen stays tidy (no cut-off or overlapping text); Aptos shows "not installed" unless Office/Windows has it.
+Automated 2026-10-02 (second part): `test_model_kinds.py`, `test_vision_pipeline.py`, `test_local_folders.py` (25: traversal, junction, session expiry, subfolder approval ...), `test_upload_hardening.py` (37), `test_font_settings.py`; live: `scripts/live_vision_check.py` (qwen2.5vl:7b: image and scanned PDF 3/3 key words in 4 s), `scripts/live_asr_long.py 10` (see VERSION_HISTORY 0.1.11); preview: Segmenter/Resampler tests with synthetic 10-minute audio, font x size x screen sweep.
+- [ ] H30 After installing the new bundle: upload a few files; if your antivirus cannot be asked they wait in My Files > Quarantine with the banner: "Allow without antivirus scan" asks for your password and moves the file to Files marked "NOT antivirus-scanned".
+- [ ] H31 Chat: ask for a web search: an approval card "Allow web access for this chat" appears once; the second search in the same chat does not ask; a new chat asks again.
+- [ ] H32 Share the `corpus` folder and ask "analyse the contents": the assistant uses localfile.digest and answers; no "model_empty" (if it still happens, tell me the model name).
+- [ ] H33 Search History for part of a word ("expl"): finds your question; the x in the search box clears it. Token ring in the chat header; Activity > Usage & budgets; no "gateway" badge; ChiRAG icon in the title bar, taskbar, tray and on the desktop shortcut.
+Automated 2026-10-02 (third part): `test_empty_rescue.py`, `test_history_search.py`, `test_unscanned_files.py`, `test_web_per_chat.py`, digest test in `test_local_folders.py`, `test_icons.py`, `test_all_modules_compile.py`; live: `scripts/live_chat_check.py` (real qwen3-coder + real Outlook: no empty replies in 4 runs).
+- [ ] H34 Memory learns: chat "I work in finance and prefer short bullet-point reports" -> within a minute Memory shows "learned from your chats" items; Forget one -> say it again -> it does not come back; toggle Learn automatically off -> nothing new appears.
+- [ ] H35 My Files: upload a PAN card scan/PDF: after a few seconds the row shows "PAN card" + summary; the file is CONFIDENTIAL; File details > Summary is editable (typing the PAN number there is refused); ask the assistant "show me my PAN card" -> it finds and shows the file; Memory has "My Files has 'PAN card...' - values are in the file".
+- [ ] H36 Home: Widgets button on the right: switch widgets on/off and reorder; mail widgets fill in after a few seconds (Local Outlook must be on); Refresh re-reads Outlook; reload the app: the choice is remembered.
+- [ ] H37 Update with ONE command (see the instructions in the chat / installer\windows\update-app.ps1).
+Automated (fourth part): `test_memory_learning.py`, `test_file_insights.py`, `test_home_widgets.py`; live: `scripts/live_memory_check.py` (real qwen3-coder).
+Performance (scripts/perf_tables.py, this PC): 99 MB .xlsx, 1.5 million rows x 12 columns: first index 62 s; group-by 0.7 s; filter 0.5 s; cache 234 MB.
+
+### Live check of the email skills (scripts/live_outlook_check.py, 2026-10-01)
+Real classic Outlook (~700 mails/day, 112 folders) + real Ollama model (gemma4:latest), throwaway data folder, software key, read-only. All ten skills
+produced structured, correct-looking results (inbox_hourly 64-76 s, approvals 72 s, deadlines 48 s, morning_brief 24-36 s, meeting_prep 36 s (found today's meeting),
+followups 20 s, reply_needed 20 s, cleanup_report 24 s, weekly_summary 56 s, vip_alert 12 s). Problems found and fixed on the way:
+(1) Outlook read `10/01/2026` day-first -> locale-safe dates; (2) thinking models returned EMPTY replies (answer budget spent on hidden reasoning) -> `reasoning_effort:none`
+for Ollama + "model_empty" error; (3) the model answered "..." -> placeholder answers rejected; (4) the model skipped tool calls / date logic -> the first data-gathering
+calls now run in code before the model starts (`prefetch`), deadline filtering is done by the tool.
+
+### Status at the end of the 2026-10-01 session
+pytest 257 passed / 1 environmental failure (clipboard: Windows denies OpenClipboard when the screen is locked or another app holds it) / 1 skipped; e2e `scripts\e2e_runner.py` 187/187; ruff and `tsc` clean;
+UI behaviour checked in the browser preview (`/?demo`) with scripted DOM checks; real Outlook + real Ollama via `scripts/live_outlook_check.py`; 99 MB workbook via `scripts/perf_tables.py`.
+NOT yet verified in the real window (needs the new bundle installed): H11-H16 above. Never test against the real TPM (CLAUDE.md).
+
+- [ ] H20 Exa web search: Secrets > Add (type API key, value = your Exa key, Used by: web.search) > Settings > Web Access > Search provider exa (password) > Settings > Connectors > Web on > Test web search shows "works"; then ask in chat "search the web for ...".

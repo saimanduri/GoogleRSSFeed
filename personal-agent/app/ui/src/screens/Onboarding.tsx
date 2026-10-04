@@ -69,7 +69,7 @@ export function Onboarding() {
 
         {step === 0 && (
           <div className="col">
-            <h1>Welcome to Personal Agent</h1>
+            <h1>Welcome to ChiRAG Agent</h1>
             <p className="muted">A private assistant that runs on this PC. Your data, keys and secrets stay here, encrypted. Let's check this PC first.</p>
             {!pre ? <div className="skeleton" style={{ height: 180 }} /> : (
               <div className="card flat">
@@ -97,7 +97,7 @@ export function Onboarding() {
               <input className="input" autoFocus value={displayName} maxLength={40} placeholder="e.g. Sai" onChange={(e) => setDisplayName(e.target.value)} />
             </Field>
             <Field label="Name your assistant" help="Address the assistant by this name. You can change it any time in Settings.">
-              <input className="input" value={assistantName} maxLength={40} placeholder="Personal Agent" onChange={(e) => setAssistantName(e.target.value)} />
+              <input className="input" value={assistantName} maxLength={40} placeholder="ChiRAG Agent" onChange={(e) => setAssistantName(e.target.value)} />
             </Field>
             <Field label="Username" help="3-64 characters, used to sign in. Not a secret.">
               <input className="input" value={username} onChange={(e) => setUsername(e.target.value)} />
@@ -109,6 +109,16 @@ export function Onboarding() {
             <Field label="Confirm password" error={password2 && password !== password2 ? "Passwords do not match" : ""}>
               <input className="input" type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} />
             </Field>
+            {(() => {
+              const todo = [
+                !displayName.trim() && "enter your name",
+                username.length < 3 && "username needs 3+ characters",
+                password.length < 12 && `password needs 12+ characters (now ${password.length})`,
+                password.length >= 12 && !pwOk && "password is not accepted yet (see above)",
+                password && password !== password2 && "the two passwords must match",
+              ].filter(Boolean) as string[];
+              return todo.length ? <div className="small" style={{ color: "var(--warn)" }} role="status">To continue: {todo.join(" · ")}</div> : null;
+            })()}
             <div className="row"><Button onClick={() => setStep(0)}>Back</Button><div className="spacer" />
               <Button kind="primary" disabled={!pwOk || username.length < 3 || !displayName.trim()} onClick={next}>Continue</Button></div>
           </div>
@@ -145,10 +155,10 @@ export function Onboarding() {
         {step === 7 && <BackupStep onNext={next} />}
         {step === 8 && (
           <div className="col center" style={{ textAlign: "center", padding: "10px 0" }}>
-            <div className="brand-logo" style={{ width: 64, height: 64, borderRadius: 18 }}><Icon name="check" size={32} /></div>
+            <div className="brand-logo logo-img" style={{ width: 72, height: 72, borderRadius: 18 }}><img src="/chirag-logo.png" alt="" /></div>
             <h1>You're all set</h1>
             <p className="muted" style={{ maxWidth: 480 }}>Everything is encrypted with your password and this PC's TPM. The agent can only act through the gateway, which checks every action against your rules. The red STOP ALL button is always one click away.</p>
-            <Button kind="primary" onClick={refresh}>Open {assistantName.trim() || "Personal Agent"}</Button>
+            <Button kind="primary" onClick={refresh}>Open {assistantName.trim() || "ChiRAG Agent"}</Button>
           </div>
         )}
       </div>
@@ -172,7 +182,8 @@ export function StrengthMeter({ s }: { s: any }) {
   return (
     <div className="col" style={{ gap: 4 }}>
       <div className="meter"><div style={{ width: `${(score + 1) * 20}%`, background: colors[score] }} /></div>
-      <div className="small"><strong>{s.strength.label}</strong>{s.errors.length ? <span className="faint"> · {s.errors.join(" · ")}</span> : null}
+      <div className="small"><span className="faint">Strength: </span><strong>{s.strength.label}</strong>
+        {s.errors.length ? <span style={{ color: "var(--danger)" }}> · Not accepted yet: {s.errors.join(" · ")}</span> : <span style={{ color: "var(--ok)" }}> · accepted</span>}
         {s.strength.feedback?.length ? <span className="faint"> · {s.strength.feedback.join(" · ")}</span> : null}</div>
     </div>
   );

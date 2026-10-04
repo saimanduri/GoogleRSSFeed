@@ -3,7 +3,7 @@
 Protocol: one JSON request per stdin line, one JSON response per stdout line. The worker never talks
 to the network (firewall) and never sees prompts or model output. It does NOT suppress, bypass or
 auto-click Outlook's Object Model Guard.
-Operations: list_folders, search, get_message, get_attachment, calendar_read, create_draft.
+Operations: list_folders, search, digest, mail_stats, awaiting_reply, get_message, get_attachment, calendar_read, create_draft.
 Not supported (by design): send, forward, delete, move, rules, contacts export, account settings.
 """
 from __future__ import annotations
@@ -13,7 +13,9 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timedelta
+
+
+from . import mailops
 
 OL_FOLDER_CALENDAR = 9
 OL_MAIL_ITEM = 0
@@ -84,42 +86,6 @@ def op_list_folders(app, cfg, p):
     return {"text": "\n".join(f"- {path} ({f.Items.Count} items)" for path, f in fs[:500]), "count": len(fs)}
 
 
-def op_search(app, cfg, p):
-    maxn = min(int(p.get("max_results", 10)), cfg["max_items"])
-    since = datetime.now() - timedelta(days=cfg["date_range_days"])
-    if p.get("since"):
-        since = max(since, datetime.fromisoformat(p["since"][:19]))
-    q = (p.get("query") or "").replace("'", "''")
-    filt = f"@SQL=\"urn:schemas:httpmail:datereceived\" >= '{since.strftime('%m/%d/%Y %H:%M')}'"
-    if q:
-        filt += (f" AND (\"urn:schemas:httpmail:subject\" LIKE '%{q}%' OR \"urn:schemas:httpmail:textdescription\" LIKE '%{q}%'"
-                 f" OR \"urn:schemas:httpmail:fromname\" LIKE '%{q}%')")
-    results, max_sens = [], 0
-    for path, folder in _folders(app, cfg):
-        if p.get("folder") and p["folder"].lower() not in path.lower():
-            continue
-        try:
-            items = folder.Items.Restrict(filt)
-            items.Sort("[ReceivedTime]", True)
-        except Exception:  # noqa: BLE001
-            continue
-        for it in items:
-            if len(results) >= maxn:
-                break
-            if getattr(it, "Class", 0) != 43:  # olMail
-                continue
-            ok, sens = _label_ok(it, cfg)
-            if not ok:
-                continue
-            max_sens = max(max_sens, sens)
-            meta_only = sens >= 3 and cfg.get("highest_label") == "metadata_only"
-            results.append(f"- id={it.EntryID}\n  {it.ReceivedTime} | {path} | from {it.SenderName}\n  subject: {it.Subject}"
-                           + ("" if meta_only else f"\n  preview: {str(it.Body or '')[:200]!s}"))
-        if len(results) >= maxn:
-            break
-    return {"text": "\n".join(results) or "No messages found.", "count": len(results), "max_sensitivity": max_sens}
-
-
 def op_get_message(app, cfg, p):
     it = app.GetNamespace("MAPI").GetItemFromID(p["message_id"])
     ok, sens = _label_ok(it, cfg)
@@ -156,9 +122,9 @@ def op_calendar_read(app, cfg, p):
     items = cal.Items
     items.IncludeRecurrences = True
     items.Sort("[Start]")
-    start = datetime.fromisoformat(p["start"][:19])
-    end = datetime.fromisoformat(p["end"][:19])
-    r = items.Restrict(f"[Start] >= '{start.strftime('%m/%d/%Y %H:%M')}' AND [End] <= '{end.strftime('%m/%d/%Y %H:%M')}'")
+    start = mailops.parse_dt(p["start"])
+    end = mailops.parse_dt(p["end"])
+    r = items.Restrict(f"[Start] >= '{mailops.ol_date(start)}' AND [End] <= '{mailops.ol_date(end)}'")
     out, max_sens = [], 0
     for i, ev in enumerate(r):
         if i >= int(p.get("max_results", 25)):
@@ -182,8 +148,11 @@ def op_create_draft(app, cfg, p):
     return {"text": f"Draft saved in Outlook Drafts (subject: {p['subject']}).", "entry_id": mail.EntryID}
 
 
-OPS = {"list_folders": op_list_folders, "search": op_search, "get_message": op_get_message,
+OPS = {"list_folders": op_list_folders, "get_message": op_get_message,
        "get_attachment": op_get_attachment, "calendar_read": op_calendar_read, "create_draft": op_create_draft}
+
+
+OPS.update(mailops.OPS)  # search, digest, mail_stats, awaiting_reply
 
 
 def main() -> int:

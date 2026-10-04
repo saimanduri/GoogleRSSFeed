@@ -33,3 +33,16 @@ def test_custom_patterns_and_keywords():
     e = eng(**{"dlp.custom_patterns": [r"ACCT-\d{6}"], "dlp.blocked_keywords": ["Project Falcon"]})
     assert e.check_outbound("see ACCT-123456")["blocked"]
     assert e.check_outbound("about project falcon")["blocked"]
+
+
+def test_defender_off_is_reported_as_unscannable_not_malware(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from pa_gateway.files import checks
+
+    f = tmp_path / "x.bin"
+    f.write_bytes(b"hello")
+    monkeypatch.setattr(checks, "find_defender", lambda: "MpCmdRun.exe")
+    monkeypatch.setattr(checks.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=2, stdout=b"WARN: Product/Feature disabled\n[Failed][0x80004005]"))
+    r = checks.scan_file(f, b"hello")
+    assert r["clean"] is False and r["unavailable"] is True and "turned off" in r["error"]

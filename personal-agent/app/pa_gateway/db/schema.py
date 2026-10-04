@@ -347,6 +347,87 @@ CREATE TABLE policy_history (
 CREATE VIRTUAL TABLE history_fts USING fts5(kind UNINDEXED, ref_id UNINDEXED, title, body, created_at UNINDEXED, tokenize='porter unicode61');
 """
 
+V2 = """
+ALTER TABLE chats ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE chats ADD COLUMN folder TEXT NOT NULL DEFAULT '';
+"""
+
+V3 = """
+ALTER TABLE missions ADD COLUMN template_id TEXT;
+CREATE TABLE net_log (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL,
+  component TEXT NOT NULL,
+  method TEXT NOT NULL,
+  scheme TEXT NOT NULL,
+  host TEXT NOT NULL,
+  port INTEGER,
+  path TEXT NOT NULL,
+  status INTEGER,
+  outcome TEXT NOT NULL,
+  reason TEXT NOT NULL DEFAULT '',
+  bytes_out INTEGER NOT NULL DEFAULT 0,
+  bytes_in INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  ip TEXT NOT NULL DEFAULT '',
+  loopback INTEGER NOT NULL DEFAULT 0,
+  purpose TEXT NOT NULL DEFAULT '',
+  tool TEXT NOT NULL DEFAULT '',
+  task_id TEXT,
+  run_id TEXT
+);
+CREATE TABLE local_grants (
+  id TEXT PRIMARY KEY,
+  chat_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  name TEXT NOT NULL,
+  ext TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  mtime INTEGER NOT NULL,
+  sensitivity INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT
+);
+CREATE INDEX idx_local_grants_chat ON local_grants(chat_id);
+CREATE INDEX idx_net_log_ts ON net_log(ts);
+CREATE INDEX idx_net_log_host ON net_log(host, ts);
+"""
+
+V4 = """
+ALTER TABLE local_grants ADD COLUMN scope TEXT NOT NULL DEFAULT 'file';
+ALTER TABLE local_grants ADD COLUMN recursive INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE local_grants ADD COLUMN session_nonce TEXT NOT NULL DEFAULT '';
+"""
+
+V5 = """
+CREATE TABLE file_meta (
+  file_id TEXT PRIMARY KEY,
+  title TEXT,
+  doc_type TEXT,
+  summary TEXT,
+  keywords_json TEXT NOT NULL DEFAULT '[]',
+  pii_json TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  edited INTEGER NOT NULL DEFAULT 0,
+  model TEXT,
+  note TEXT,
+  memory_id TEXT,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE memory_learn_state (
+  chat_id TEXT PRIMARY KEY,
+  last_msg_created_at TEXT NOT NULL
+);
+CREATE TABLE memory_forgotten (
+  content_hash TEXT PRIMARY KEY,
+  ts TEXT NOT NULL
+);
+"""
+
 MIGRATIONS: list[tuple[int, str]] = [
     (1, V1),
+    (2, V2),
+    (3, V3),
+    (4, V4),
+    (5, V5),
 ]

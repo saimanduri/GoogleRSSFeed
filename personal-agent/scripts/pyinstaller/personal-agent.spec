@@ -8,8 +8,14 @@ ROOT = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 APP = os.path.join(ROOT, "app")
 HERE = SPECPATH
 hidden = (collect_submodules("pa_gateway") + collect_submodules("pa_core") + collect_submodules("pa_workers")
-          + collect_submodules("pa_common") + ["win32timezone", "sqlcipher3", "argon2", "tzdata", "tzlocal"])
-datas = collect_data_files("pa_gateway") + collect_data_files("tzdata")
+          + collect_submodules("pa_common") + ["win32timezone", "win32pdh", "pypdf", "sqlcipher3", "argon2", "tzdata", "tzlocal"])
+# Explicit data files: collect_data_files("pa_gateway") finds nothing because app/ is not on sys.path while the
+# spec runs (the password/PIN lists were missing from v0.1.1 bundles). Fail the build if they are not there.
+DATA_DIR = os.path.join(APP, "pa_gateway", "data")
+for _f in ("common_passwords.txt", "common_pins.txt"):
+    if not os.path.isfile(os.path.join(DATA_DIR, _f)):
+        raise SystemExit("missing data file: " + _f)
+datas = [(os.path.join(DATA_DIR, "*.txt"), os.path.join("pa_gateway", "data"))] + collect_data_files("tzdata")
 
 
 def analysis(entry):

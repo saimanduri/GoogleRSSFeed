@@ -32,11 +32,16 @@ def main(argv: list[str] | None = None) -> int:
         print("--data-dir is only allowed in developer mode", file=sys.stderr)
         return 2
     paths = DataPaths(Path(args.data_dir) if args.data_dir else default_data_dir())
+    if dev_mode() and os.environ.get("PA_DEBUG_DUMP"):  # developer aid: periodic thread stack dump to stderr
+        import faulthandler
+        faulthandler.dump_traceback_later(int(os.environ["PA_DEBUG_DUMP"]), repeat=True, file=sys.stderr)
     mutex = None
     if sys.platform == "win32":
         from . import winsession
         winsession.harden_process()
-        mutex = winsession.single_instance()
+        import hashlib
+        scope = hashlib.sha256(str(paths.root).lower().encode()).hexdigest()[:12] if (dev_mode() and args.data_dir) else ""
+        mutex = winsession.single_instance(scope)
         if mutex is None:
             print("pa-gateway is already running", file=sys.stderr)
             return 0

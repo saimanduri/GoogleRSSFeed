@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from pa_common.buildinfo import RELEASE_BUILD, SIGNED_BUILD
+from pa_common.portable import portable_core_exe, portable_root, portable_ui_exe
 from pa_common.devmode import dev_mode
 from pa_common.ids import new_id
 from pa_common.protocol import FrameDecoder, FrameError, encode_frame
@@ -27,6 +28,8 @@ from pa_common.protocol import FrameDecoder, FrameError, encode_frame
 from .dispatch import ClientInfo, Dispatcher
 
 BUF = 64 * 1024
+ERROR_IO_PENDING = 997
+ERROR_PIPE_CONNECTED = 535
 UI_EXE = "pa-ui.exe"
 CORE_EXE = "pa-core.exe"
 
@@ -161,18 +164,24 @@ class PipeServer:
             try:
                 rc = win32pipe.ConnectNamedPipe(h, ov)
             except pywintypes.error as e:
-                if e.winerror == 535:  # ERROR_PIPE_CONNECTED
+                if e.winerror == ERROR_PIPE_CONNECTED:  # the client connected before we called ConnectNamedPipe
                     rc = 0
-                else:
+                else:  # e.g. ERROR_NO_DATA: the client already went away - this instance is unusable
                     h.Close()
                     continue
-            if rc != 0:
+            if rc == ERROR_IO_PENDING:
+                # waiting for a client; only this code means "the event will be signalled when one connects"
                 while not self._stop.is_set():
                     if win32event.WaitForSingleObject(ov.hEvent, 500) == win32event.WAIT_OBJECT_0:
                         break
                 if self._stop.is_set():
                     h.Close()
                     break
+            elif rc not in (0, ERROR_PIPE_CONNECTED):
+                # any other return code means the connect already finished with an error: waiting on the event would
+                # block forever and leave NO listening instance (all later clients get "all pipe instances busy")
+                h.Close()
+                continue
             threading.Thread(target=self._serve, args=(h,), daemon=True, name="pipe-conn").start()
 
     # ---------------------------------------------------------------- one connection
@@ -263,6 +272,10 @@ class PipeServer:
     def _image_ok(self, image: str | None, expected_exe: str) -> bool:
         """Client verification (spec 2.4): exact executable inside the install folder, plus a valid
         Authenticode signature when the build is signed. Source/developer runs are allowed only in dev mode."""
+        if portable_root() is not None:
+            # portable folder: the exact files inside it (exact pid for the core is checked in _handshake)
+            want = portable_ui_exe() if expected_exe == UI_EXE else portable_core_exe()
+            return bool(image and want and Path(image).resolve() == want)
         if not getattr(sys, "frozen", False):
             return (not RELEASE_BUILD) and dev_mode()
         if not image or self.install_dir is None:

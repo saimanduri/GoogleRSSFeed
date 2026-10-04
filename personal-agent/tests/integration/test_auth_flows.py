@@ -49,13 +49,13 @@ def test_profile_defaults_and_prompt():
     p = system_prompt(ctx)
     assert "You are Jarvis" in p and "their name is Sai" in p
     ctx.pop("profile")
-    assert "You are Personal Agent" in system_prompt(ctx)
+    assert "You are ChiRAG Agent" in system_prompt(ctx)
 
 
 def test_profile_defaults_when_not_given(env_nocore):
     env_nocore.setup(model=False)
     st = env_nocore.ui.call("session.status")
-    assert (st["display_name"], st["assistant_name"]) == ("tester", "Personal Agent")
+    assert (st["display_name"], st["assistant_name"]) == ("tester", "ChiRAG Agent")
 
 
 def test_weak_password_and_trivial_pin_rejected(env_nocore):
@@ -157,3 +157,20 @@ def test_delete_everything(env_nocore):
     env_nocore.ui.call("privacy.delete_everything", {"password": PASSWORD, "confirmation": "DELETE EVERYTHING"})
     assert env_nocore.ui.call("session.status")["state"] == "SETUP_REQUIRED"
     assert not env_nocore.paths.vault_header.exists()
+
+
+def test_tpm_throttle_gives_friendly_error_and_leaves_no_vault(env_nocore, monkeypatch):
+    from pa_gateway.vault import protector as pr
+
+    class Throttled(pr.SoftwareProtector):
+        def create(self, pin, secret):
+            raise pr.ProtectorUnavailable("cannot finalize TPM key (0x80290409)")
+
+    import pa_gateway.app as app_mod
+    monkeypatch.setattr(app_mod, "default_protector", lambda: Throttled())
+    with pytest.raises(PAError) as ei:
+        env_nocore.ui.call("setup.create", {"username": "tester", "password": PASSWORD, "pin": PIN})
+    assert ei.value.code == "tpm_throttled" and "10-30 minutes" in str(ei.value)
+    assert env_nocore.ui.call("session.status")["state"] == "SETUP_REQUIRED"   # nothing half-created
+    monkeypatch.undo()
+    env_nocore.setup(model=False)   # a later retry works

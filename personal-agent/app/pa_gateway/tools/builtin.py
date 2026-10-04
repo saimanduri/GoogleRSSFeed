@@ -21,6 +21,14 @@ def register_builtin_tools(gw) -> None:
         # listing names/metadata only: sensitivity of names is the max label (file names can be sensitive too)
         return ToolResult(text, sens, "files", {"count": len(rows)})
 
+    def files_find(a: dict[str, Any], c: ExecContext) -> ToolResult:
+        hits = gw.insights.find(a["query"], a["limit"])
+        sens = max([int(Sensitivity[h["sensitivity"]]) for h in hits] or [0])
+        text = "\n".join(f"- {h['id']} | {h['folder'].rstrip('/')}/{h['name']} | {h['type'] or 'document'} | {h['sensitivity']}"
+                         + (f" | {h['summary']}" if h["summary"] else "") + (f" | contains: {', '.join(h['personal_data'])}" if h["personal_data"] else "") for h in hits) \
+            or "No matching file in My Files."
+        return ToolResult(text, sens, "files", {"count": len(hits)})
+
     def files_read(a: dict[str, Any], c: ExecContext) -> ToolResult:
         text, row = gw.files.text(a["file_id"], a["max_chars"])
         hidden = json.loads(row["hidden_json"] or "[]")
@@ -35,7 +43,10 @@ def register_builtin_tools(gw) -> None:
                           trust=Trust.TRUSTED)
 
     def notify_user(a: dict[str, Any], c: ExecContext) -> ToolResult:
-        gw.notify("agent", a["title"], a["message"], c.hwm, "home", c.task["id"])
+        # the text comes from the model: show it only as the short status line under the name of the chat / routine it belongs to
+        row = gw.db.one("SELECT title FROM chats WHERE id=?", (c.task["chat_id"],)) if c.task.get("chat_id") else None
+        name = row["title"] if row else (gw.missions.get(c.task["mission_id"])["name"] if c.task.get("mission_id") else None)
+        gw.notify("agent", a["title"], a["message"], c.hwm, "home", c.task["id"], subject=name, status=a["title"])
         return ToolResult("Notification shown.", 0, "notify", {}, trust=Trust.TRUSTED)
 
     def history_search(a: dict[str, Any], c: ExecContext) -> ToolResult:
@@ -80,8 +91,11 @@ def register_builtin_tools(gw) -> None:
     def missions_propose(a: dict[str, Any], c: ExecContext) -> ToolResult:
         mid = gw.missions.create({"name": a["name"], "objective": a["objective"], "schedule": a["schedule"],
                                   "allowed_tools": a["tools"], "kind": "routine"}, proposed_by="agent")
-        gw.home_event("mission_proposed", "info", f"Proposed routine: {a['name']}", "Review and activate it in Missions.", mid)
-        return ToolResult(f"Created a DRAFT routine '{a['name']}'. The user must review and activate it in Missions.", 0,
+        gw.home_event("mission_proposed", "warn", f"Routine proposed: {a['name']}", "Waiting for you in Approvals > Proposed routines.", mid)
+        gw.notify("approval", f"Routine proposed: {a['name']}", None, 0, "approvals", mid, subject=a["name"], status="Routine proposed - review it in Approvals")
+        gw.emit("missions.changed", {"mission_id": mid})
+        return ToolResult(f"Saved the routine '{a['name']}' as a PROPOSAL. It is NOT running yet: tell the user to open Approvals > "
+                          "Proposed routines (or Missions) and press Activate. Do not say it is active.", 0,
                           "missions", {"mission_id": mid}, trust=Trust.TRUSTED)
 
     def skills_propose(a: dict[str, Any], c: ExecContext) -> ToolResult:
@@ -119,7 +133,9 @@ def register_builtin_tools(gw) -> None:
         now = datetime.now().astimezone()
         return ToolResult(now.strftime("%A %d %B %Y, %H:%M (%Z, UTC%z)"), 0, "builtin", {"iso": now.isoformat()}, trust=Trust.TRUSTED)
 
+    gw.localfiles.register_tools(tg)
     tg.register("files.list", files_list)
+    tg.register("files.find", files_find)
     tg.register("files.read", files_read)
     tg.register("files.write", files_write)
     tg.register("python.run", gw.sandbox.run_tool)

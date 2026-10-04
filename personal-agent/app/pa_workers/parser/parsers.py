@@ -26,6 +26,41 @@ def _xml(data: bytes) -> ET.Element:
     return ET.fromstring(data)
 
 
+def pdf_page_images(data: bytes, max_pages: int = 12, max_total: int = 40_000_000) -> dict[str, Any]:
+    """Scanned PDFs are pages that are one big picture. Without a PDF renderer we hand over the embedded JPEG of each page (the usual
+    format of scanners and phone apps). Pages whose picture uses another encoding are counted in `skipped` so the user is told."""
+    import base64
+    import io
+
+    from pypdf import PdfReader
+    rd = PdfReader(io.BytesIO(data))
+    pages, skipped, total = [], 0, 0
+    n = min(len(rd.pages), max_pages)
+    for i in range(n):
+        best = None
+        try:
+            xo = rd.pages[i].get("/Resources", {}).get("/XObject", {})
+            for key in list(xo)[:50]:
+                obj = xo[key].get_object()
+                if obj.get("/Subtype") != "/Image":
+                    continue
+                flt = obj.get("/Filter")
+                flt = flt[0] if isinstance(flt, list) and len(flt) == 1 else flt
+                if flt != "/DCTDecode":
+                    continue
+                raw = obj._data  # the JPEG file exactly as stored in the PDF (no decoding, no Pillow needed)
+                if best is None or len(raw) > len(best):
+                    best = raw
+        except Exception:  # noqa: BLE001 - a damaged page only counts as skipped
+            best = None
+        if not best or total + len(best) > max_total:
+            skipped += 1
+            continue
+        total += len(best)
+        pages.append({"page": i + 1, "mime": "image/jpeg", "b64": base64.b64encode(best).decode()})
+    return {"pages": pages, "skipped": skipped, "total_pages": len(rd.pages)}
+
+
 def parse(family: str, name: str, data: bytes) -> dict[str, Any]:
     ext = name.lower().rsplit(".", 1)[-1] if "." in name else ""
     if family == "pdf":

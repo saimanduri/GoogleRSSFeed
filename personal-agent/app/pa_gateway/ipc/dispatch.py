@@ -8,6 +8,7 @@ Unknown/disallowed methods are denied and logged. Params are validated with `P` 
 """
 from __future__ import annotations
 
+import re
 import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +53,24 @@ def rpc(name: str, roles: tuple[str, ...] = (UI,), state: str = "unlocked", step
     return deco
 
 
+_SURROGATES = re.compile("[\ud800-\udfff]")
+MAX_PARAM_DEPTH = 24
+
+
+def _scrub(v: Any, depth: int) -> Any:
+    """Replace lone UTF-16 surrogates in every string of the request (they cannot be stored in SQLite or encoded to UTF-8, and a
+    value that was stored once would make every later reply containing it fail) and refuse absurdly deep nesting."""
+    if depth > MAX_PARAM_DEPTH:
+        raise ValidationError("params are nested too deeply")
+    if isinstance(v, str):
+        return _SURROGATES.sub("\ufffd", v) if v and not v.isascii() else v
+    if isinstance(v, dict):
+        return {(_SURROGATES.sub("\ufffd", k) if isinstance(k, str) else k): _scrub(x, depth + 1) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_scrub(x, depth + 1) for x in v]
+    return v
+
+
 class P:
     """Tiny schema validator for RPC params (fails closed with a readable message)."""
 
@@ -60,7 +79,7 @@ class P:
             params = {}
         if not isinstance(params, dict):
             raise ValidationError("params must be an object")
-        self.d = params
+        self.d = _scrub(params, 0)
 
     def str(self, k: str, required: bool = True, max_len: int = 10_000, default: str = "") -> str:
         v = self.d.get(k, None)
@@ -174,6 +193,20 @@ class Dispatcher:
             return {"type": "res", "id": rid, "ok": True, "result": result}
         except PAError as e:
             return {"type": "res", "id": rid, "ok": False, "error": e.to_dict()}
+        except (OSError, ValueError, UnicodeError) as e:
+            # a bad path / name / value typed by the user (missing file, no access, NUL in a path...): a clear error, not "internal error".
+            # Still audited by type only (the message could contain the path).
+            try:
+                self.gw.audit.write("ipc.handler_error", "ipc", method=str(method_name)[:80], error=type(e).__name__, severity="low")
+            except Exception:  # noqa: BLE001
+                pass
+            if isinstance(e, FileNotFoundError):
+                code, msg = "not_found", "the file or folder was not found"
+            elif isinstance(e, PermissionError):
+                code, msg = "access_denied", "Windows did not allow access to that file or folder"
+            else:
+                code, msg = "invalid_request", "that value is not valid here (check the path or text you entered)"
+            return {"type": "res", "id": rid, "ok": False, "error": {"code": code, "message": msg, "details": {}}}
         except Exception as e:  # noqa: BLE001 - never leak internals; log type only
             try:
                 self.gw.audit.write("ipc.handler_error", "ipc", method=str(method_name)[:80], error=type(e).__name__,
@@ -182,6 +215,11 @@ class Dispatcher:
                 pass
             if __debug__ and self.gw and getattr(self.gw, "debug", False):
                 traceback.print_exc()
+            if type(e).__name__ in ("HashingError", "MemoryError"):
+                # Argon2id needs ~256 MiB: when Windows is short of memory say so instead of "internal error"
+                return {"type": "res", "id": rid, "ok": False, "error": {
+                    "code": "low_memory", "details": {},
+                    "message": "Not enough free memory to check your password right now. Close other programs and try again."}}
             return {"type": "res", "id": rid, "ok": False,
                     "error": {"code": "internal_error", "message": f"internal error ({type(e).__name__})", "details": {}}}
 

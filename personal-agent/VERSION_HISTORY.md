@@ -3,6 +3,110 @@
 Semantic versioning. Newest first. Every entry lists user-visible changes, security-relevant changes and
 DB migrations.
 
+## 0.1.13 - 2026-10-03 - Automatic memory, file summaries, Home widgets, one-command update
+**Automatic memory** (`agentdata/memory_learn.py`, `pii.py`; DB migration 5): the assistant now learns lasting facts and preferences by itself from what YOU type in chats (a local-model extraction step that never sees tool output, mail or web text), from routines/email skills you switch on (no model) and from files you add. Learned memories are ACTIVE with their source shown; Memory has a "Learn automatically" toggle (`memory.auto_learn`, daily cap `memory.auto_learn_per_day`), search, and **Forget**: forgotten or rejected facts are remembered as hashes (`memory_forgotten`) and never learned again; delete-all forgets everything. Never stored: secrets, ID/PAN/Aadhaar/card/bank/phone/e-mail values, DLP findings. The assistant is told the learned memories and the ones most relevant to the current question.
+**File summaries** (`files/insights.py`, table `file_meta`, setting `files.auto_summary`, default ON): after a file is ready a local model writes title, kind (PAN card, invoice...), 2-3 sentence summary, keywords and the KINDS of personal data; ID values are detected by code and redacted from anything the model returns; the file is raised to CONFIDENTIAL when it holds ID-like data; the summary is editable (File details; `files.meta_update`, "Summarise again" = `files.analyse`) and refuses ID values; a memory says where the file is and what it is (never the values); searchable by kind/summary; new tool `files.find` so "show me my PAN card" finds it and `files.read` shows it. Deleting a file (even while it is being summarised) removes summary, index entry and memory. Live: qwen3-coder described a PAN card and an invoice in 4 s each, no number leaked, "Show me my PAN card" answered with the card.
+**Home widgets** (`agentdata/home_widgets.py`, `home.widgets`, `home.widgets_set`, setting `home.widgets`): 15 widgets - mail unread / in To / waiting for my approval / deadlines / waiting for a reply (Outlook counts, background, cached 5 min), reminders, next routine runs, approvals, needs attention, recent files, storage, what I learned lately (with Forget), AI models and PC, activity today, updates. A Widgets panel on the right switches each on/off and orders them; only enabled widgets are computed or shown.
+**Install**: `installer\windows\update-app.ps1` does stop + install + start in one command. **Fixes**: race where a deleted file's summary could re-enter search.
+**Tests**: 475+ pytest, e2e 205 steps.
+
+## 0.1.12 - 2026-10-02 - Review round after first real use
+**Empty model replies** (`model_empty`) are rescued: retry without the JSON constraint and with more room, then once through Ollama's native API (16k context, no thinking); only then the error, now with advice. **History search**: words match by their beginning ("expl" finds "explain"), any letter case, 2+ letters, plus a plain-text fallback over chat messages; deleted chats also leave the run summaries in the index; Activity > Search history searches as you type. **Search boxes** (History, Activity, My Files, Secrets, chat list, Network Logs) have a clear (x) button and Esc.
+**Antivirus**: when Microsoft Defender is off the app asks the active antivirus through Windows AMSI (trusted only if it detects the EICAR test string - McAfee on this PC does not, so AMSI is unavailable here); otherwise files wait in Quarantine with a banner and can be accepted one by one or all at once (`files.release_unscanned`, needs your password, never for malware detections) or by the new setting `files.accept_unscanned`; accepted files are marked "NOT antivirus-scanned".
+**Web approval per chat**: the first web search/fetch in a chat asks you once; the answer covers that chat until sign-out/restart (`web.ask_per_chat`, `gw.web_grants`). **Folder analysis**: new tool `localfile.digest` (every file of a shared folder with its first lines in one call) for small local models.
+**Screen changes**: token use is a small ring in the chat header (click: Activity > Usage & budgets), Home no longer shows "Today's budget" and says "last 24 hours" instead of "while you were away", the meaningless "gateway" source badge is gone (other sources have readable names). **Icon**: the ChiRAG icon replaces the shield everywhere (exe, window, tray, UI logo, favicon; built by `scripts/make_icons.py` from the 48 px source - a larger source gives sharper large icons); the installer creates Desktop and Start-menu shortcuts.
+**Tests**: 452 pytest, e2e 199/200 (clipboard = environment), RPC fuzz: no findings.
+
+## 0.1.11 - 2026-10-02 - Model kinds, vision, folder approvals, live voice, fonts
+**Models** (Settings > AI Model): four separate cards - Chat, Voice (speech-to-text), Vision, Embedding - each with its own list, default and Add button; Discover shows only models of that kind
+(`llm.discover` returns kinds); the gateway refuses a model of the wrong kind on add (`wrong_kind`; stt/embedding models only under their own kind, vision needs image capability), refuses `llm.set_role` for the wrong kind and never uses a
+misassigned model (`role_model`). Vision models are tested with a real picture (red square) and become the default for the vision role when none exists.
+**Vision** (`pa_gateway/vision.py`): images (.png .jpg .gif .webp) and scanned PDFs (pages without a text layer; the isolated parser hands over the embedded JPEG of each page) are read by the vision model on upload (My Files),
+as chat attachments and in shared folders; pictures pasted with Ctrl+V are saved to My Files and read; new RPC `files.reread` ("Read with vision model"), settings `vision.auto`, `vision.max_pages`. CONFIDENTIAL+ files are never sent to a remote vision model.
+**Local files and folders** (`localfiles.py`, DB migration 4: scope/recursive/session_nonce): folder grants (direct files only), subfolders need a separate explicit approval (tick in the dialog, or a card when the assistant asks),
+every approval is bound to ONE chat and ONE app session (sign-out/restart expires it: "Allow again"; the subfolder approval does not carry over), new tool `localfile.browse`, `path` argument for files inside a folder, paths resolved (links followed) and kept inside the root,
+drive roots / the user profile / Windows / Program Files / app data / AppData / credential folders / network paths refused, links and junctions ignored, programs never listed. New RPCs: localfiles.folder_info, grant_folder, allow_subfolders, reapprove, requests, deny_request.
+**File sanity round 2**: zip-slip names, duplicate and overlapping entries, password-protected archives, per-member bomb ratio, OOXML must match its extension (word/document.xml ...), PDF remote-goto / submit-form / import-data / XFA / encrypted / trailing data flagged, hidden data after the end of a picture flagged, .lnk and .cab signatures blocked.
+**Voice**: the microphone now records live: every ~30 s (cut at a quiet moment, 40 s max) the piece is transcribed in the background and the text appears as you speak; failed pieces are retried; unsent text is kept as a draft; up to 60 minutes. Proven with the real model: 8.9 minutes (1508 words) in 17 pieces, 16 s total, 0.2 s wait after Stop (clean synthetic speech; a real microphone will be less accurate); the old "one big recording" could not even be sent above ~6 minutes (16 MiB frame limit).
+**Appearance**: 20 popular office fonts + Windows default (installed-font detection, marked when missing, Hindi fallback) and Small/Medium/Large text (`ui.font`, `ui.font_size`, fine-tune `ui.text_scale`); layout fixed for large text and wide fonts (rows wrap, long paths wrap) - all screens and 21 fonts x 3 sizes swept in the preview.
+**Tests**: 424 pytest, e2e 198/199 (clipboard = environment).
+
+## 0.1.10 - 2026-10-02 - Rename/pin any chat, named Windows notifications, position rail, settings round-trip test
+**Chats**: rename from the list (pencil or double-click), the chat header, History (hover), `/rename New name` or F2; pin/unpin in the header and History too; names are cleaned (no control/invisible characters, max 120, never empty).
+**Notifications**: toast title = name of the reminder / routine / chat the event is about, text = short status ("Reminder", "New results", "Needs your approval", "Answer ready"); chat answers toast only when the window is not in front (Rust `toast()` checks focus).
+New setting `notifications.show_names` (default on; off = generic titles). Names only, never mail/document content; the model's `notify_user` text appears only as the status line under the chat/routine name. **Tests**: every one of the 130+ settings is changed, read back, checked in the encrypted DB and reset (`test_settings_roundtrip.py`).
+**Position rail** (`components/ChatRail.tsx`): ChatGPT-style ticks at the right edge of long chats, hover list, click/keyboard jump, scroll tracking by binary search over cached offsets (<= 40 ticks, grouped beyond that). Needs `pa-ui.exe` rebuilt (Rust change) to see focus-aware toasts.
+
+## 0.1.9 - 2026-10-02 - Security audit round (SAST + DAST)
+Full list with proof in `docs/SECURITY_AUDIT_2026-10-02.md`. **Fixed**: non-English text in uploads was rejected (parser console code page); lone-surrogate text hung the gateway reply;
+system tools started by absolute path (+ firewall repair only from Program Files); safe file names; image/Office structure checks; DTD guard in the table reader; CSV formula neutralisation;
+clean errors instead of "internal error" for bad paths/labels; Windows-1252 text accepted, UTF-16 only with BOM; DDE/external-reference flags; more blocked auto-run extensions.
+New tools: `scripts/corpus_dast.py`, `scripts/pentest_rpc.py`. 306 pytest pass (clipboard test = environment).
+
+## 0.1.8 - 2026-10-02 - Voice with Ollama speech models, automatic model test
+**Voice**: speech models served by Ollama (tested with `frozenlab/qwen3-asr:1.7b`) now work: the window converts the recording to 16 kHz mono WAV
+(`audioWav.ts`), the gateway re-checks it (`llm/audio.py`), cuts recordings longer than 50 s into pieces at quiet moments, calls Ollama `/api/chat`
+(audio in `images`), strips the `language X<asr_text>` prefix. Whisper-style `/audio/transcriptions` servers still work. **Add model**: `llm.inspect` detects the
+model type (chat / speech / embedding) from Ollama metadata; `llm.add` now tests the model in the background (`llm.models_changed` event, "testing..." badge) and,
+if no default exists for that role and the model runs on this PC, makes it the default (never replaces an existing default, never for remote models).
+"Test model" for speech models now really transcribes a short clip. Security: audit `stt.request` has sizes only; calls appear in Network Logs; no audio is stored.
+Fixed: malformed WAV headers could raise an unhandled RuntimeError (caught, friendly error). Test hygiene: the email-skills "nothing new" test no longer reads the real mailbox.
+
+## 0.1.6 - 2026-10-01 - Apple-design UI improvements
+**Accessibility**: every theme now meets WCAG AA 4.5:1 (secondary text, accent text, button text, status colours; new
+`--danger-solid`); honours OS reduce-motion (cross-fades, no endless loops), reduce-transparency and more-contrast.
+**Motion**: spring easing, exit animations for dialogs/palette/slash menu/toasts (ghost copy, `components/motion.tsx`),
+dialogs grow from the control that opened them, press feedback on every clickable element, backdrop without live blur.
+**Materials/type**: soft scroll-edge fades and shadows replace hard dividers; type-scale tokens; layout units follow the
+text-size setting. **Agency**: 8-second Undo for deleting chats, files, memory and cancelling missions (deletion is
+deferred in the UI and completed on timeout, lock, or window close). **Wayfinding**: breadcrumb + window title,
+last screen remembered, "Activity" renamed "Activity log". **Default**: animated background Off.
+**Tests**: `tests/unit/test_theme_contrast.py` (computes ratios from the CSS tokens).
+
+## 0.1.5 - 2026-10-01 - end-to-end catalogue and fixes
+**Added**: `tests/e2e/` action catalogue (175 scenario steps, 80 UI controls), `scripts/e2e_runner.py`,
+`scripts/gen_action_catalog.py`, `docs/ACTION_CATALOG.md`, `docs/UI_REVIEW_APPLE_DESIGN.md`.
+**Fixed (security-relevant availability)**: gateway pipe accept loop could stop accepting connections (UI and pa-core
+locked out); Argon2 low-memory failure now a friendly `low_memory` error. **Dev**: `PA_DEBUG_DUMP` stack dumps.
+**Tests**: 175 e2e steps + `test_pipe_keeps_accepting_after_connect_disconnect_storm`, `test_action_catalog`.
+
+## 0.1.4 - 2026-10-01 - UI polish
+**Added**
+- Themes: System, Day & night (PC clock, editable times), Light, Dark, Aurora, Ocean, Forest, Sunset (Settings >
+  Appearance & Voice, with preview cards) and animated backgrounds: Aurora glow, Bubbles, Waves, Starfield, Off
+  (CSS only; off with Reduce motion).
+- History screen (chats + agent work, grouped by date, search), pinned chats and folders, date-grouped chat list.
+- Slash commands in chat (/new /remind /mission /search /history /steps /pin /theme /lock /help), floating
+  scroll-to-top / jump-to-latest buttons with unseen counter, daily token meter, Claude-Code-style local time labels.
+**Database**: migration 2 adds `chats.pinned` and `chats.folder` (UI organisation only).
+**Settings**: `ui.theme` (+ time_of_day, aurora, ocean, forest, sunset), `ui.background`, `ui.day_starts`, `ui.night_starts`.
+**Tests**: `test_chat_organise.py`; 162 automated tests.
+
+## 0.1.3 - 2026-10-01 - portable mode
+**Added**
+- `scripts/build-portable.ps1`: copy-and-run folder, one double-click (`pa-ui.exe` starts the gateway via the bundled,
+  PSF-signed embeddable Python; hash + signature verified at build). No installer, no administrator rights.
+- Portable mode (`PORTABLE_BUILD`): release-strict, processes identified by exact paths in the folder.
+
+**Security**
+- Posture shows a High "Portable mode: no firewall isolation" finding (no firewall rules without admin).
+
+**Fixed**
+- Bundles shipped without `pa_gateway/data/*.txt` (wizard could not continue); the spec now ships them and fails if missing.
+- `install-dev.ps1` used the wrong source folder.
+
+## 0.1.2 - 2026-09-30 - laptop hardening
+**Security**
+- Release builds refuse to start pa-core or any limited worker while a firewall block rule is missing
+  (audited `core.start_blocked`, Home event, Repair action). Fail closed if the lookup fails.
+- Automated tests never use the real TPM (`PA_FORCE_SOFTWARE_PROTECTOR`, dev mode only): wrong-PIN tests had
+  exhausted the laptop TPM's authorization budget.
+- Supply chain: hash-pinned `requirements.lock` / `requirements-dev.lock`, CI installs with `--require-hashes`,
+  `security.yml` (pip-audit, npm audit, cargo audit, CycloneDX SBOMs, CodeQL), Dependabot.
+
+**Fixed**
+- Dev runs from a venv: workers start from the base interpreter so the exact-pid IPC check holds.
+
 ## 0.1.1 - 2026-09-30 - personal names
 **Added**
 - Name your assistant and tell it your name during setup; both editable any time in
@@ -42,3 +146,30 @@ Built from `docs/spec/personal_desktop_agent_spec_v1_1.txt` (spec v1.1 incl. sec
 - SQLCipher `cipher_memory_security` disabled on all platforms (Windows stack overflow) - see DEVIATIONS D5.
 
 **DB**: schema v1.
+
+## 0.1.6 (addendum) - stale gateway rendezvous
+**Fixed (K13)**: pa-ui.exe now detects that the gateway named in `run\gateway.json` is no longer running and starts a new
+one (previously it waited forever after the gateway was killed or crashed). Portable folder rebuilt with the 0.1.6 UI.
+
+## 0.1.6 (addendum 2) - TPM throttle message, ChiRAG Agent name
+**Added**: friendly tpm_throttled error (setup leaves nothing behind); dev-only PA_SKIP_DEFENDER for tests/e2e. **Renamed** product text to ChiRAG Agent.
+
+## 0.1.6 (addendum 3) - guide, accent colours, calmer chat layout
+**Added**: Guide screen (searchable), ui.accent setting (5 colours), chat list drawer, scripts/run-dev.ps1. **Changed**: steps panel and chat list hidden by default (chat.show_steps default off); model prompt carries the user's local time and zone. **Fixed**: reminder due time shown in UTC instead of local when the model wrote UTC. **Tests**: accent contrast, guide coverage.
+
+## 0.1.6 (addendum 4) - routines
+**Added**: schedule picker, output formats, readable schedule text, missions.parse_schedule accepts cron + returns text. **Fixed**: JSON tool calls with action=<tool name> shown as raw JSON; web-search routines without provider failing silently.
+
+## 0.1.6 (addendum 5)
+**Changed**: constrained JSON reply shape for local models; warnings/errors colour-coded (orange/red) incl. action buttons and toasts.
+
+## 0.1.7 - 2026-10-01 - Outlook skills, local files, network logs
+**Added**: Outlook screen + Settings > Email monitoring (10 read-only skills); outlook_local.digest/mail_stats/awaiting_reply; picture upload;
+Alt-key shortcuts; GPU meter; Network Logs tab + central network log (migration 3: `net_log`); local files read in place (migration 3: `local_grants`;
+tools localfile.list/inspect/rows/query/text; paperclip, /attach, drag and drop); proposed routines in Approvals; dev gateways get their own lock.
+**Fixed**: Outlook date filters on non-US locales; model replies with `action`=tool name; reminders in UTC; stale `gateway.json`; Defender-off message.
+**Tests**: +80 (mail heuristics, tables engine, local files, network log, email skills, sysmon, pictures); e2e 187 steps; scripts/perf_tables.py.
+
+## 0.1.7 (final notes, 2026-10-01 night)
+Live-verified on a real mailbox + Ollama (gemma4): all ten email skills. Fixes from that run: `reasoning_effort: none` for Ollama (empty replies), placeholder answers rejected, prefetch of data-gathering tool calls,
+`deadline_within_days`, `model_empty` error. Dev gateways get their own single-instance lock. Manifest versions are still 0.1.1 (bump at the first signed release). See docs/HANDOFF.md.

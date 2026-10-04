@@ -185,3 +185,47 @@ def test_selftest_over_named_pipes_with_core_process(tmp_path):
     finally:
         gw.terminate()
         gw.wait(20)
+
+
+def test_pipe_keeps_accepting_after_connect_disconnect_storm(piped):
+    """Regression (found by scripts/e2e_runner.py): clients that connect and vanish at once - or five core workers
+    connecting together - used to leave the accept loop waiting on an instance that was already connected, so every
+    later client got 'all pipe instances busy' and the agent stopped answering."""
+    import threading
+
+    import win32file
+    from pa_common.pipeclient import PipeClient
+    e, srv = piped
+    for _ in range(60):  # connect and drop immediately
+        try:
+            h = win32file.CreateFile(srv.pipe_name, win32file.GENERIC_READ | win32file.GENERIC_WRITE, 0, None,
+                                     win32file.OPEN_EXISTING, 0, None)
+            h.Close()
+        except Exception:  # noqa: BLE001 - busy/not found is fine, we only care that the server recovers
+            pass
+    errors: list[Exception] = []
+
+    def worker():
+        try:
+            c = PipeClient(srv.pipe_name, "ui", srv.ui_token, "w", expected_server_pid=os.getpid(), timeout=10)
+            assert c.call("session.status")["state"] == "SETUP_REQUIRED"
+            c.close()
+        except Exception as ex:  # noqa: BLE001
+            errors.append(ex)
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join(30) for t in threads]
+    assert not errors, errors[:1]
+
+
+def test_gpu_monitor_reads_real_counters():
+    import time
+
+    from pa_gateway.sysmon import GpuMonitor
+    m = GpuMonitor()
+    m.usage()
+    time.sleep(4)
+    r = m.usage()
+    assert r["available"] in (True, False)      # PCs without GPU counters report unavailable instead of failing
+    if r["available"]:
+        assert 0 <= r["util"] <= 100 and r["vram_mb"] >= 0 and len(r["history"]) >= 1

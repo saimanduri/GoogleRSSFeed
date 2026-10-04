@@ -65,6 +65,19 @@ export async function pickFile(opts: { directory?: boolean; filters?: { name: st
   return (await open({ directory: !!opts.directory, multiple: !!opts.multiple, filters: opts.filters })) as any;
 }
 
+/** Files dropped onto the window (Tauri gives real paths; a browser preview does not). Returns an unsubscribe function. */
+export async function onFileDrop(cb: (paths: string[], phase: "over" | "drop" | "leave") => void): Promise<() => void> {
+  if (!inTauri) return () => undefined;
+  const { getCurrentWebview } = await import("@tauri-apps/api/webview");
+  const off = await getCurrentWebview().onDragDropEvent((e: any) => {
+    const t = e.payload.type;
+    if (t === "over" || t === "enter") cb([], "over");
+    else if (t === "drop") cb(e.payload.paths ?? [], "drop");
+    else cb([], "leave");
+  });
+  return off;
+}
+
 export async function pickSavePath(defaultPath: string, filters?: { name: string; extensions: string[] }[]) {
   if (!inTauri) return window.prompt("Save to path (browser preview):", defaultPath) || null;
   const { save } = await import("@tauri-apps/plugin-dialog");

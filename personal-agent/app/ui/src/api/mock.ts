@@ -7,6 +7,7 @@ export function mockListen(fn: Listener) {
 }
 
 const now = () => new Date().toISOString();
+const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 let seq = 0;
 const id = (p: string) => `${p}_${Date.now().toString(16)}${(seq++).toString(16)}`;
 
@@ -40,7 +41,7 @@ const SCHEMA = {
     ["account", "Account & Security"], ["connectors", "Connectors"], ["model", "AI Model"], ["autonomy", "Autonomy & Budgets"],
     ["rules", "Rules & Safety"], ["approvals", "Approvals"], ["tools", "Tools & Skills"], ["web", "Web Access"], ["files", "Files & Storage"],
     ["memory", "Memory"], ["notifications", "Notifications"], ["logs", "Logs & SIEM"], ["backup", "Backup & Restore"],
-    ["emergency", "Emergency Stop"], ["updates", "Updates"], ["privacy", "Privacy & Data"], ["diagnostics", "Diagnostics & About"], ["ui", "Appearance & Voice"],
+    ["emergency", "Emergency Stop"], ["updates", "Updates"], ["privacy", "Privacy & Data"], ["diagnostics", "Diagnostics & About"], ["ui", "Appearance & Voice"], ["emailmon", "Email monitoring"],
   ].map(([id, label]) => ({ id, label })),
   settings: [
     { key: "security.auto_lock_minutes", group: "account", label: "Auto-lock after idle (minutes)", type: "int", default: 10, value: 10, min: 1, max: 60, options: [], help: "Auto-lock cannot be switched off.", risk: "A longer timeout leaves the app open for longer.", loosen: "up", stepup: false, floor: false },
@@ -49,8 +50,9 @@ const SCHEMA = {
     { key: "web.allowlist", group: "web", label: "Allowed domains", type: "list", default: [], value: ["wikipedia.org", "github.com"], options: [], help: "", risk: "", loosen: "list_add", stepup: false, floor: false },
     { key: "autonomy.profile", group: "autonomy", label: "Autonomy profile", type: "enum", default: "cautious", value: "cautious", options: ["cautious", "balanced"], help: "", risk: "", loosen: ["cautious", "balanced"], stepup: false, floor: false },
     { key: "budget.task.tool_calls", group: "autonomy", label: "Per task: max tool calls", type: "int", default: 100, value: 100, min: 1, max: 2000, options: [], help: "", risk: "", loosen: "up", stepup: false, floor: false },
+    { key: "notifications.show_names", group: "notifications", label: "Show names in Windows notifications", type: "bool", default: true, value: true, options: [], help: "The notification title is the name of the reminder, routine or chat it is about.", risk: "Names can be read on screen.", loosen: "true", stepup: false, floor: false },
     { key: "notifications.content_level", group: "notifications", label: "Notification content", type: "enum", default: "notify", value: "notify", options: ["notify", "summary"], help: "", risk: "", loosen: ["notify", "summary"], stepup: false, floor: false },
-    { key: "ui.theme", group: "ui", label: "Theme", type: "enum", default: "system", value: "system", options: ["system", "light", "dark"], help: "", risk: "", loosen: null, stepup: false, floor: false },
+    { key: "ui.theme", group: "ui", label: "Theme", type: "enum", default: "system", value: "system", options: ["system", "time_of_day", "light", "dark", "aurora", "ocean", "forest", "sunset"], help: "", risk: "", loosen: null, stepup: false, floor: false },
   ],
 };
 
@@ -59,13 +61,37 @@ function status() {
   if (S.state === "UNLOCKED")
     Object.assign(base, {
       tasks_running: S.runs.filter((r: any) => r.status === "RUNNING").length,
-      approvals_pending: S.approvals.filter((a: any) => a.status === "PENDING").length,
+      approvals_pending: S.approvals.filter((a: any) => a.status === "PENDING").length, proposals_pending: 0, outlook_unseen: (S as any).unseen ?? 1,
       killswitch: { levels: S.kill, any: Object.values(S.kill).some(Boolean), labels: {} },
       needs_pin_setup: false, unread_notifications: 0,
-      ui: { "ui.theme": S.settings["ui.theme"] ?? "system", "ui.text_scale": 100, "ui.reduce_motion": false, "chat.show_steps": true, "voice.enabled": true, "security.auto_lock_minutes": 10, "emergency.hotkey": "Ctrl+Alt+Shift+S" },
+      ui: { "ui.theme": S.settings["ui.theme"] ?? "system", "ui.background": S.settings["ui.background"] ?? "off", "ui.accent": S.settings["ui.accent"] ?? "theme", "ui.font": S.settings["ui.font"] ?? "windows", "ui.font_size": S.settings["ui.font_size"] ?? "medium", "ui.assistant_icon": S.settings["ui.assistant_icon"] ?? "", "ui.user_icon": S.settings["ui.user_icon"] ?? "", "ui.day_starts": "07:00", "ui.night_starts": "19:00", "ui.text_scale": 100, "ui.reduce_motion": false, "chat.show_steps": false, "voice.enabled": true, "security.auto_lock_minutes": 10, "emergency.hotkey": "Ctrl+Alt+Shift+S" },
     });
   return base;
 }
+
+// Browser preview only: open http://127.0.0.1:5173/?demo to start signed in with sample chats and history.
+function seedDemo() {
+  const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
+  S.state = "UNLOCKED"; S.username = "sai"; S.display_name = "Sai"; S.assistant_name = "Manduri";
+  const titles: [string, number, number, string][] = [["Plan for the week", 1, 1, ""], ["Summarise unread mail", 5, 0, ""], ["Dentist reminder", 27, 0, ""],
+    ["Local LLM news", 50, 0, "Research"], ["Budget spreadsheet help", 100, 0, "Research"], ["Old trip notes", 400, 0, ""]];
+  titles.forEach(([title, h, pinned, folder], i) => {
+    const c = { id: `chat_demo${i}`, title, created_at: ago(h), updated_at: ago(h), hwm: 0, allow_tools: 1, pinned, folder };
+    S.chats.push(c);
+    S.messages[c.id] = Array.from({ length: i === 0 ? 40 : 2 }, (_, k) => ({ id: `m${i}_${k}`, chat_id: c.id, role: k % 2 ? "assistant" : "user",
+      content: k % 2 ? "Here is a longer answer with **bold text**, a list:\n\n- first point\n- second point\n- third point\n\nAnd more explanation so the message is tall enough to scroll." : `Question number ${k / 2 + 1} about ${title}`,
+      created_at: ago(h - k * 0.01), sources: ["model only"], sensitivity: 0 }));
+  });
+  ["Morning mail summary", "Weekly report", "Reminder fired", "Web search: LLM news"].forEach((t, i) =>
+    S.runs.push({ id: `run_demo${i}`, kind: i === 1 ? "mission" : "chat", status: i === 2 ? "FAILED" : "COMPLETED", title: t, started_at: ago(2 + i * 30), created_at: ago(2 + i * 30) }));
+}
+function seedDemoFiles() {
+  const mk = (id: string, name: string, status: string, extra: any) => ({ id, name, folder: "/Identity", status, status_reason: null, sensitivity: 2, size_bytes: 120000, created_at: ago(3), in_knowledge: 0, tags_json: [], source: "upload", sha256: "ab12cd34".repeat(8), sniffed_type: "pdf", scan_json: { antivirus: { engine: "defender", clean: true } }, ...extra });
+  S.files.push(mk("file_pan", "PAN card.pdf", "READY", { meta_full: { title: "PAN card of Sai", doc_type: "PAN card", summary: "Income tax identity card issued to Sai. The number is in the file, not here.", keywords: ["pan", "income tax", "identity"], personal_data: ["PAN number", "date of birth"], status: "READY", edited: false, model: "qwen3-coder", note: null }, meta: { doc_type: "PAN card", summary: "Income tax identity card issued to Sai.", status: "READY" } }));
+  S.files.push(mk("file_inv", "Invoice 4711.png", "READY", { sensitivity: 1, meta_full: { title: "Invoice 4711", doc_type: "Invoice", summary: "Tax invoice for Sharma Traders, total Rs 60,000.", keywords: ["invoice", "sharma"], personal_data: [], status: "READY", edited: true, model: null, note: "edited by you" }, meta: { doc_type: "Invoice", summary: "Tax invoice for Sharma Traders.", status: "READY" } }));
+  S.files.push(mk("file_held", "contract.docx", "REJECTED", { sensitivity: 1, status_reason: "not scanned: Microsoft Defender is turned off (another antivirus may be active), so the file cannot be scanned", scan_json: { antivirus: { unavailable: true } } }));
+}
+if (typeof location !== "undefined" && new URLSearchParams(location.search).has("demo")) { seedDemo(); seedDemoFiles(); }
 
 function step(runId: string, type: string, title: string, status = "done", detail: any = {}) {
   for (const prev of S.steps[runId] ?? []) if (prev.status === "running" && type !== "policy") prev.status = "done";
@@ -128,7 +154,37 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "auth.sign_out": S.state = "SIGNED_OUT"; return status();
     case "auth.step_up": return { category: p.category, method: p.method, minutes: 5 };
     case "auth.forgot_password": S.state = "UNLOCKED"; return { recovery_key: "NEW01-KEY02-ABCDE-FGHJK-MNPQR-STVWX-YZ012-34567", confirm_groups: [0, 3] };
-    case "home.summary": return { events: [{ id: "h1", kind: "mission_done", severity: "info", title: "Morning mail summary finished", detail: "Output saved to My Files.", created_at: now() }], completed: [], failed: [], waiting: [], outcome_unknown: [], files_created: [], memories_proposed: S.memories.filter((m: any) => m.status === "PROPOSED"), approvals_pending: S.approvals.filter((a: any) => a.status === "PENDING").length, reminders_today: S.reminders, security: [], memory_review: null, budget: { used: { tokens: 12345, web_requests: 3 }, limits: { tokens: 2000000, web_requests: 150, egress_bytes: 1048576, runtime_seconds: 14400 } }, recovery_key_confirmed: true };
+    case "home.dismiss": ((S as any).dismissed ??= []).push(p.id); return { ok: true };
+    case "home.widgets": case "home.widgets_set": {
+      const CAT: [string, string, string, string][] = [["updates", "Assistant", "Updates from the assistant", "Finished routines, files created and other notes."],
+        ["mail_unread", "Mail", "Mail: unread today", "Unread mail received today."], ["mail_to_me", "Mail", "Mail: addressed to me", "Mail where you are in To."],
+        ["mail_approvals", "Mail", "Mail: waiting for my approval", "Unanswered approval requests, last 7 days."], ["mail_deadlines", "Mail", "Mail: deadlines", "Deadlines within 7 days or overdue."],
+        ["mail_awaiting_reply", "Mail", "Mail: waiting for a reply", "Sent mail nobody has answered."], ["reminders", "Planner", "Upcoming reminders", "Your next reminders."],
+        ["routines_next", "Planner", "Next routine runs", "When routines run next."], ["approvals", "Attention", "Approvals waiting", "Actions, routines and memories waiting for you."],
+        ["attention", "Attention", "Needs your attention", "Failed work, quarantine, expired shares, reminders."], ["recent_files", "Files", "Recent files", "Files lately added, with summaries."],
+        ["storage", "Files", "My Files storage", "Quota used."], ["memory_recent", "Assistant", "What I learned lately", "Newest memories - forget any."],
+        ["models_health", "System", "AI models and PC", "Which models are ready."], ["activity_today", "System", "Activity today", "Work finished in 24 hours."]];
+      const DEF = ["updates", "mail_unread", "mail_to_me", "mail_approvals", "mail_deadlines", "reminders", "approvals", "attention", "routines_next", "recent_files", "models_health", "activity_today"];
+      if (method === "home.widgets_set") S.settings["home.widgets"] = (p.enabled as string[]).filter((i) => CAT.some((c) => c[0] === i));
+      const en: string[] = S.settings["home.widgets"] ?? DEF;
+      const mail = (value: number, sub: string, tone?: string) => ({ state: "ok", value, sub, tone, age: 40, go: { screen: "outlook" } });
+      const D: Record<string, any> = {
+        updates: { state: "ok", items: S.home?.events ?? [{ id: "e1", kind: "mission_done", severity: "info", title: "Morning mail summary finished", detail: "Output saved to My Files.", created_at: ago(1) }], go: { screen: "activity" } },
+        mail_unread: mail(45, "of 120 received today"), mail_to_me: mail(30, "in To today, 12 in CC"), mail_approvals: mail(4, "unanswered, last 7 days", "warn"), mail_deadlines: mail(2, "due within 7 days or overdue", "warn"),
+        mail_awaiting_reply: mail(3, "sent mail without a reply (7 days)"),
+        reminders: { state: "ok", items: [{ id: "r1", text: "Call the dentist", due_at: ago(-60) }, { id: "r2", text: "Budget review with finance", due_at: ago(-300) }], go: { screen: "reminders" } },
+        routines_next: { state: "ok", items: [{ id: "m1", name: "Email: Hourly inbox check", next_run_at: ago(-30) }, { id: "m2", name: "Morning digest", next_run_at: ago(-600) }], go: { screen: "missions" } },
+        approvals: { state: "ok", value: 2, sub: "1 actions, 1 routines, 0 memories", tone: "warn", go: { screen: "approvals" } },
+        attention: { state: "ok", value: 2, tone: "warn", items: [{ kind: "files", text: "15 files in quarantine", go: { screen: "files" } }, { kind: "share", text: "1 shared folder approval expired (ask again in the chat)", go: { screen: "chat" } }] },
+        recent_files: { state: "ok", items: [{ id: "f1", name: "PAN card.pdf", doc_type: "PAN card", summary: "Income tax identity card issued to Sai." }, { id: "f2", name: "Invoice 4711.png", doc_type: "Invoice", summary: "Invoice for Sharma Traders." }], go: { screen: "files" } },
+        storage: { state: "ok", used: 1500000, quota: 10737418240, value: 15, go: { screen: "files" } },
+        memory_recent: { state: "ok", value: 3, items: [{ id: "mm1", content: "Prefers short bullet-point reports", source: "learned:chat", created_at: ago(5) }, { id: "mm2", content: "My Files has 'PAN card.pdf' (in /Identity): PAN card. Contains: PAN number (values are in the file, not here).", source: "learned:file", created_at: ago(9) }], go: { screen: "memory" } },
+        models_health: { state: "ok", kinds: { chat: { ready: true, name: "qwen3-coder" }, voice: { ready: true, name: "qwen3-asr" }, vision: { ready: false, name: "" }, embedding: { ready: false, name: "" } }, total: 3, reachable: true, gpu: 12, go: { screen: "settings", params: { section: "model" } } },
+        activity_today: { state: "ok", done: 20, failed: 3, tokens: 124000, go: { screen: "activity" } },
+      };
+      return { catalog: CAT.map(([id, group, title, about]) => ({ id, group, title, about })), enabled: en, data: Object.fromEntries(en.map((i) => [i, D[i]])) };
+    }
+    case "home.summary": return { events: [{ id: "h1", kind: "mission_done", severity: "info", title: "Morning mail summary finished", detail: "Output saved to My Files.", created_at: now() }].filter((e: any) => !((S as any).dismissed ?? []).includes(e.id)), completed: [], failed: [], waiting: [], outcome_unknown: [], files_created: [], memories_proposed: S.memories.filter((m: any) => m.status === "PROPOSED"), approvals_pending: S.approvals.filter((a: any) => a.status === "PENDING").length, reminders_today: S.reminders, security: [], memory_review: null, budget: { used: { tokens: 12345, web_requests: 3 }, limits: { tokens: 2000000, web_requests: 150, egress_bytes: 1048576, runtime_seconds: 14400 } }, recovery_key_confirmed: true };
     case "chat.list": return S.chats;
     case "chat.create": { const c = { id: id("chat"), title: "New chat", created_at: now(), updated_at: now(), hwm: 0, allow_tools: 1 }; S.chats.unshift(c); S.messages[c.id] = []; return { id: c.id }; }
     case "chat.get": { const chat = S.chats.find((c: any) => c.id === p.chat_id); return { chat: { ...chat, sensitivity: "INTERNAL", sources: [] }, messages: S.messages[p.chat_id] ?? [], pending_approvals: S.approvals.filter((a: any) => a.chat_id === p.chat_id && a.status === "PENDING"), running: [] }; }
@@ -142,7 +198,8 @@ async function mockImpl(method: string, p: any): Promise<any> {
       void simulateChat(p.chat_id, p.text, runId);
       return { run_id: runId, task_id: id("task") };
     }
-    case "chat.update": case "chat.delete": return { ok: true };
+    case "chat.update": { const c = S.chats.find((x: any) => x.id === p.chat_id); if (c) { for (const k of ["pinned", "folder", "title", "archived", "allow_tools"]) if (p[k] !== undefined) c[k] = typeof p[k] === "boolean" ? +p[k] : p[k]; if (p.title !== undefined && !String(p.title).trim()) throw { code: "invalid_request", message: "a chat name cannot be empty" }; } return { ok: true }; }
+    case "chat.delete": S.chats = S.chats.filter((c: any) => c.id !== p.chat_id); delete S.messages[p.chat_id]; return { ok: true };
     case "runs.list": return S.runs;
     case "runs.get": return { ...S.runs.find((r: any) => r.id === p.run_id), steps: S.steps[p.run_id] ?? [] };
     case "approvals.list": return S.approvals.filter((a: any) => a.status === (p.status ?? "PENDING"));
@@ -162,16 +219,60 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "reminders.create": S.reminders.push({ id: id("rem"), text: p.text, due_at: p.due_at, status: "SCHEDULED" }); return { id: "x" };
     case "reminders.action": S.reminders = S.reminders.filter((r: any) => r.id !== p.id || p.action === "snooze"); return { ok: true };
     case "missions.list": return S.missions;
-    case "missions.create": { const m = { id: id("msn"), ...p.mission, status: "DRAFT", schedule_text: typeof p.mission.schedule === "string" ? p.mission.schedule : JSON.stringify(p.mission.schedule), allowed_tools: p.mission.allowed_tools ?? [], warnings: ["Runs only while this PC is on and you stay signed in to Windows."] }; S.missions.push(m); return { id: m.id }; }
+    case "missions.create": { const m = { id: id("msn"), ...p.mission, status: "DRAFT", schedule_text: typeof p.mission.schedule === "string" ? p.mission.schedule : JSON.stringify(p.mission.schedule), allowed_tools: p.mission.allowed_tools ?? [], warnings: ["Runs only while this PC is on and you stay signed in to Windows.", ...((p.mission.allowed_tools ?? []).includes("web.search") ? ["Web search needs a search provider and its API key (Settings > Web Access / Secrets). Without it this mission cannot search and will report an error each time it runs.", "emergency stop is active"] : [])] }; S.missions.push(m); return { id: m.id }; }
     case "missions.activate": S.missions.find((m: any) => m.id === p.mission_id).status = "ACTIVE"; return { ok: true };
     case "missions.set_status": S.missions.find((m: any) => m.id === p.mission_id).status = p.status; return { ok: true };
     case "missions.describe": return { name: "Morning mail summary", objective: p.text, schedule: { type: "cron", cron: "30 7 * * 1-5" }, timezone: "Europe/Berlin", allowed_tools: ["m365.search_mail", "notify.user"], notification_level: "notify", output_format: "markdown", missed_run_policy: "RUN_ONCE", kind: "routine" };
-    case "missions.parse_schedule": return { schedule: { type: "cron", cron: "30 7 * * 1-5" }, next_run: new Date(Date.now() + 3600e3).toISOString() };
+    case "localfiles.list": return ((S as any).lf ??= []).filter((g: any) => g.chat_id === p.chat_id);
+    case "localfiles.grant": { const name = String(p.path).split(/[\\/]/).pop() || "file"; const g = { id: id("lf"), chat_id: p.chat_id, name, ext: "." + (name.split(".").pop() ?? ""), kind: /xlsx|csv|tsv/i.test(name) ? "table" : "text", size: 98_000_000, sensitivity: "INTERNAL", created_at: now(), folder: "C:\\Users\\you\\Desktop", indexed: false }; ((S as any).lf ??= []).push(g); emit("localfiles.changed", {}); return g; }
+    case "localfiles.folder_info": return { path: p.path, name: String(p.path).split(/[\/]/).pop() || p.path, files: 12, subfolders: 3, subfolder_files: 40, subfolder_names: ["2026", "Archive", "Drafts"], total_mb: 85.2, truncated: false };
+    case "localfiles.grant_folder": { const name = String(p.path).split(/[\/]/).pop() || "folder"; const g = { id: id("lf"), chat_id: p.chat_id, name, ext: "", scope: "folder", recursive: !!p.include_subfolders, expired: false, kind: "folder", size: 0, sensitivity: "CONFIDENTIAL", folder: p.path, created_at: now() }; ((S as any).lf ??= []).push(g); emit("localfiles.changed", {}); return g; }
+    case "localfiles.reapprove": { const g = ((S as any).lf ?? []).find((x: any) => x.id === p.grant_id); if (g) { g.expired = false; g.recursive = !!p.include_subfolders; } emit("localfiles.changed", {}); return g; }
+    case "localfiles.allow_subfolders": { const g = ((S as any).lf ?? []).find((x: any) => x.id === p.grant_id); if (g) g.recursive = true; (S as any).lfreq = []; emit("localfiles.changed", {}); return g; }
+    case "localfiles.requests": return ((S as any).lfreq ??= []).filter((r: any) => r.chat_id === p.chat_id);
+    case "localfiles.deny_request": (S as any).lfreq = ((S as any).lfreq ?? []).filter((r: any) => r.id !== p.request_id); return { ok: true };
+    case "files.release_unscanned": { const f = S.files.find((x: any) => x.id === p.file_id); if (f) { f.status = "READY"; f.status_reason = "NOT antivirus-scanned (no antivirus could scan it)"; } return f; }
+    case "files.meta_update": return { title: p.title, doc_type: p.doc_type, summary: p.summary, keywords: p.keywords, personal_data: [], status: "READY", edited: true, model: null, note: "edited by you" };
+    case "files.analyse": return { started: true };
+    case "files.reread": return { ok: true };
+    case "localfiles.revoke": (S as any).lf = ((S as any).lf ?? []).filter((g: any) => g.id !== p.grant_id); emit("localfiles.changed", {}); return { ok: true };
+    case "system.usage": {
+      const g: any = (S as any).gpu ?? ((S as any).gpu = { h: Array.from({ length: 40 }, () => 3), v: 3 });
+      g.v = Math.max(0, Math.min(100, g.v + (Math.random() - 0.45) * 30)); g.h = [...g.h.slice(-59), g.v];
+      return { available: true, util: g.v, vram_mb: 6200, history: g.h };
+    }
+    case "network.logs": {
+      const t = (min: number) => new Date(Date.now() - min * 60e3).toISOString();
+      const rows = [
+        { id: "n1", ts: t(2), component: "llm", method: "POST", scheme: "http", host: "127.0.0.1", port: 11434, path: "/v1/chat/completions", status: 200, outcome: "ok", reason: "", bytes_out: 5100, bytes_in: 2200, duration_ms: 8400, ip: "", loopback: 1, purpose: "model chat (ollama: llama3.1)", tool: "", task_id: "t1" },
+        { id: "n2", ts: t(35), component: "web", method: "GET", scheme: "https", host: "en.wikipedia.org", port: 443, path: "/wiki/Reserve_Bank_of_India", status: 200, outcome: "ok", reason: "", bytes_out: 0, bytes_in: 88000, duration_ms: 640, ip: "208.80.154.224", loopback: 0, purpose: "", tool: "web.fetch", task_id: "t2" },
+        { id: "n3", ts: t(36), component: "web", method: "GET", scheme: "https", host: "news.example.org", port: 443, path: "/ai/today", status: null, outcome: "blocked", reason: "domain_not_allowed: domain is not on the allowlist (Settings > Web Access)", bytes_out: 0, bytes_in: 0, duration_ms: 3, ip: "", loopback: 0, purpose: "", tool: "web.fetch", task_id: "t2" },
+        { id: "n4", ts: t(90), component: "m365", method: "GET", scheme: "https", host: "graph.microsoft.com", port: 443, path: "/v1.0/me/messages", status: 200, outcome: "ok", reason: "", bytes_out: 0, bytes_in: 41000, duration_ms: 420, ip: "", loopback: 0, purpose: "Microsoft Graph", tool: "m365.search_mail", task_id: "t3" },
+      ];
+      return { rows, total: rows.length, retention_days: 14, summary: { requests: 4, bytes_out: 5100, bytes_in: 131200, blocked: 1, errors: 0, local: 1,
+        hosts: [["127.0.0.1", "llm", 1, 1], ["en.wikipedia.org", "web", 1, 0], ["news.example.org", "web", 1, 0], ["graph.microsoft.com", "m365", 1, 0]].map(([h, c, n, l]: any, i) => ({ host: h, requests: n, bytes_out: 0, bytes_in: 0, blocked: h === "news.example.org" ? 1 : 0, last_ts: rows[i].ts, component: c, loopback: l })),
+        by_day: [{ day: new Date(Date.now() - 86400e3).toISOString().slice(0, 10), requests: 6, blocked: 0 }, { day: new Date().toISOString().slice(0, 10), requests: 4, blocked: 1 }], by_component: [] } };
+    }
+    case "emailskills.list": {
+      const base = [["inbox_hourly", "Hourly inbox check", "Every hour (08:00-20:00, Mon-Sat): sorts the last hour's mail into approval / deadline / urgent / questions / information.", "Every hour between 08:00 and 20:59 on Mon, Tue, Wed, Thu, Fri, Sat"],
+        ["approvals", "Emails waiting for my approval", "Finds mail that asks for your approval, reads it and tells you what exactly is asked.", "Every 2 hours between 08:00 and 18:59 on Mon, Tue, Wed, Thu, Fri, Sat"],
+        ["deadlines", "Deadline radar", "Mail whose deadline is overdue or within 3 days.", "At 09:00 and 15:00 on weekdays"],
+        ["morning_brief", "Morning briefing", "Overnight mail in numbers and today's meetings.", "At 08:30 on Mon-Sat"],
+        ["vip_alert", "VIP sender alert", "Mail from the people you list in the last hour.", "Every hour between 08:00 and 20:59"]];
+      const st: any = (S as any).skills ?? ((S as any).skills = {});
+      if (p.mark_seen) (S as any).unseen = 0;
+      return { skills: base.map(([id, title, description, sched]) => ({ id, title, description, needs_vips: id === "vip_alert", tools: [], enabled: !!st[id], mission_id: st[id] ? "msn_" + id : null, status: st[id] ? "ACTIVE" : "OFF", schedule_text: sched, next_run_at: st[id] ? new Date(Date.now() + 3600e3).toISOString() : null, last_run_at: null,
+        last_state: st[id] ? "COMPLETED" : null, last_at: now(), last_error: null, last_nothing: false,
+        last_result: st[id] ? "**2 need your approval**\n\n- **Budget revision FY27** - Finance (To) - approval sought for a 4% increase; deadline 3 Oct. Worth reading in full.\n- **Vendor onboarding** - Procurement (CC) - FYI only." : "" })), outlook_installed: true, usable: true, reason: "", connector_enabled: true, vips: [], show_nav: true };
+    }
+    case "emailskills.set": { ((S as any).skills ??= {})[p.skill] = !!p.enabled; (S as any).unseen = p.enabled ? 1 : 0; return { ok: true }; }
+    case "emailskills.run": return { task_id: id("task") };
+    case "missions.parse_schedule": return { schedule: { type: "cron", cron: String(p.text) }, text: String(p.text), next_run: new Date(Date.now() + 3600e3).toISOString() };
     case "missions.run_now": return { task_id: "t" };
     case "tasks.list": return S.runs.map((r: any) => ({ id: r.id, objective: r.title, state: r.status, trigger_type: "USER", updated_at: r.started_at, usage: { tool_calls: 1, tokens: 900 }, limits: { tool_calls: 100, tokens: 200000 } }));
     case "files.list": return { files: S.files, storage: { used_bytes: 1234567, quota_bytes: 10737418240, count: S.files.length, quarantined: 0 } };
     case "files.upload": { const f = { id: id("file"), name: p.name ?? String(p.path).split(/[\\/]/).pop(), folder: "/", size_bytes: 2048, status: "READY", sensitivity: 1, source: "upload", created_at: now(), tags_json: [] }; S.files.unshift(f); return f; }
-    case "files.preview": return { ...S.files.find((f: any) => f.id === p.file_id), text: "Extracted text preview (mock)." };
+    case "files.preview": { const f: any = S.files.find((x: any) => x.id === p.file_id); return { ...f, meta: f?.meta_full ?? null, text: "Extracted text preview (mock)." }; }
     case "memory.list": return S.memories;
     case "memory.add": S.memories.push({ id: id("mem"), type: p.type ?? "preference", content: p.content, trust: "TRUSTED", status: "ACTIVE", source: "user", created_at: now(), provenance: [] }); return { id: "m" };
     case "memory.about_me": return { stated: S.memories.filter((m: any) => m.trust === "TRUSTED"), inferred: S.memories.filter((m: any) => m.trust === "INFERRED") };
@@ -187,7 +288,9 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "llm.models": return { models: S.models, roles: {}, builtin_runtime: false };
     case "llm.add": S.models.push({ id: id("mdl"), name: p.model.name || p.model.model_name || p.model.provider, provider: p.model.provider, kind: p.model.kind ?? "chat", endpoint: p.model.endpoint, tested: 0, isolation: "Reduced isolation", location: "loopback" }); return { id: "m" };
     case "llm.test": { const m = S.models.find((x: any) => x.id === p.model_id); m.tested = 1; return { passed: true, checks: [{ name: "follows_instructions", ok: true }, { name: "json_action_protocol", ok: true }, { name: "attack_attempt_rate", ok: true, note: "0/3" }] }; }
-    case "llm.discover": return { models: ["llama3.1:8b", "qwen2.5:14b", "whisper-large-v3"] };
+    case "web.test_search": return { ok: true, provider: "exa", results: 1, ms: 420 };
+    case "llm.inspect": return { kind: /asr|whisper/i.test(p.model_name) ? "stt" : /embed/i.test(p.model_name) ? "embedding" : "chat", vision: /vl/i.test(p.model_name), capabilities: [], detail: "" };
+    case "llm.discover": return { models: ["llama3.1:8b", "qwen2.5:14b", "whisper-large-v3", "qwen2.5vl:7b"], details: [{ name: "llama3.1:8b", kind: "chat", vision: false }, { name: "qwen2.5:14b", kind: "chat", vision: false }, { name: "whisper-large-v3", kind: "stt", vision: false }, { name: "qwen2.5vl:7b", kind: "chat", vision: true }] };
     case "settings.describe": return { groups: SCHEMA.groups, settings: SCHEMA.settings.map((s: any) => ({ ...s, value: S.settings[s.key] ?? s.value })) };
     case "settings.classify": return { normalized: p.changes, loosening: Object.keys(p.changes).filter((k) => k === "web.fetch_any_site" && p.changes[k]).map((k) => ({ key: k, label: "Fetch any site", before: false, after: true, risk: "The agent may fetch any public website." })), stepup: [] };
     case "settings.begin_loosen": return { token: "tok", delay_seconds: 10, loosening: [] };

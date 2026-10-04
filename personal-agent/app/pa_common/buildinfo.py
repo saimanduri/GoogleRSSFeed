@@ -9,4 +9,7 @@ SIGNED_BUILD = True additionally requires IPC clients to carry a valid Authentic
 """
 RELEASE_BUILD = False
 SIGNED_BUILD = False
+# PORTABLE_BUILD = True: copy-and-run folder (pa-ui.exe + python\python.exe + app\), no installer, no admin.
+# Same restrictions as RELEASE_BUILD; processes are identified by exact path inside the folder.
+PORTABLE_BUILD = False
 BUILD_HASH = "dev"

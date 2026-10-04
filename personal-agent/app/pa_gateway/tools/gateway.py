@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
+from dataclasses import replace
 from typing import Any, Callable
 
 from pydantic import ValidationError as PydValidationError
@@ -59,6 +60,8 @@ class ToolGateway:
                     continue
             if t.name not in self.executors:
                 continue
+            if t.name.startswith("localfile.") and not self.gw.localfiles.has_grants(task.get("chat_id")):
+                continue        # only offered in chats where the user attached a local file
             out.append(t.for_llm())
         return out
 
@@ -149,6 +152,15 @@ class ToolGateway:
         dlp = self._dlp(tool, args, task)
         if dlp is not None:
             return self._finish_denied(step, run_id, task, tool, dlp, "dlp_blocked")
+        # 10b. web access is asked per chat and per app session: the first web tool call in a chat needs the user's explicit OK, which then
+        #      covers that chat until sign-out/restart (Settings > Web Access > "Ask before the web is used in a chat")
+        web_gate = (decision.decision == ALLOW and tool.connector == "web" and bool(task.get("chat_id")) and bool(gw.settings.get("web.ask_per_chat"))
+                    and gw.web_grants.get(task["chat_id"]) != gw.session.s.nonce)
+        if web_gate:
+            what = f"search the web for \"{str(args.get('query', ''))[:80]}\"" if tool.name == "web.search" else f"open {str(args.get('url', ''))[:100]}"
+            decision = replace(decision, decision=REQUIRE_APPROVAL, risk="medium", rules=decision.rules + ["web_ask_per_chat"],
+                               approval_reason=f"The assistant wants to {what}. Approving allows web search and page fetching in THIS chat until you sign out or restart. "
+                                               "Nothing from your files or mail is sent unless you approve it separately.")
         # 11. approval
         approval_id = None
         if decision.decision == REQUIRE_APPROVAL:
@@ -173,6 +185,9 @@ class ToolGateway:
                 gw.approvals.consume(approval_id, tool_name, args, destination)
             except PAError as e:
                 return self._finish_denied(step, run_id, task, tool, str(e), e.code)
+            if web_gate:
+                gw.web_grants[task["chat_id"]] = gw.session.s.nonce
+                gw.audit.write("web.chat_allowed", "authorization", chat_id=task["chat_id"], approval_id=approval_id)
         elif decision.decision not in (ALLOW, SANDBOX):
             return self._finish_denied(step, run_id, task, tool, "no permitting decision", "policy_denied")
         # 13. audit "about to execute" - fail closed
@@ -206,7 +221,8 @@ class ToolGateway:
         if idem:
             ctx.task = {**task, "idempotency_key": idem}
         try:
-            result = self.executors[tool_name](args, ctx)
+            with gw.netlog.context(tool=tool_name, task_id=task_id, run_id=run_id):
+                result = self.executors[tool_name](args, ctx)
         except ToolUnavailable as e:
             if idem:
                 gw.outbox_put(idem, task_id, tool_name, phash, "FAILED")
@@ -317,7 +333,13 @@ class ToolGateway:
         gw.tasks.transition(task["id"], "WAITING_FOR_APPROVAL", f"waiting for approval of {tool.name}")
         gw.runs.step(task.get("run_id"), "approval", f"Waiting for your approval: {tool.name}", "waiting",
                      {"approval_id": a["id"], "risk": a["risk"], "reason": a["reason"]})
-        gw.notify("approval", "1 approval waiting", None, 0, "approvals", a["id"])
+        subject = None
+        if task.get("chat_id"):
+            row = gw.db.one("SELECT title FROM chats WHERE id=?", (task["chat_id"],))
+            subject = row["title"] if row else None
+        elif task.get("mission_id"):
+            subject = gw.missions.get(task["mission_id"])["name"]
+        gw.notify("approval", "1 approval waiting", None, 0, "approvals", a["id"], subject=subject, status="Needs your approval")
         timeout = APPROVAL_WAIT_CHAT if task.get("chat_id") else APPROVAL_WAIT_MISSION
         status, final_id = gw.approvals.wait(a["id"], timeout, lambda: gw.tasks.is_cancelled(task["id"]) or gw.killswitch.agent_blocked())
         if gw.tasks.get(task["id"])["state"] == "WAITING_FOR_APPROVAL":

@@ -87,17 +87,28 @@ class MemoryService:
         self.audit.write("memory.edited", "memory", memory_id=mid)
 
     def set_status(self, mid: str, status: str) -> None:
+        if status == "REJECTED":
+            self._tomb("id=?", (mid,))
         if status not in ("ACTIVE", "DISABLED", "REJECTED"):
             raise PAError("invalid status", code="invalid_request")
         self._get(mid)
         self.db.update("memories", "id", mid, {"status": status})
         self.audit.write("memory.status", "memory", memory_id=mid, status=status)
 
+    def _tomb(self, where: str, params: tuple) -> None:
+        """Remember what the user threw away so automatic learning never brings it back."""
+        import hashlib
+        for r in self.db.all(f"SELECT content FROM memories WHERE {where}", params):
+            h = hashlib.sha256(re.sub(r"\W+", " ", r["content"].lower()).strip().encode()).hexdigest()
+            self.db.execute("INSERT OR IGNORE INTO memory_forgotten(content_hash, ts) VALUES (?,?)", (h, now_iso()))
+
     def delete(self, mid: str) -> None:
+        self._tomb("id=?", (mid,))
         self.db.execute("DELETE FROM memories WHERE id=?", (mid,))
         self.audit.write("memory.deleted", "memory", memory_id=mid)
 
     def delete_all(self) -> int:
+        self._tomb("1=1", ())
         n = self.db.execute("DELETE FROM memories")
         self.audit.write("memory.deleted_all", "memory", count=n, severity="medium")
         return n
@@ -174,8 +185,14 @@ class MemoryService:
                 "inferred": [r for r in rows if r["trust"] == Trust.INFERRED]}
 
     def preferences_for_prompt(self, limit: int = 20) -> list[dict[str, Any]]:
-        return self.db.all("SELECT id, type, content, trust FROM memories WHERE status='ACTIVE' AND trust IN (?,?) "
-                           "ORDER BY last_verified_at DESC LIMIT ?", (Trust.TRUSTED, Trust.VERIFIED, limit))
+        """What the model is told about the user: stated/confirmed memories first, then the ones learned automatically (kept on a short leash:
+        they come from the user's own words, routines and own files only, and the user can see and delete every one)."""
+        rows = self.db.all("SELECT id, type, content, trust FROM memories WHERE status='ACTIVE' AND trust IN (?,?) "
+                           "ORDER BY coalesce(last_verified_at, created_at) DESC LIMIT ?", (Trust.TRUSTED, Trust.VERIFIED, limit))
+        if self.settings.get("memory.auto_learn"):
+            rows += self.db.all("SELECT id, type, content, trust FROM memories WHERE status='ACTIVE' AND source LIKE 'learned:%' "
+                                "ORDER BY created_at DESC LIMIT ?", (max(0, limit - len(rows)) or 5,))
+        return rows
 
     def review(self) -> dict[str, Any]:
         cutoff = to_iso(utcnow() - timedelta(days=90))

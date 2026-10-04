@@ -160,10 +160,9 @@ class M365Connector(ConnectorAdapter):
         if q.get("error"):
             raise PAError(f"Microsoft sign-in error: {(q.get('error_description') or q['error'])[0][:300]}", code="oauth_error")
         code = (q.get("code") or [""])[0]
-        r = httpx.post(f"{LOGIN}/{pending['tenant']}/oauth2/v2.0/token", data={
+        r = self._post_token(f"{LOGIN}/{pending['tenant']}/oauth2/v2.0/token", {
             "client_id": pending["client_id"], "grant_type": "authorization_code", "code": code,
-            "redirect_uri": pending["redirect"], "code_verifier": pending["verifier"], "scope": " ".join(pending["scopes"])},
-            timeout=30)
+            "redirect_uri": pending["redirect"], "code_verifier": pending["verifier"], "scope": " ".join(pending["scopes"])}, "Microsoft sign-in")
         if r.status_code != 200:
             raise PAError(f"token exchange failed: {r.json().get('error_description', r.text)[:300]}", code="oauth_error")
         tok = r.json()
@@ -184,9 +183,9 @@ class M365Connector(ConnectorAdapter):
         if not rt:
             raise ToolUnavailable("Microsoft 365 is not connected")
         s = self.gw.settings
-        r = httpx.post(f"{LOGIN}/{s.get('m365.tenant_id') or 'organizations'}/oauth2/v2.0/token", data={
+        r = self._post_token(f"{LOGIN}/{s.get('m365.tenant_id') or 'organizations'}/oauth2/v2.0/token", {
             "client_id": s.get("m365.client_id"), "grant_type": "refresh_token", "refresh_token": rt,
-            "scope": " ".join(self.scopes())}, timeout=30)
+            "scope": " ".join(self.scopes())}, "Microsoft token refresh")
         if r.status_code != 200:
             err = r.json().get("error_description", r.text)[:300] if r.headers.get("content-type", "").startswith("application/json") else r.text[:300]
             raise ToolUnavailable(f"Microsoft 365 token refresh failed - sign in again ({err})")
@@ -198,16 +197,34 @@ class M365Connector(ConnectorAdapter):
         self.gw.secrets.delete_bound("m365.refresh_token")
 
     # ------------------------------------------------------------------ Graph helper with throttling/circuit breaker
+    def _post_token(self, url: str, data: dict[str, Any], purpose: str) -> httpx.Response:
+        t0 = time.time()
+        try:
+            r = httpx.post(url, data=data, timeout=30)
+        except httpx.HTTPError as e:
+            self.gw.netlog.record("m365", "POST", url, None, outcome="error", reason=type(e).__name__, purpose=purpose,
+                                  duration_ms=int((time.time() - t0) * 1000))
+            raise
+        self.gw.netlog.record("m365", "POST", url, r.status_code, purpose=purpose, bytes_in=len(r.content),
+                              duration_ms=int((time.time() - t0) * 1000))
+        return r
+
     def _graph(self, method: str, path: str, **kw: Any) -> httpx.Response:
         if time.time() < self._breaker_until:
             raise ToolUnavailable("Microsoft 365 temporarily unavailable")
         headers = {"Authorization": f"Bearer {self._token()}", **kw.pop("headers", {})}
         for attempt in range(4):
+            t0 = time.time()
             try:
                 r = httpx.request(method, GRAPH + path, headers=headers, timeout=30, **kw)
             except httpx.HTTPError as e:
+                self.gw.netlog.record("m365", method, GRAPH + path.split("?")[0], None, outcome="error", reason=type(e).__name__,
+                                      purpose="Microsoft Graph", duration_ms=int((time.time() - t0) * 1000))
                 self._trip()
                 raise ToolUnavailable(f"cannot reach Microsoft Graph: {e}") from e
+            self.gw.netlog.record("m365", method, GRAPH + path.split("?")[0], r.status_code, purpose="Microsoft Graph",
+                                  bytes_out=len(kw.get("content") or b"") if isinstance(kw.get("content"), (bytes, bytearray)) else 0,
+                                  bytes_in=len(r.content), duration_ms=int((time.time() - t0) * 1000))
             if r.status_code == 429 or r.status_code >= 500:
                 wait = min(float(r.headers.get("Retry-After", 2 ** attempt)), 30)
                 time.sleep(wait)

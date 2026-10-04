@@ -17,13 +17,24 @@ def main() -> int:
     raw = sys.stdin.buffer.read()
     nl = raw.find(b"\n")
     try:
-        header = json.loads(raw[:nl])
-        from pa_workers.parser.parsers import parse
-        result = parse(header.get("family", "binary"), header.get("name", "file"), raw[nl + 1:])
-        out = {"ok": True, **result}
+        header = json.loads(raw[:nl if nl >= 0 else len(raw)])
+        if header.get("mode") == "table":      # large spreadsheet / CSV read straight from disk (see tables.py)
+            from pa_workers.parser.tables import main_table
+            out = main_table(header)
+        elif header.get("mode") == "pdf_images":   # scanned PDF: hand the embedded page pictures to the gateway (for the vision model)
+            from pathlib import Path
+
+            from pa_workers.parser.parsers import pdf_page_images
+            data = Path(header["path"]).read_bytes() if header.get("path") else raw[nl + 1:]
+            out = {"ok": True, **pdf_page_images(data, int(header.get("max_pages", 12)))}
+        else:
+            from pa_workers.parser.parsers import parse
+            result = parse(header.get("family", "binary"), header.get("name", "file"), raw[nl + 1:])
+            out = {"ok": True, **result}
     except Exception as e:  # noqa: BLE001
         out = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:300]}"}
-    sys.stdout.write(json.dumps(out, ensure_ascii=False))
+    # ASCII-only JSON: the console code page of a Windows pipe (cp1252) must never decide whether non-English text survives
+    sys.stdout.write(json.dumps(out, ensure_ascii=True))
     sys.stdout.flush()
     return 0
 

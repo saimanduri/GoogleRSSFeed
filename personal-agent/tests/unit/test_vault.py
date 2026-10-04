@@ -105,3 +105,10 @@ def test_set_pin_requires_current_recovery_key(vault):
 def test_no_plaintext_vmk_in_header(vault):
     v, keys, _ = vault
     assert keys.vmk.get().hex() not in v.header.path.read_text()
+
+
+def test_tests_never_use_real_tpm():
+    """Automated tests must fall back to the software protector so the real TPM's PIN-guess budget is safe."""
+    from pa_gateway.vault.protector import SoftwareProtector, default_protector, tpm_status
+    assert tpm_status()["usable"] is False
+    assert isinstance(default_protector(), SoftwareProtector)

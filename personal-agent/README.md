@@ -8,7 +8,7 @@ security log **remembers**; **you** have the final say, one STOP button away.
 
 | What you get | Where |
 |---|---|
-| One desktop window (Tauri + WebView2): Home, Chat, Missions & Routines, Reminders, Tasks, Approvals, My Files, Memory, Secrets, Activity, **Settings** | `app/ui` |
+| One desktop window (Tauri + WebView2): Home, Chat, History, Missions & Routines, Reminders, Tasks, Approvals, My Files, Memory, Secrets, Activity log (incl. **Network Logs**), **Outlook**, **Guide**, **Settings** (incl. Email monitoring) | `app/ui` |
 | Security core `pa-gateway` (vault, auth, policy, tool gateway, DLP, egress filter, approvals, budgets, kill switch, unified log) | `app/pa_gateway` |
 | Agent runtime `pa-core` (no keys, no network) | `app/pa_core` |
 | Worker processes: file parser, Outlook COM worker, sandbox launcher | `app/pa_workers` |
@@ -16,9 +16,17 @@ security log **remembers**; **you** have the final say, one STOP button away.
 | Installer scripts (firewall rules, logon tasks) | `installer/windows` |
 | Windows CI (tests + UI build + bundle) | `.github/workflows/windows-ci.yml` |
 
+Highlights added in 0.1.2-0.1.7: 8 themes + accent colours, History, slash commands, Undo for deletes, a searchable Guide, Alt-key shortcuts, a GPU meter, assistant/user pictures,
+Outlook email-monitoring skills (read-only, on/off switches), routines with a friendly schedule picker, **attach a file from your PC and ask questions about it without uploading it**
+(100 MB Excel files in seconds), a complete **network log**, and a portable no-admin build. See `docs/HANDOFF.md` for the full state and `VERSION_HISTORY.md` for the changelog.
+
 Screenshots (browser preview with the built-in mock gateway): [`docs/screenshots/`](docs/screenshots).
 
 ## Quick start on your Windows laptop
+
+### 0. Try it without the TPM or admin (developer mode)
+`powershell -ExecutionPolicy Bypass -File scripts\run-dev.ps1 [-Fresh]` starts the built `pa-ui.exe` with a source gateway in developer mode (software key, separate data folder
+`%LOCALAPPDATA%\PersonalAgent-dev`, mock model available). Use throwaway credentials. Portable alternative: `scripts\build-portable.ps1` then double-click `pa-ui.exe`.
 
 ### A. Easiest: download the bundle built by GitHub Actions
 1. On GitHub open **Actions -> personal-agent-windows -> latest green run -> Artifacts ->
@@ -28,6 +36,15 @@ Screenshots (browser preview with the built-in mock gateway): [`docs/screenshots
    (installs to `C:\Program Files\PersonalAgent`, adds the firewall rules and the logon tasks).
 3. Start `pa-gateway.exe`, then `pa-ui.exe`. The first-run wizard guides you.
 4. Connect a model: Settings > AI Model (Ollama on this PC is the quickest: `ollama pull llama3.1:8b`).
+
+### C. Portable - no installer, no administrator rights (0.1.3)
+Build once: `cd app\ui; npx tauri build --no-bundle; cd ..\..; .\scripts\build-portable.ps1`
+-> `dist\PersonalAgent-Portable`. Copy that folder anywhere and **double-click `pa-ui.exe`** - it starts the
+background gateway itself through the bundled python.org Python (signed by the Python Software Foundation, so
+Windows 11 *Smart App Control* accepts it; the unsigned PyInstaller `.exe` files of options A are blocked by it).
+Release-strict (TPM required, no mock model). Without admin there are no firewall rules, so Security Posture shows a
+High "Portable mode" finding until the AppContainer isolation (PENDING_WORK 0) is built. Connect Ollama in
+Settings > AI Model (`http://127.0.0.1:11434`).
 
 ### B. From source (for development / code changes)
 Prerequisites: Windows 11, **Python 3.12**, **Node 20+**, **Rust (stable, MSVC)**, Git.
@@ -71,3 +88,9 @@ UI-only work on any OS: `cd app/ui && npm install && npm run dev` then open http
 | [docs/CONNECTORS.md](docs/CONNECTORS.md) | Outlook, Microsoft 365, Web; adding new connectors |
 | [docs/DEVIATIONS.md](docs/DEVIATIONS.md) | Where and why the implementation differs from the spec |
 | [docs/SPEC_TRACEABILITY.md](docs/SPEC_TRACEABILITY.md) | Spec section -> code -> test map |
+
+## What's in the UI (0.1.4)
+Eight themes (System, Day & night, Light, Dark, Aurora, Ocean, Forest, Sunset) and five animated backgrounds
+(Off, Aurora glow, Bubbles, Waves, Starfield) under **Settings > Appearance & Voice**; **History** of chats and
+agent work; pinned chats and folders; slash commands in chat (`/remind`, `/mission`, `/search`, `/theme`, `/help`...);
+floating scroll buttons; a daily token meter. See docs/USER_GUIDE.md.

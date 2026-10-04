@@ -73,11 +73,13 @@ def harden_process() -> None:
         pass
 
 
-def single_instance() -> object | None:
+def single_instance(scope: str = "") -> object | None:
+    """One gateway per user. `scope` (developer mode with its own data folder only) lets test/dev gateways run next to
+    the installed one without sharing its lock."""
     import win32api  # type: ignore[import-not-found]
     import win32event  # type: ignore[import-not-found]
     import winerror  # type: ignore[import-not-found]
-    m = win32event.CreateMutex(None, False, "Local\\PersonalAgent-Gateway")
+    m = win32event.CreateMutex(None, False, "Local\\PersonalAgent-Gateway" + (f"-{scope}" if scope else ""))
     if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
         return None
     return m

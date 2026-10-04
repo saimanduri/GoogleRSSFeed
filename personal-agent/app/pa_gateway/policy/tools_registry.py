@@ -40,6 +40,107 @@ class MailSearchArgs(_Args):
     max_results: int = Field(default=10, ge=1, le=50)
 
 
+class OutlookSearchArgs(MailSearchArgs):
+    scope: Literal["inbox", "sent", "all"] = "inbox"      # inbox = Inbox + its sub-folders
+    unread_only: bool = False
+    since_minutes: Optional[int] = Field(default=None, ge=1, le=525_600)
+    sender: Optional[str] = Field(default=None, max_length=200)
+
+
+class OutlookDigestArgs(_Args):
+    since: Optional[str] = Field(default=None, max_length=40)
+    until: Optional[str] = Field(default=None, max_length=40)
+    since_minutes: Optional[int] = Field(default=None, ge=1, le=525_600, description="only mail from the last N minutes")
+    scope: Literal["inbox", "sent", "all"] = "inbox"
+    unread_only: bool = False
+    only_flagged: bool = Field(default=False, description="only mail with approval wording, a deadline, urgency or a question")
+    unanswered_only: bool = Field(default=False, description="hide mail you already replied to")
+    only_flag: Optional[Literal["approval", "deadline", "urgent", "question"]] = Field(default=None, description="only mail carrying this flag")
+    deadline_within_days: Optional[int] = Field(default=None, ge=0, le=60, description="only mail whose DEADLINE is overdue or within this many days from today")
+    sender: Optional[str] = Field(default=None, max_length=200)
+    query: str = Field(default="", max_length=400)
+    folder: Optional[str] = Field(default=None, max_length=200)
+    any_of: list[str] = Field(default_factory=list, max_length=8, description="only mail containing at least one of these words (subject or body)")
+    scan_limit: int = Field(default=0, ge=0, le=300, description="read up to this many messages (newest first) before applying only_flagged / unanswered_only")
+    max_results: int = Field(default=30, ge=1, le=50)
+
+
+class OutlookStatsArgs(_Args):
+    since: Optional[str] = Field(default=None, max_length=40)
+    until: Optional[str] = Field(default=None, max_length=40)
+    since_minutes: Optional[int] = Field(default=None, ge=1, le=525_600)
+    scope: Literal["inbox", "sent", "all"] = "inbox"
+    unread_only: bool = False
+    top_senders: int = Field(default=10, ge=1, le=25)
+
+
+class AwaitingReplyArgs(_Args):
+    days: int = Field(default=7, ge=1, le=60)
+    min_age_hours: int = Field(default=24, ge=0, le=720)
+    max_results: int = Field(default=25, ge=1, le=50)
+
+
+class LocalFileArgs(_Args):
+    file_id: str = Field(min_length=3, max_length=64, description="id of a local file or folder shared with this chat (from the shared list)")
+    path: Optional[str] = Field(default=None, max_length=400, description="for a FOLDER: path of the file inside the folder, e.g. 'reports\\2026.xlsx'")
+    sheet: Optional[str] = Field(default=None, max_length=120)
+
+
+class LocalBrowseArgs(_Args):
+    grant_id: str = Field(min_length=3, max_length=64, description="id of a shared FOLDER")
+    subpath: Optional[str] = Field(default=None, max_length=400, description="subfolder to list; needs the user's approval for subfolders")
+
+
+class LocalInspectArgs(LocalFileArgs):
+    sample_rows: int = Field(default=5, ge=1, le=20)
+
+
+class LocalRowsArgs(LocalFileArgs):
+    start: int = Field(default=0, ge=0, le=50_000_000)
+    count: int = Field(default=20, ge=1, le=200)
+    columns: list[str] = Field(default_factory=list, max_length=40)
+
+
+class LocalFilter(_Args):
+    col: str = Field(min_length=1, max_length=120)
+    op: Literal["=", "!=", ">", ">=", "<", "<=", "contains", "startswith", "in", "is_empty", "not_empty"]
+    value: Optional[str | int | float | list[str | int | float]] = None
+
+
+class LocalAgg(_Args):
+    fn: Literal["count", "sum", "avg", "min", "max", "count_distinct"]
+    col: Optional[str] = Field(default=None, max_length=120)
+    name: Optional[str] = Field(default=None, max_length=60)
+
+
+class LocalOrder(_Args):
+    col: str = Field(min_length=1, max_length=120)
+    dir: Literal["asc", "desc"] = "asc"
+
+
+class LocalQueryArgs(LocalFileArgs):
+    select: list[str] = Field(default_factory=list, max_length=40, description="columns to list when not grouping")
+    where: list[LocalFilter] = Field(default_factory=list, max_length=20)
+    group_by: list[str] = Field(default_factory=list, max_length=6)
+    aggregates: list[LocalAgg] = Field(default_factory=list, max_length=12)
+    order_by: list[LocalOrder] = Field(default_factory=list, max_length=4)
+    limit: int = Field(default=50, ge=1, le=200)
+
+
+class LocalDigestArgs(_Args):
+    grant_id: str = Field(min_length=3, max_length=64, description="id of a shared FOLDER")
+    subpath: Optional[str] = Field(default=None, max_length=400, description="subfolder (needs the user's approval for subfolders)")
+    max_files: int = Field(default=25, ge=1, le=60)
+    chars: int = Field(default=500, ge=100, le=1500, description="characters of each file to include")
+
+
+class LocalTextArgs(_Args):
+    file_id: str = Field(min_length=3, max_length=64)
+    path: Optional[str] = Field(default=None, max_length=400, description="for a FOLDER: path of the file inside the folder")
+    offset: int = Field(default=0, ge=0, le=500_000_000)
+    max_chars: int = Field(default=20_000, ge=500, le=60_000)
+
+
 class MessageIdArgs(_Args):
     message_id: str = Field(min_length=1, max_length=1024)
 
@@ -70,6 +171,11 @@ class DraftArgs(_Args):
 class FilesListArgs(_Args):
     folder: str = Field(default="/", max_length=500)
     query: str = Field(default="", max_length=200)
+
+
+class FilesFindArgs(_Args):
+    query: str = Field(min_length=2, max_length=200, description="what the user is looking for, e.g. 'PAN card', 'rent agreement', 'invoice from Sharma'")
+    limit: int = Field(default=8, ge=1, le=20)
 
 
 class FilesReadArgs(_Args):
@@ -171,8 +277,16 @@ TOOLS: list[ToolDef] = [
             "Fetch a public web page (https) and return its text."),
     ToolDef("outlook_local.list_folders", "1", "outlook_local", NONE, "low", "mail", EmptyArgs,
             "List folders in classic Outlook on this PC."),
-    ToolDef("outlook_local.search", "1", "outlook_local", NONE, "low", "mail", MailSearchArgs,
-            "Search classic Outlook mail (incl. archives if enabled). Read-only."),
+    ToolDef("outlook_local.search", "2", "outlook_local", NONE, "low", "mail", OutlookSearchArgs,
+            "Search classic Outlook mail, newest first (default scope: Inbox and its sub-folders; since/until accept ISO dates). Read-only."),
+    ToolDef("outlook_local.digest", "1", "outlook_local", NONE, "low", "mail", OutlookDigestArgs,
+            "List recent Outlook mail with built-in flags: APPROVAL wording, DEADLINE date, URGENT, QUESTION, whether you are in To or CC, "
+            "unread, attachments and whether you already replied. Best first step for any inbox review. Read-only."),
+    ToolDef("outlook_local.mail_stats", "1", "outlook_local", NONE, "low", "mail", OutlookStatsArgs,
+            "Count Outlook mail in a period: total, unread, you in To vs CC, important, attachments, per day, top senders. Use this for "
+            "'how many' questions - never count from a search list. Read-only."),
+    ToolDef("outlook_local.awaiting_reply", "1", "outlook_local", NONE, "low", "mail", AwaitingReplyArgs,
+            "Mail you sent that has had no reply yet (follow-up tracker). Read-only."),
     ToolDef("outlook_local.get_message", "1", "outlook_local", NONE, "low", "mail", MessageIdArgs,
             "Read one Outlook message as plain text."),
     ToolDef("outlook_local.get_attachment", "1", "outlook_local", INTERNAL_WRITE, "low", "mail", AttachmentArgs,
@@ -196,7 +310,29 @@ TOOLS: list[ToolDef] = [
             "Propose an email to send. It is sent only after you approve the exact message.", always_approval=True,
             optional_setting="m365.enable_send"),
     ToolDef("files.list", "1", "files", NONE, "low", "files", FilesListArgs, "List files in My Files."),
+    ToolDef("files.find", "1", "files", NONE, "low", "files", FilesFindArgs,
+            "Find the user's own documents in My Files by what they ARE (type, summary, keywords, name): 'my PAN card', 'the rent agreement'. Returns ids, "
+            "folder, kind, a short summary and the KINDS of personal data inside (never the values). Then use files.read with the id to show the content."),
     ToolDef("files.read", "1", "files", NONE, "low", "files", FilesReadArgs, "Read the extracted text of a file in My Files."),
+    ToolDef("localfile.list", "1", "files", NONE, "low", "files", EmptyArgs,
+            "List the local files the user attached to this chat from their own PC (read in place, never uploaded)."),
+    ToolDef("localfile.browse", "1", "files", NONE, "low", "files", LocalBrowseArgs,
+            "List the files directly inside a shared FOLDER (and its subfolders only if the user allowed them). Use the names it returns as `path`."),
+    ToolDef("localfile.digest", "1", "files", NONE, "low", "files", LocalDigestArgs,
+            "ONE call that gives an overview of a shared FOLDER: every readable file with its type, size and the first lines of its content "
+            "(documents, text, sheets). Use it first for 'analyse / summarise / what is in this folder', then read single files in full with localfile.text.",
+            timeout=300),
+    ToolDef("localfile.inspect", "1", "files", NONE, "low", "files", LocalInspectArgs,
+            "Describe an attached spreadsheet/CSV: sheets, row counts, columns with types and ranges, first rows. Call this first. "
+            "The first call on a big workbook indexes it (can take a minute or two)."),
+    ToolDef("localfile.rows", "1", "files", NONE, "low", "files", LocalRowsArgs,
+            "Read rows start..start+count of an attached spreadsheet/CSV (max 200)."),
+    ToolDef("localfile.query", "1", "files", NONE, "low", "files", LocalQueryArgs,
+            "Filter / group / aggregate an attached spreadsheet or CSV exactly (count, sum, avg, min, max, count_distinct; filters =, !=, >, <, "
+            "contains, startswith, in, is_empty). Use this for every number - never estimate from a few rows.", timeout=300),
+    ToolDef("localfile.text", "1", "files", NONE, "low", "files", LocalTextArgs,
+            "Read the text of a shared document (.txt .md .json .docx .pdf) in pages of up to 60000 characters. Pictures (.png .jpg .gif .webp) and "
+            "scanned PDFs are read by the vision model and come back as text."),
     ToolDef("files.write", "1", "files", INTERNAL_WRITE, "low", "internal", FilesWriteArgs,
             "Save a text/markdown file into My Files."),
     ToolDef("python.run", "1", "sandbox", NONE, "medium", "internal", PythonArgs,

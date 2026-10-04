@@ -24,6 +24,7 @@ from pa_common.ids import new_id
 from pa_common.sensitivity import Sensitivity, Trust
 from pa_common.timeutil import now_iso, to_iso, utcnow
 from pa_common.version import APP_VERSION
+from pa_common.winpaths import powershell
 
 from .. import backup as backup_mod
 from ..auth.passwords import strength, validate_password, validate_pin
@@ -193,9 +194,16 @@ def posture_fix(gw, p: P, c: ClientInfo) -> Any:
         script = Path(sys.executable).parent / "installer" / "firewall-rules.ps1" if getattr(sys, "frozen", False) \
             else Path(__file__).resolve().parents[3] / "installer" / "windows" / "firewall-rules.ps1"
         if sys.platform == "win32" and script.exists():
+            # An elevated script must live where only administrators can write (Program Files): a script in a user-writable
+            # folder (dev checkout, portable copy) could be swapped by any program of this user before they press "Repair".
+            pf = [os.environ.get(k, "") for k in ("ProgramFiles", "ProgramW6432")]
+            if not any(x and str(script.resolve()).lower().startswith(x.lower() + os.sep) for x in pf):
+                raise PAError("the firewall repair script is not in a protected folder; run installer\\windows\\firewall-rules.ps1 as administrator yourself",
+                              code="unavailable")
             import subprocess
-            subprocess.run(["powershell", "-NoProfile", "-Command",
-                            f"Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{script}\"'"],
+            ps = powershell()
+            subprocess.run([ps, "-NoProfile", "-Command",
+                            f"Start-Process -FilePath '{ps}' -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"{script}\"'"],
                            check=False)
             gw.audit.write("posture.firewall_repair_requested", "security")
             return {"ok": True, "elevation_requested": True}
@@ -271,6 +279,22 @@ def home_summary(gw, p: P, c: ClientInfo) -> Any:
         "budget": gw.budgets.summary(),
         "recovery_key_confirmed": bool(gw.auth_state.data.get("rk_confirmed", True)),
     }
+
+
+@rpc("home.widgets")
+def home_widgets(gw, p: P, c: ClientInfo) -> Any:
+    """The widget catalogue, which ones are on, and the data of the enabled ones. `refresh` forces a new Outlook reading."""
+    en = gw.widgets.enabled()
+    return {"catalog": gw.widgets.catalog(), "enabled": en, "data": gw.widgets.data(en, refresh_mail=p.bool("refresh"))}
+
+
+@rpc("home.widgets_set")
+def home_widgets_set(gw, p: P, c: ClientInfo) -> Any:
+    """Switch widgets on/off and order them (Home > Widgets). Unknown ids are ignored."""
+    ids = [str(x) for x in p.list("enabled", True, 40)]
+    en = gw.widgets.set_enabled(ids)
+    gw.audit.write("home.widgets_changed", "configuration", count=len(en))
+    return {"enabled": en, "data": gw.widgets.data(en)}
 
 
 @rpc("home.dismiss")
@@ -358,11 +382,22 @@ def chat_update(gw, p: P, c: ClientInfo) -> Any:
     cid = p.str("chat_id", max_len=100)
     changes: dict[str, Any] = {}
     if p.opt("title") is not None:
-        changes["title"] = p.str("title", max_len=200)
+        from ..files.checks import clean_label
+        title = clean_label(p.str("title", max_len=200))
+        if not title:
+            raise PAError("a chat name cannot be empty", code="invalid_request")
+        changes["title"] = title[:120]
     if p.opt("allow_tools") is not None:
         changes["allow_tools"] = int(p.bool("allow_tools"))
     if p.opt("archived") is not None:
         changes["archived"] = int(p.bool("archived"))
+    if p.opt("pinned") is not None:
+        changes["pinned"] = int(p.bool("pinned"))
+    if p.opt("folder") is not None:
+        folder = p.str("folder", False, 40).strip()
+        if any(ord(ch) < 32 or ch in "<>" for ch in folder):
+            raise PAError("folder name has invalid characters", code="invalid_request")
+        changes["folder"] = folder
     if changes:
         gw.db.update("chats", "id", cid, changes)
         gw.audit.write("chat.updated", "chat", chat_id=cid, fields=list(changes))
@@ -372,11 +407,15 @@ def chat_update(gw, p: P, c: ClientInfo) -> Any:
 @rpc("chat.delete")
 def chat_delete(gw, p: P, c: ClientInfo) -> Any:
     cid = p.str("chat_id", max_len=100)
+    gw.web_grants.pop(cid, None)
     for m in gw.db.all("SELECT id FROM chat_messages WHERE chat_id=?", (cid,)):
         gw.history.remove("chat", m["id"])
+    for r in gw.db.all("SELECT id FROM runs WHERE chat_id=?", (cid,)):          # the answers also live in the runs' summaries
+        gw.history.remove("run", r["id"])
     gw.db.execute("DELETE FROM chat_messages WHERE chat_id=?", (cid,))
     gw.db.execute("DELETE FROM session_events WHERE session_id=?", (cid,))
     gw.db.update("chats", "id", cid, {"deleted": 1})
+    gw.localfiles.revoke_chat(cid)
     gw.audit.write("chat.deleted", "chat", chat_id=cid)
     return {"ok": True}
 
@@ -545,12 +584,101 @@ def missions_describe(gw, p: P, c: ClientInfo) -> Any:
 def missions_parse_schedule(gw, p: P, c: ClientInfo) -> Any:
     from ..agentdata import schedule as sch
     from ..agentdata.missions import local_tz
-    parsed = sch.parse_plain(p.str("text", max_len=200))
+    text = p.str("text", max_len=200)
+    parsed = sch.parse_plain(text)
+    if parsed is None and len(text.split()) == 5:
+        parsed = {"type": "cron", "cron": text.strip()}
     nxt = None
-    if parsed and parsed["type"] != "event":
-        n = sch.next_run(parsed, p.str("timezone", False, 64) or local_tz(), utcnow())
-        nxt = to_iso(n) if n else None
-    return {"schedule": parsed, "next_run": nxt}
+    if parsed:
+        tz = p.str("timezone", False, 64) or local_tz()
+        try:
+            sch.validate(parsed, tz)
+        except (sch.ScheduleError, ValueError, KeyError):
+            return {"schedule": None, "next_run": None, "text": None}
+        if parsed["type"] != "event":
+            n = sch.next_run(parsed, tz, utcnow())
+            nxt = to_iso(n) if n else None
+    return {"schedule": parsed, "next_run": nxt, "text": sch.describe(parsed) if parsed else None}
+
+
+# ====================================================================== local files (read in place, per chat)
+@rpc("localfiles.grant")
+def localfiles_grant(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.grant(p.str("chat_id", max_len=100), p.str("path", max_len=1000), p.str("sensitivity", False, 20) or None)
+
+
+@rpc("localfiles.list")
+def localfiles_list(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.list(p.str("chat_id", max_len=100))
+
+
+@rpc("localfiles.folder_info")
+def localfiles_folder_info(gw, p: P, c: ClientInfo) -> Any:
+    """What the approval dialog shows (counts of files and subfolders) before the user allows a folder."""
+    return gw.localfiles.folder_info(p.str("path", max_len=1000))
+
+
+@rpc("localfiles.grant_folder")
+def localfiles_grant_folder(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.grant_folder(p.str("chat_id", max_len=100), p.str("path", max_len=1000), p.bool("include_subfolders"),
+                                      p.bool("confirm_subfolders"), p.str("sensitivity", False, 20) or None)
+
+
+@rpc("localfiles.allow_subfolders")
+def localfiles_allow_subfolders(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.allow_subfolders(p.str("grant_id", max_len=100), p.bool("confirm"))
+
+
+@rpc("localfiles.reapprove")
+def localfiles_reapprove(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.reapprove(p.str("grant_id", max_len=100), p.bool("include_subfolders"), p.bool("confirm_subfolders"))
+
+
+@rpc("localfiles.requests")
+def localfiles_requests(gw, p: P, c: ClientInfo) -> Any:
+    return gw.localfiles.pending_requests(p.str("chat_id", max_len=100))
+
+
+@rpc("localfiles.deny_request")
+def localfiles_deny_request(gw, p: P, c: ClientInfo) -> Any:
+    gw.localfiles.deny_request(p.str("request_id", max_len=100))
+    return {"ok": True}
+
+
+@rpc("localfiles.revoke")
+def localfiles_revoke(gw, p: P, c: ClientInfo) -> Any:
+    gw.localfiles.revoke(p.str("grant_id", max_len=100))
+    return {"ok": True}
+
+
+# ====================================================================== live GPU meter
+@rpc("system.usage", touch=False)
+def system_usage(gw, p: P, c: ClientInfo) -> Any:
+    return gw.gpu.usage()
+
+
+# ====================================================================== network log
+@rpc("network.logs")
+def network_logs(gw, p: P, c: ClientInfo) -> Any:
+    return gw.netlog.query(days=p.int("days", False, 1, 14, 7), host=p.str("host", False, 100) or "", component=p.str("component", False, 20) or "",
+                           outcome=p.str("outcome", False, 20) or "", limit=p.int("limit", False, 1, 1000, 300), offset=p.int("offset", False, 0, 100000, 0),
+                           include_loopback=p.bool("include_local", False, True))
+
+
+# ====================================================================== email monitoring (Outlook skills)
+@rpc("emailskills.list")
+def emailskills_list(gw, p: P, c: ClientInfo) -> Any:
+    return gw.emailskills.list(mark_seen=p.bool("mark_seen"))
+
+
+@rpc("emailskills.set")
+def emailskills_set(gw, p: P, c: ClientInfo) -> Any:
+    return gw.emailskills.set_enabled(p.str("skill", max_len=60), p.bool("enabled"))
+
+
+@rpc("emailskills.run")
+def emailskills_run(gw, p: P, c: ClientInfo) -> Any:
+    return gw.emailskills.run_now(p.str("skill", max_len=60))
 
 
 # ====================================================================== reminders
@@ -579,9 +707,21 @@ def reminders_action(gw, p: P, c: ClientInfo) -> Any:
 
 
 # ====================================================================== files
+def _level(name: str) -> int:
+    """A sensitivity label by name (PUBLIC ... RESTRICTED); anything else is a clear 'invalid_request', never a KeyError."""
+    try:
+        return int(Sensitivity[name])
+    except KeyError:
+        raise PAError("unknown sensitivity label", code="invalid_request") from None
+
+
 @rpc("files.list")
 def files_list(gw, p: P, c: ClientInfo) -> Any:
-    return {"files": gw.files.list(p.str("folder", False, 500) or None, p.str("query", False, 200)), "storage": gw.files.storage()}
+    rows = gw.files.list(p.str("folder", False, 500) or None, p.str("query", False, 200))
+    for r in rows:
+        m = gw.insights.get(r["id"])
+        r["meta"] = {"doc_type": m["doc_type"], "summary": m["summary"], "status": m["status"]} if m else None
+    return {"files": rows, "storage": gw.files.storage()}
 
 
 @rpc("files.upload")
@@ -596,10 +736,39 @@ def files_upload(gw, p: P, c: ClientInfo) -> Any:
     else:
         data, name = base64.b64decode(p.str("data_b64", max_len=40_000_000)), p.str("name", max_len=200)
     lvl = p.str("sensitivity", False, 20)
-    f = gw.files.ingest(name=name, data=data, source="upload", sensitivity=int(Sensitivity[lvl]) if lvl else None,
+    f = gw.files.ingest(name=name, data=data, source="upload", sensitivity=_level(lvl) if lvl else None,
                         folder=p.str("folder", False, 500) or "/", tags=[str(t) for t in p.list("tags", max_items=30)],
                         on_done=lambda row: gw.missions.on_event("new_file", {"file_id": row.get("id")}) if row.get("status") == "READY" else None)
     return gw.files.public(f)
+
+
+@rpc("files.release_unscanned", stepup="security_settings")
+def files_release_unscanned(gw, p: P, c: ClientInfo) -> Any:
+    """Quarantine > 'Allow without antivirus scan' for ONE file (needs re-authentication)."""
+    return gw.files.release_unscanned(p.str("file_id", max_len=100))
+
+
+@rpc("files.meta_update")
+def files_meta_update(gw, p: P, c: ClientInfo) -> Any:
+    """Edit the automatic summary of a file (title, kind, summary, keywords). Your edit is kept; it also updates the memory about the file."""
+    return gw.insights.update(p.str("file_id", max_len=100), p.str("title", max_len=100), p.str("doc_type", False, 100), p.str("summary", False, 600),
+                              [str(x) for x in p.list("keywords", max_items=12)])
+
+
+@rpc("files.analyse")
+def files_analyse(gw, p: P, c: ClientInfo) -> Any:
+    """'Summarise again' (also when the automatic summary is switched off): runs in the background."""
+    fid = p.str("file_id", max_len=100)
+    row = gw.files.get(fid)
+    if not row or row["deleted"] or row["status"] != "READY":
+        raise PAError("only files that are ready can be summarised", code="file_not_ready")
+    return {"started": gw.insights.schedule(fid, force=True)}
+
+
+@rpc("files.reread")
+def files_reread(gw, p: P, c: ClientInfo) -> Any:
+    """Read a picture / scanned PDF again with the vision model (after adding one)."""
+    return gw.files.reread(p.str("file_id", max_len=100))
 
 
 @rpc("files.preview")
@@ -609,6 +778,7 @@ def files_preview(gw, p: P, c: ClientInfo) -> Any:
     if not row:
         raise PAError("file not found", code="not_found")
     out = gw.files.public(row)
+    out["meta"] = gw.insights.get(fid)
     if row["status"] == "READY":
         out["text"] = (row["text_content"] or "")[:200_000]
     return out
@@ -617,7 +787,7 @@ def files_preview(gw, p: P, c: ClientInfo) -> Any:
 @rpc("files.update")
 def files_update(gw, p: P, c: ClientInfo) -> Any:
     fid = p.str("file_id", max_len=100)
-    gw.files.update_meta(fid, folder=p.str("folder", False, 500) or None, tags=p.list("tags") if p.opt("tags") is not None else None,
+    gw.files.update_meta(fid, folder=p.str("folder", False, 500) or None, tags=[str(t) for t in p.list("tags", max_items=30)] if p.opt("tags") is not None else None,
                          in_knowledge=p.bool("in_knowledge") if p.opt("in_knowledge") is not None else None,
                          name=p.str("name", False, 200) or None)
     return {"ok": True}
@@ -626,7 +796,7 @@ def files_update(gw, p: P, c: ClientInfo) -> Any:
 @rpc("files.set_label")
 def files_set_label(gw, p: P, c: ClientInfo) -> Any:
     fid = p.str("file_id", max_len=100)
-    level = int(Sensitivity[p.str("level", max_len=20)])
+    level = _level(p.str("level", max_len=20))
     row = gw.files.get(fid)
     if row and level < int(row["sensitivity"]) and not gw.session.has_stepup("security_settings"):
         raise StepUpRequired("lowering a label needs re-authentication", category="security_settings")  # spec 13.2
@@ -830,9 +1000,19 @@ def llm_models(gw, p: P, c: ClientInfo) -> Any:
 @rpc("llm.discover")
 def llm_discover(gw, p: P, c: ClientInfo) -> Any:
     try:
-        return {"models": gw.llm.discover(p.str("provider", max_len=20), p.str("endpoint", max_len=500), p.str("api_key", False, 500) or None)}
+        prov, ep, key = p.str("provider", max_len=20), p.str("endpoint", max_len=500), p.str("api_key", False, 500) or None
+        details = gw.llm.discover_details(prov, ep, key)
+        return {"models": [d["name"] for d in details], "details": details}
     except Exception as e:  # noqa: BLE001
         raise PAError(f"could not list models: {e}", code="unreachable") from e
+
+
+@rpc("llm.inspect")
+def llm_inspect(gw, p: P, c: ClientInfo) -> Any:
+    try:
+        return gw.llm.inspect(p.str("provider", max_len=20), p.str("endpoint", max_len=500), p.str("model_name", max_len=200), p.str("api_key", False, 500) or None)
+    except Exception as e:  # noqa: BLE001
+        raise PAError(f"could not inspect the model: {type(e).__name__}", code="unreachable") from e
 
 
 @rpc("llm.add")
@@ -851,8 +1031,12 @@ def llm_add(gw, p: P, c: ClientInfo) -> Any:
         # a remote model receives chat content: loosening change -> password (spec 5.5)
         if not _pw_ok(gw, p):
             raise PAError("remote models receive your chat content - confirm with your password", code="password_required")
+    spec["kind_confirmed"] = bool(spec.get("kind_confirmed")) and _pw_ok(gw, p) if spec.get("kind_confirmed") else False
+    gw.llm.check_kind(spec)
     mid = gw.llm.add_model(spec)
-    return {"id": mid, "sha256": spec.get("sha256")}
+    # test it in the background so it becomes usable without a manual step (never blocks the window)
+    testing = gw.llm.test_in_background(mid, make_default=p.bool("make_default", default=True)) if p.bool("auto_test", default=True) else False
+    return {"id": mid, "sha256": spec.get("sha256"), "testing": testing}
 
 
 @rpc("llm.remove")
@@ -869,8 +1053,13 @@ def llm_test(gw, p: P, c: ClientInfo) -> Any:
 @rpc("llm.set_role")
 def llm_set_role(gw, p: P, c: ClientInfo) -> Any:
     role, mid = p.str("role", max_len=20), p.str("model_id", False, 100)
+    from ..llm.service import ROLE_KIND
+    if role not in ROLE_KIND:
+        raise PAError("unknown role", code="invalid_request")
     if mid:
         m = gw.llm.get_model(mid)
+        if m["kind"] != ROLE_KIND[role]:
+            raise PAError(f"a {m['kind']} model cannot be used for '{role}' (that needs a {ROLE_KIND[role]} model)", code="wrong_kind")
         if not m["tested"]:
             raise PAError("run 'Test model' first - a model must pass before it can be a default", code="model_untested")
     gw.settings.apply({f"llm.role.{role}": mid})
@@ -886,6 +1075,23 @@ def voice_transcribe(gw, p: P, c: ClientInfo) -> Any:
 
 
 # ====================================================================== tools & skills
+@rpc("web.test_search")
+def web_test_search(gw, p: P, c: ClientInfo) -> Any:
+    """Settings > Connectors > Web: one harmless search through the real provider path (egress filter, bound key). Never returns the key."""
+    from ..tools.base import ToolFailed
+    web = gw.connectors.web
+    if not web.status()["search_ready"]:
+        raise PAError("web search is not set up: choose a provider (Settings > Web Access) and bind its API key to web.search (Secrets)", code="needs_setup")
+    t0 = time.time()
+    try:
+        r = web.search({"query": "weather today", "count": 1}, None)
+    except ToolFailed as e:
+        gw.audit.write("web.search_test", "egress", ok=False)
+        raise PAError(f"the search provider did not answer: {str(e)[:200]}", code="search_failed") from e
+    gw.audit.write("web.search_test", "egress", ok=True, provider=gw.settings.get("web.provider"))
+    return {"ok": True, "provider": gw.settings.get("web.provider"), "results": len(r.data.get("results", [])), "ms": int((time.time() - t0) * 1000)}
+
+
 @rpc("tools.catalog")
 def tools_catalog(gw, p: P, c: ClientInfo) -> Any:
     disabled = set(gw.settings.get("tools.disabled") or [])

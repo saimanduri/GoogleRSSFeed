@@ -31,9 +31,10 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Copy-Item -Recurse -Force build\pyi-dist\PersonalAgent\* $OutDir
 New-Item -ItemType Directory -Force -Path "$OutDir\installer" | Out-Null
 Copy-Item -Force installer\windows\*.ps1 "$OutDir\installer\"
+Copy-Item -Force installer\windows\*.ico "$OutDir\installer\" -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path "$OutDir\llm-runtime" | Out-Null
 @"
-Personal Agent - Windows bundle ($hash, $(if ($Dev) {'DEVELOPER'} else {'release mode, unsigned'}))
+ChiRAG Agent - Windows bundle ($hash, $(if ($Dev) {'DEVELOPER'} else {'release mode, unsigned'}))
 
 1. Copy this folder somewhere, open PowerShell AS ADMINISTRATOR in it and run:
        Set-ExecutionPolicy -Scope Process Bypass; .\installer\install-dev.ps1

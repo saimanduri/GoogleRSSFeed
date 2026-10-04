@@ -9,6 +9,7 @@ Stops on: final answer, step budget, kill switch / cancellation, budget exhausti
 """
 from __future__ import annotations
 
+import json
 import threading
 import time
 from typing import Any, Callable
@@ -21,6 +22,21 @@ from .context import label_summary, messages_from_events, needs_summary, summary
 
 MAX_FORMAT_RETRIES = 2
 MAX_CONSECUTIVE_ERRORS = 3
+
+
+
+def _readable(text: str) -> str:
+    """Last resort when the model never produced a valid action: show its words, never raw JSON plumbing."""
+    t = (text or "").strip()
+    try:
+        obj = json.loads(t[t.find("{"):t.rfind("}") + 1]) if "{" in t else None
+    except json.JSONDecodeError:
+        obj = None
+    if isinstance(obj, dict):
+        words = obj.get("answer") or obj.get("thought")
+        if isinstance(words, str) and words.strip():
+            return words.strip()[:20000] + "\n\n(The model did not follow the expected reply format, so no action was taken.)"
+    return t[:20000] or "(no answer)"
 
 
 class Stop(Exception):
@@ -70,12 +86,21 @@ class AgentLoop:
         for skill in ctx.get("skills", []):
             if skill.get("name", "").lower() in ctx["task"]["objective"].lower():
                 self.call("session.append", kind="skill.used", content=f"using skill {skill['name']}", meta={"skill_id": skill["id"]})
+        pre = (ctx.get("mission") or {}).get("prefetch") or []
+        if pre and not any(e["kind"] in ("tool.result", "tool.denied") for e in ctx["events"]):
+            # The application itself gathers the data first (deterministic, through the normal policy gate); the model then only explains it.
+            for item in pre:
+                out = self.call("tools.invoke", tool=item["tool"], args=item["args"])
+                if out.get("status") in ("unavailable",) and not chat:
+                    self.finish("WAITING_FOR_RESOURCE", reason=out.get("reason", "resource unavailable"))
+                    return
+            ctx = self.call("task.context")
         for step in range(max_steps):
             self._check_cancel()
             ctx = self._maybe_summarise(self.call("task.context") if step else ctx)
             try:
-                res = self.call("llm.complete", messages=self._messages(ctx), role="standard", json_mode=True, stream=chat,
-                                max_tokens=2048)
+                res = self.call("llm.complete", messages=self._messages(ctx), role="standard", json_mode=True, action_schema=True, stream=chat,
+                                max_tokens=4096)
             except PAError as e:
                 if e.code in ("no_model", "budget_exhausted", "kill_switch_active", "policy_denied", "unlogged_context"):
                     self.finish("FAILED", reason=_friendly(e))
@@ -93,7 +118,7 @@ class AgentLoop:
             except ActionError as e:
                 format_retries += 1
                 if format_retries > MAX_FORMAT_RETRIES:
-                    self.finish("COMPLETED", result=res["text"].strip()[:20000] or "(no answer)")
+                    self.finish("COMPLETED", result=_readable(res["text"]))
                     return
                 self.call("session.append", kind="note",
                           content=f"[format] Your last reply was not valid ({e}). Reply with exactly one JSON object as instructed.")

@@ -1,4 +1,4 @@
-// pa-ui: the single Personal Agent window (Tauri 2 + WebView2).
+// pa-ui: the single ChiRAG Agent window (Tauri 2 + WebView2).
 //
 // Security notes (spec 2.2, 2.4, 39.1-39.3):
 // - holds no long-term secrets; the only credential is the per-launch UI token read from the gateway's
@@ -135,6 +135,28 @@ mod link {
     #[link(name = "kernel32")]
     extern "system" {
         fn GetNamedPipeServerProcessId(pipe: isize, pid: *mut u32) -> i32;
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+        fn CloseHandle(h: isize) -> i32;
+        fn GetExitCodeProcess(h: isize, code: *mut u32) -> i32;
+    }
+
+    /// True only if a process with this id is still running. A gateway that was killed or crashed leaves gateway.json
+    /// behind; without this check the UI would wait for it forever instead of starting a new one. An exited process can
+    /// still be openable while any program holds a handle to it, so the exit code is checked too.
+    fn pid_alive(pid: u32) -> bool {
+        if pid == 0 {
+            return false;
+        }
+        const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+        const STILL_ACTIVE: u32 = 259;
+        let h = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if h == 0 {
+            return false;
+        }
+        let mut code: u32 = 0;
+        let running = unsafe { GetExitCodeProcess(h, &mut code) } != 0 && code == STILL_ACTIVE;
+        unsafe { CloseHandle(h) };
+        running
     }
     const SECURITY_IDENTIFICATION: u32 = 0x0001_0000;
 
@@ -156,6 +178,19 @@ mod link {
                 let _ = std::process::Command::new(prog).args(parts).spawn();
             }
         } else if let Some(dir) = exe_dir {
+            // Portable folder (no installer, no admin): <dir>\python\python.exe -m pa_gateway, code in <dir>pp.
+            // Started from pa-ui.exe so one double-click starts everything.
+            let py = dir.join("python").join("python.exe");
+            let app_dir = dir.join("app");
+            if py.exists() && app_dir.join("pa_gateway").exists() {
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new(py)
+                    .args(["-m", "pa_gateway"])
+                    .current_dir(app_dir)
+                    .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+                    .spawn();
+                return;
+            }
             let gw = dir.join("pa-gateway.exe");
             if gw.exists() {
                 let _ = std::process::Command::new(gw).spawn();
@@ -185,6 +220,9 @@ mod link {
         let pipe = rv["pipe"].as_str().ok_or("bad rendezvous")?.to_string();
         let token = rv["ui_token"].as_str().ok_or("bad rendezvous")?.to_string();
         let expected_pid = rv["pid"].as_u64().unwrap_or(0) as u32;
+        if !pid_alive(expected_pid) {
+            return Err("rendezvous is stale (gateway not running)".into());
+        }
         let client = ClientOptions::new()
             .security_qos_flags(SECURITY_IDENTIFICATION)
             .open(&pipe)
@@ -254,9 +292,22 @@ mod link {
         if data.get("toast").and_then(Value::as_bool) != Some(true) {
             return;
         }
-        let title = data.get("title").and_then(Value::as_str).unwrap_or("Personal Agent");
+        // A chat answer only deserves a toast when the window is not in front of the user.
+        if data.get("kind").and_then(Value::as_str) == Some("chat") {
+            if let Some(w) = app.get_webview_window("main") {
+                if w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false) {
+                    return;
+                }
+            }
+        }
+        // The gateway names the toast after what it is about (reminder text, routine name, chat name) and adds a short status line.
+        let title = data
+            .get("toast_title")
+            .and_then(Value::as_str)
+            .or_else(|| data.get("title").and_then(Value::as_str))
+            .unwrap_or("ChiRAG Agent");
         let mut b = app.notification().builder().title(title);
-        if let Some(body) = data.get("body").and_then(Value::as_str) {
+        if let Some(body) = data.get("toast_body").and_then(Value::as_str).or_else(|| data.get("body").and_then(Value::as_str)) {
             b = b.body(body);
         }
         let _ = b.show();
@@ -267,7 +318,7 @@ mod link {
 mod link {
     use super::*;
     pub async fn run(app: AppHandle) {
-        let _ = app.emit("gw-status", json!({"connected": false, "error": "Personal Agent runs on Windows"}));
+        let _ = app.emit("gw-status", json!({"connected": false, "error": "ChiRAG Agent runs on Windows"}));
     }
 }
 
@@ -298,7 +349,7 @@ fn main() {
             let handle = app.handle().clone();
             // The single window. It may only show the bundled app; any other navigation is refused.
             let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("Personal Agent")
+                .title("ChiRAG Agent")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(900.0, 600.0)
                 .center()
@@ -324,7 +375,7 @@ fn main() {
             let quit = MenuItem::with_id(app, "quit", "Close window (agent keeps running)", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let menu = Menu::with_items(app, &[&open, &pause, &stop, &lock, &sep, &quit])?;
-            let mut tray = TrayIconBuilder::with_id("main").tooltip("Personal Agent").menu(&menu).show_menu_on_left_click(false);
+            let mut tray = TrayIconBuilder::with_id("main").tooltip("ChiRAG Agent").menu(&menu).show_menu_on_left_click(false);
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
@@ -353,5 +404,5 @@ fn main() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Personal Agent");
+        .expect("error while running ChiRAG Agent");
 }

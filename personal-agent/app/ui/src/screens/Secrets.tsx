@@ -1,5 +1,6 @@
 // Local password/secret vault (spec 6). Values need step-up to reveal/copy, auto-hide after 20 s, the window is
 // excluded from screen capture while a value is visible, and the clipboard is excluded from history and cleared.
+import { SearchBox } from "../components/SearchBox";
 import { useEffect, useState } from "react";
 import { native, pickFile, pickSavePath } from "../api/gateway";
 import { errText, useApp } from "../app";
@@ -30,7 +31,7 @@ export function Secrets() {
     <div className="page">
       <div className="page-header">
         <div className="grow"><h1>Secrets</h1><div className="muted">Your passwords and keys, encrypted on this PC. The agent never sees these values; a bound secret is injected by the gateway only into its tool's request.</div></div>
-        <input className="input" style={{ width: 220 }} placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <SearchBox style={{ width: 220 }} placeholder="Search" value={q} onChange={setQ} />
         <Button onClick={async () => { const p = await pickFile({ filters: [{ name: "CSV", extensions: ["csv"] }] }); if (p) { try { const r = await call<any>("secrets.import_csv", { path: p, secure_delete: confirm("Securely delete the CSV after import? (recommended)") }); toast(`Imported ${r.imported}`, "ok"); void load(); } catch (e: any) { toast(errText(e), "danger"); } } }}>Import CSV</Button>
         <Button onClick={async () => { const p = await pickSavePath("secrets-export.json"); if (p) { try { const r = await call<any>("secrets.export", { path: p }); toast(`Exported ${r.count} (encrypted with your password)`, "ok"); } catch (e: any) { toast(errText(e), "danger"); } } }}>Export</Button>
         <Button kind="primary" icon="plus" onClick={() => setEdit({ type: "password", title: "", value: "", tags: [], bindings: [] })}>Add</Button>

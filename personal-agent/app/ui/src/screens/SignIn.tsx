@@ -53,8 +53,8 @@ export function SignIn() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="row" style={{ marginBottom: 18 }}>
-          <div className="brand-logo" style={{ width: 42, height: 42, borderRadius: 12 }}><Icon name={locked ? "lock" : "shield"} size={22} /></div>
-          <div><h1 style={{ margin: 0 }}>{locked ? `${status.assistant_name ?? "Personal Agent"} is locked` : `Welcome back${status.display_name ? ", " + status.display_name : ""}`}</h1>
+          <div className="brand-logo logo-img" style={{ width: 52, height: 52, borderRadius: 14 }}><img src="/chirag-logo.png" alt="" /></div>
+          <div><h1 style={{ margin: 0 }}>{locked ? `${status.assistant_name ?? "ChiRAG Agent"} is locked` : `Welcome back${status.display_name ? ", " + status.display_name : ""}`}</h1>
             <div className="muted small">{locked ? "It keeps working in the background." : `Sign in to unlock ${status.assistant_name ?? "your assistant"}.`}</div></div>
         </div>
         <div className="col">
@@ -137,13 +137,13 @@ export function RestoreNewPc({ onBack }: { onBack: () => void }) {
         <p className="muted">Only possible on a PC without an existing vault (e.g. a new PC). You need the password that was used when the backup was made. You will then create a new PIN and recovery key.</p>
         <div className="col">
           <Field label="Backup file (.pabk)"><div className="row"><input className="input" value={path} onChange={(e) => setPath(e.target.value)} />
-            <Button onClick={async () => { const f = await pickFile({ filters: [{ name: "Personal Agent backup", extensions: ["pabk"] }] }); if (f) setPath(String(f)); }}>Browse</Button></div></Field>
+            <Button onClick={async () => { const f = await pickFile({ filters: [{ name: "ChiRAG Agent backup", extensions: ["pabk"] }] }); if (f) setPath(String(f)); }}>Browse</Button></div></Field>
           <Field label="Backup password"><input className="input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} /></Field>
           {msg && <div className="banner info">{msg}</div>}
           <div className="row"><Button onClick={onBack}>Back</Button><div className="spacer" />
             <Button kind="primary" busy={busy} disabled={!path || !pw} onClick={async () => {
               setBusy(true);
-              try { await rpc("backup.restore_signed_out", { path, password: pw }); setMsg("Restore prepared. Restart Personal Agent (tray > Close window, then start it again) and sign in with the backup's password."); }
+              try { await rpc("backup.restore_signed_out", { path, password: pw }); setMsg("Restore prepared. Restart ChiRAG Agent (tray > Close window, then start it again) and sign in with the backup's password."); }
               catch (e: any) { setMsg(errText(e)); } finally { setBusy(false); }
             }}>Restore</Button></div>
         </div>

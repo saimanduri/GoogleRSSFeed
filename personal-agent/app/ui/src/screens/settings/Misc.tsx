@@ -26,11 +26,11 @@ export function BackupSettings({ generic }: { generic: ReactNode }) {
           <tr key={f.name}><td className="mono small">{f.name}</td><td className="small">{bytes(f.size)}</td>
             <td style={{ textAlign: "right" }}>
               <Button small onClick={() => withPw(async (pw) => { const r = await call<any>("backup.verify", { path: `${d.folder}\\${f.name}`, password: pw }); if (!r.ok) throw new Error("verification failed"); }, "Backup verified (full test decrypt)")}>Verify</Button>
-              <Button small kind="danger" onClick={() => confirm("Restore this backup? The app will sign out; restart it to finish.") && withPw((pw) => call("backup.restore", { path: `${d.folder}\\${f.name}`, password: pw }), "Restore staged - restart Personal Agent")}>Restore</Button>
+              <Button small kind="danger" onClick={() => confirm("Restore this backup? The app will sign out; restart it to finish.") && withPw((pw) => call("backup.restore", { path: `${d.folder}\\${f.name}`, password: pw }), "Restore staged - restart ChiRAG Agent")}>Restore</Button>
             </td></tr>))}</tbody></table>
       </Card>
       {generic}
-      <Card title="Restore from another file"><Button onClick={async () => { const f = await pickFile({ filters: [{ name: "Backup", extensions: ["pabk"] }] }); if (f) await withPw((pw) => call("backup.restore", { path: String(f), password: pw }), "Restore staged - restart Personal Agent"); }}>Choose .pabk file</Button></Card>
+      <Card title="Restore from another file"><Button onClick={async () => { const f = await pickFile({ filters: [{ name: "Backup", extensions: ["pabk"] }] }); if (f) await withPw((pw) => call("backup.restore", { path: String(f), password: pw }), "Restore staged - restart ChiRAG Agent"); }}>Choose .pabk file</Button></Card>
     </div>
   );
 }

@@ -8,6 +8,7 @@ States:
 """
 from __future__ import annotations
 
+import secrets
 import threading
 import time
 from dataclasses import dataclass, field
@@ -37,6 +38,9 @@ class SessionState:
     last_activity: float = field(default_factory=time.time)
     last_password: float = 0.0
     stepups: dict[str, tuple[float, str]] = field(default_factory=dict)  # category -> (expires, method)
+    # Identifies one "app session": new at every start of the gateway and every sign-out. Approvals to read local files and folders
+    # are bound to it, so after signing out or restarting the user has to approve the same file or folder again.
+    nonce: str = field(default_factory=lambda: secrets.token_hex(16))
 
 
 class SessionManager:
@@ -50,6 +54,8 @@ class SessionManager:
 
     def set_state(self, state: str) -> None:
         with self._lock:
+            if state in (SIGNED_OUT, SETUP_REQUIRED) and self.s.state not in (SIGNED_OUT, SETUP_REQUIRED):
+                self.s.nonce = secrets.token_hex(16)         # leaving a session: its local-file approvals die with it
             self.s.state = state
             if state != UNLOCKED:
                 self.s.stepups.clear()

@@ -43,3 +43,11 @@ last-used time and dependent missions (Settings → Connectors). Effective state
 See DEVELOPMENT.md → "Add a connector". Future third-party connectors ship as signed packages whose manifest
 (destinations, data types, side effects, secrets, tools, package hash) is verified with a pinned Ed25519
 publisher key (`pa_gateway/extensions.py`) and enforced at runtime.
+
+### Local Outlook - tools as of 0.1.7
+`outlook_local.search` (newest first; scope inbox = Inbox + sub-folders / sent / all; since, until, sender, unread_only, since_minutes; text query matches subject, sender, or the body of the newest 300 messages),
+`digest` (recent mail with flags APPROVAL / DEADLINE:date / URGENT / QUESTION, "you are in: To|CC|other", UNREAD, attachments, replied yes/no; filters only_flag, only_flagged, unanswered_only, deadline_within_days, any_of, scan_limit),
+`mail_stats` (counts only: total, unread, To vs CC, important, flagged, per day, top senders - table API, seconds for thousands of mails), `awaiting_reply` (sent mail with no reply),
+`get_message`, `get_attachment` (-> My Files, scanned), `calendar_read`, `create_draft` (off by default, approval). Flags come from deterministic English patterns in `mailscan.py`.
+Measured on a real mailbox (~700 mails/day, 112 folders): stats 6 s (24 h) / 12 s (7 days), digest of 50 mails 7 s, awaiting_reply 8 s.
+Email-monitoring skills (Settings > Email monitoring) are routines built on these tools - see `agentdata/email_skills.py`.

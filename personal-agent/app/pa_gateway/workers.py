@@ -32,7 +32,30 @@ def frozen() -> bool:
 def worker_command(module: str) -> list[str]:
     if frozen():
         return [str(Path(sys.executable).with_name(WORKER_EXES[module]))]
-    return [sys.executable, "-m", module]
+    py = _source_python()
+    if py != sys.executable:
+        # base interpreter started directly: load the venv's site-packages (incl. .pth files, e.g. pywin32's
+        # DLL directory) before running the module
+        import sysconfig
+        boot = ("import site,runpy,sys;site.addsitedir(%r);"
+                "runpy.run_module(%r,run_name='__main__',alter_sys=True)" % (sysconfig.get_paths()["purelib"], module))
+        return [py, "-c", boot]
+    return [py, "-m", module]
+
+
+def _in_venv() -> bool:
+    return sys.prefix != getattr(sys, "base_prefix", sys.prefix)
+
+
+def _source_python() -> str:
+    """Source/dev runs: a venv's python.exe is only a launcher that starts the real interpreter as a child,
+    so the process that connects to the IPC pipe would not be the one we started. Start the base interpreter
+    directly (worker_command loads the venv site-packages) so the exact-pid check stays unchanged."""
+    if sys.platform == "win32" and _in_venv():
+        base = getattr(sys, "_base_executable", "")
+        if base and Path(base).exists():
+            return base
+    return sys.executable
 
 
 def scrubbed_env(extra: dict[str, str] | None = None, tmp: Path | None = None) -> dict[str, str]:
@@ -88,6 +111,8 @@ def _job_for(limits: JobLimits):
 def popen_limited(cmd: list[str], *, cwd: Path | None, env: dict[str, str], limits: JobLimits | None,
                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE) -> tuple[subprocess.Popen, object]:
     """Start a process with Job Object limits (Windows). Returns (process, job_handle_or_None)."""
+    from .posture import require_firewall_rules
+    require_firewall_rules()
     if sys.platform != "win32" or limits is None:
         p = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=stdin, stdout=stdout, stderr=stderr)
         return p, None

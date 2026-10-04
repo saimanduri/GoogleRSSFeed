@@ -38,7 +38,7 @@ export function ApprovalCard({ a, onDone }: { a: any; onDone?: () => void }) {
       {isReminder ? (
         <div className="col" style={{ gap: 4 }}>
           <div style={{ fontSize: "1.05em" }}>⏰ <b>{a.payload.text}</b></div>
-          <div className="muted">{new Date(a.payload.due_at).toLocaleString()}</div>
+          <div className="muted">{new Date(a.payload.due_at).toLocaleString([], { weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</div>
         </div>
       ) : edit ? (
         <textarea className="input mono" rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} />

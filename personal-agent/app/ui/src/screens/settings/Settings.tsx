@@ -5,11 +5,13 @@ import { AccountSettings } from "./AccountSettings";
 import { ConnectorSettings } from "./ConnectorSettings";
 import { GenericGroup } from "./GenericGroup";
 import { BackupSettings, DiagnosticsSettings, EmergencySettings, LogsExtras, PrivacySettings, RulesExtras, ToolsExtras, UpdatesSettings } from "./Misc";
+import { EmailMonitoring } from "./EmailMonitoring";
 import { ModelSettings } from "./ModelSettings";
+import { ThemePicker } from "../../components/ThemePicker";
 
 const ICONS: Record<string, string> = { account: "shield", connectors: "plug", model: "model", autonomy: "activity", rules: "approvals", approvals: "check",
   tools: "steps", web: "search", files: "files", memory: "memory", notifications: "reminders", logs: "archive", backup: "download", emergency: "alert",
-  updates: "refresh", privacy: "lock", diagnostics: "info", ui: "sparkle" };
+  updates: "refresh", privacy: "lock", diagnostics: "info", ui: "sparkle", emailmon: "mail" };
 
 export function Settings() {
   const { call, route } = useApp();
@@ -44,7 +46,9 @@ export function Settings() {
         {section === "logs" && <>{generic}<LogsExtras /></>}
         {section === "tools" && <>{generic}<ToolsExtras /></>}
         {section === "rules" && <>{generic}<RulesExtras reload={load} /></>}
-        {["autonomy", "approvals", "web", "files", "memory", "notifications", "ui"].includes(section) && generic}
+        {["autonomy", "approvals", "web", "files", "memory", "notifications"].includes(section) && generic}
+        {section === "ui" && <><ThemePicker />{generic}</>}
+        {section === "emailmon" && <EmailMonitoring generic={generic} onChanged={load} />}
       </div>
     </div>
   );

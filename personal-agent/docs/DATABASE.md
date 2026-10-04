@@ -24,7 +24,7 @@
 | `secret_bindings` | which tool/connector may use a secret (`web.search`, `llm:<id>`, `m365.refresh_token`) |
 | `connectors` | per connector: `enabled`, `use_chat`, `use_missions`, `connected`, `scopes_json`, `last_used_at` |
 | `models` | model registry: provider, endpoint, model_name, path + `sha256` (GGUF), kind (chat/stt/embedding), `tested`, `test_report_json` |
-| `chats` | chat list; `hwm` = highest sensitivity seen; `sources_json`; `allow_tools`; `archived` |
+| `chats` | chat list; `hwm` = highest sensitivity seen; `sources_json`; `allow_tools`; `archived`; `pinned`, `folder` (migration 2, UI organisation only) |
 | `chat_messages` | user/assistant messages with sources and sensitivity |
 | `runs` | one per request (chat turn, mission run, sub-task): status, hwm, tokens, tool calls, `archived` (beyond last 100) |
 | `run_steps` | the live step timeline: type (input/llm/thought/plan/tool/policy/approval/summary/…), status, detail JSON, duration |
@@ -55,3 +55,18 @@
 ## Backups / copies
 `Database.backup_to()` uses `sqlcipher_export` into a new file with the same key (used by backups and
 pre-update snapshots). A copied data folder cannot be opened without the password (tested).
+
+## Migration 3 (0.1.7)
+- `missions.template_id` - set for email-monitoring skills (see agentdata/email_skills.py); NULL for normal routines.
+- `net_log` - one row per outbound request (ts, component web|m365|llm, method, scheme, host, port, path WITHOUT query, status, outcome ok|error|blocked, reason,
+  bytes_out, bytes_in, duration_ms, ip, loopback, purpose, tool, task_id, run_id). Kept 14 days (purged hourly). No bodies, headers, tokens or queries.
+- `local_grants` - files the user attached to a chat from disk (id, chat_id, path, name, ext, size, mtime, sensitivity, created_at, last_used_at). The model only ever sees id + name.
+  Private SQLite index files live in `tmp/localfiles/<grant>.sqlite` (deleted on removal, chat deletion, or after 7 days).
+
+
+## Migration 4 (0.1.11): local_grants
+`local_grants.scope` ('file' | 'folder'), `recursive` (0/1: subfolders approved), `session_nonce` (the app session in which the user approved; an approval is valid only while it equals the gateway's current session nonce, which changes at every start and sign-out). Pre-existing rows get '' and therefore need re-approval.
+
+
+## Migration 5 (0.1.13): file_meta, memory_learn_state, memory_forgotten
+`file_meta` (one row per file: title, doc_type, summary, keywords_json, pii_json = KINDS of personal data only, status PENDING/ANALYSING/READY/FAILED, edited flag, model, note, memory_id); `memory_learn_state` (per chat: newest user message already looked at); `memory_forgotten` (SHA-256 of normalised text of memories the user deleted or rejected - automatic learning never recreates them).

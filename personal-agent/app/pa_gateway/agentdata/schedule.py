@@ -121,12 +121,49 @@ def validate(schedule: dict, tz: str) -> None:
         raise ScheduleError("unknown schedule type")
 
 
+_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+
+def _every(n: int, unit: str) -> str:
+    return f"Every {unit}" if n == 1 else f"Every {n} {unit}s"
+
+
+def describe_cron(expr: str) -> str:
+    """Plain-language text for the cron shapes the UI and the plain-words parser produce; falls back to the raw cron."""
+    try:
+        mi, ho, dom, mon, dow = expr.split()
+        c = Cron(expr)
+    except (ValueError, ScheduleError):
+        return f"cron {expr}"
+    days = ""
+    if dow != "*" and dom == "*" and mon == "*":
+        ds = sorted(c.dow)
+        days = " on weekdays" if ds == [1, 2, 3, 4, 5] else " on weekends" if ds == [0, 6] else " on " + ", ".join(_DAYS[d] for d in ds)
+    elif dom != "*" or mon != "*":
+        return f"cron {expr}"
+    plain = lambda s: s.isdigit()  # noqa: E731
+    if plain(mi) and plain(ho):
+        return f"Every day at {int(ho):02d}:{int(mi):02d}" if not days else f"At {int(ho):02d}:{int(mi):02d}{days}"
+    window = ""
+    if "-" in ho.split("/")[0]:
+        a, b = ho.split("/")[0].split("-")
+        window = f" between {int(a):02d}:00 and {int(b):02d}:59"
+    elif ho != "*" and not plain(ho) and not ho.startswith("*/"):
+        return f"cron {expr}"
+    if mi.startswith("*/") and mi[2:].isdigit():
+        return f"{_every(int(mi[2:]), 'minute')}{window}{days}"
+    if plain(mi) and "/" in ho and ho.split("/")[1].isdigit():
+        return f"{_every(int(ho.split('/')[1]), 'hour')}{window}{days}" + (f" (at :{int(mi):02d})" if int(mi) else "")
+    return f"cron {expr}"
+
+
 def describe(schedule: dict) -> str:
     t = schedule.get("type")
     if t == "cron":
-        return f"cron {schedule['cron']}"
+        return describe_cron(schedule["cron"])
     if t == "interval":
-        return f"every {schedule['minutes']} minutes"
+        m = int(schedule["minutes"])
+        return _every(m // 60, "hour") if m % 60 == 0 else _every(m, "minute")
     if t == "once":
         return f"once at {schedule['at']}"
     if t == "event":

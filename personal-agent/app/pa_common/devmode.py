@@ -24,3 +24,8 @@ def is_windows() -> bool:
 def fast_kdf_for_tests() -> bool:
     """Lower Argon2id cost for automated tests only. Never honoured in release builds."""
     return (not RELEASE_BUILD) and os.environ.get("PA_TEST_FAST_KDF", "0") == "1"
+
+
+def force_software_protector() -> bool:
+    """Developer mode only: never touch the real TPM (automated tests would burn its PIN-guess budget)."""
+    return dev_mode() and os.environ.get("PA_FORCE_SOFTWARE_PROTECTOR", "0") == "1"

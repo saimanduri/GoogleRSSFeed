@@ -36,21 +36,38 @@ class HomeService:
         now = datetime.now().strftime("%H:%M")
         return (start <= now < end) if start < end else (now >= start or now < end)
 
-    def notify(self, kind: str, title: str, body: str | None, sensitivity: int, screen: str | None, ref_id: str | None) -> None:
+    def notify(self, kind: str, title: str, body: str | None, sensitivity: int, screen: str | None, ref_id: str | None, *,
+               subject: str | None = None, status: str | None = None, record: bool = True) -> None:
         """Content-level rules: default 'notify' shows only a generic line; 'summary' never includes
-        CONFIDENTIAL content. Toasts are private (no lock-screen content) and carry no actions (spec 26)."""
+        CONFIDENTIAL content. Toasts are private (no lock-screen content) and carry no actions (spec 26).
+
+        `subject` is the NAME of what the notification is about (reminder text, routine name, chat name) and `status` a short
+        fixed line ("Finished", "Needs your approval"). With 'Show names in Windows notifications' on, the Windows toast is
+        titled with the subject and carries the status as its text - like Claude's own notifications. Names only, never mail or
+        document content. `record=False` shows a toast without adding a row to the notification list (chat answers)."""
+        from ..files.checks import clean_label
         level = self.settings.get("notifications.content_level")
         shown_body = None
         if level == "summary" and body and sensitivity < Sensitivity.CONFIDENTIAL:
             shown_body = body[:200]
-        nid = new_id("ntf")
-        self.db.insert("notifications", {"id": nid, "kind": kind, "title": title[:120], "body": shown_body,
-                                         "sensitivity": int(sensitivity), "screen": screen, "ref_id": ref_id,
-                                         "created_at": now_iso()})
+        subj = clean_label(subject or "")[:60]
+        stat = clean_label(status or "")[:100]
+        list_title = f"{title}: {subj}" if subj else title
+        if subj and self.settings.get("notifications.show_names"):
+            toast_title, toast_body = subj, " - ".join(x for x in (stat, shown_body if kind != "chat" else None) if x) or None
+        else:
+            toast_title, toast_body = title, shown_body
+        nid = None
+        if record:
+            nid = new_id("ntf")
+            self.db.insert("notifications", {"id": nid, "kind": kind, "title": list_title[:120], "body": shown_body,
+                                             "sensitivity": int(sensitivity), "screen": screen, "ref_id": ref_id,
+                                             "created_at": now_iso()})
         toast = bool(self.settings.get("notifications.toasts")) and not self._quiet()
         # screen/ref_id only open a screen in the app; links never carry parameters that change anything (39.2)
-        self.emit("notify", {"id": nid, "kind": kind, "title": title[:120], "body": shown_body, "screen": screen,
-                             "toast": toast, "private": sensitivity > Sensitivity.PUBLIC})
+        self.emit("notify", {"id": nid, "kind": kind, "title": list_title[:120], "body": shown_body, "screen": screen, "ref_id": ref_id if kind == "chat" else None,
+                             "toast": toast, "toast_title": toast_title[:120], "toast_body": (toast_body or "")[:300] or None,
+                             "private": sensitivity > Sensitivity.PUBLIC})
 
     def notifications(self, limit: int = 100) -> list[dict[str, Any]]:
         return self.db.all("SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?", (limit,))

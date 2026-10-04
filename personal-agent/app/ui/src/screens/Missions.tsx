@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { onEvent } from "../api/gateway";
 import { errText, useApp } from "../app";
 import { Icon } from "../components/Icon";
-import { Badge, Button, Card, ChipInput, Empty, Field, Modal, Tabs, Time } from "../components/ui";
+import { SchedulePicker } from "../components/SchedulePicker";
+import { Badge, Button, Card, ChipInput, Empty, Field, Modal, Notice, Tabs, Time, toneOf } from "../components/ui";
 
 const TONE: Record<string, string> = { ACTIVE: "ok", DRAFT: "accent", PAUSED: "warn", SUSPENDED: "warn", FAILED: "danger", COMPLETED: "info" };
 
 export function Missions() {
-  const { call, toast, route } = useApp();
+  const { call, toast, route, go, deferDelete, isHidden } = useApp();
   const [list, setList] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
   const [describe, setDescribe] = useState(false);
@@ -15,8 +16,8 @@ export function Missions() {
   const load = () => call<any[]>("missions.list").then(setList).catch(() => undefined);
   useEffect(() => { void load(); return onEvent((t) => t === "missions.changed" && void load()); /* eslint-disable-next-line */ }, []);
   useEffect(() => { if (route.params?.create) setDescribe(true); }, [route.params?.create]);
-  const act = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok, "ok"); void load(); } catch (e: any) { toast(errText(e), "danger"); } };
-  const shown = list.filter((m) => tab === "all" || m.kind === tab);
+  const act = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok, "ok"); void load(); } catch (e: any) { toast(errText(e), e?.code === "needs_setup" ? "warn" : "danger"); } };
+  const shown = list.filter((m) => !isHidden(`mission:${m.id}`) && (tab === "all" || m.kind === tab));
   return (
     <div className="page">
       <div className="page-header">
@@ -38,13 +39,14 @@ export function Missions() {
                 <span>Next run</span><span><Time iso={m.next_run_at} /></span>
                 <span>If missed</span><span>{m.missed_run_policy.replace("_", " ").toLowerCase()}</span>
               </div>
-              {m.warnings?.length > 0 && <div className="small faint" style={{ marginTop: 8 }}>{m.warnings.map((w: string) => <div key={w}>⚠ {w}</div>)}</div>}
+              {m.warnings?.length > 0 && <div className="col small" style={{ marginTop: 8, gap: 6 }}>{m.warnings.map((w: string) => (
+                <Notice key={w} text={w}>{/web|search provider/i.test(w) && <Button small tone={toneOf(w) === "error" ? "error" : "warn"} onClick={() => go("settings", { section: /provider|API key/i.test(w) ? "web" : "connectors" })}>Fix this</Button>}</Notice>))}</div>}
               <div className="row wrap" style={{ marginTop: 12 }}>
                 {m.status !== "ACTIVE" && <Button small kind="primary" icon="play" onClick={() => act(() => call("missions.activate", { mission_id: m.id }), "Activated")}>Activate</Button>}
                 {m.status === "ACTIVE" && <Button small icon="pause" onClick={() => act(() => call("missions.set_status", { mission_id: m.id, status: "PAUSED" }), "Paused")}>Pause</Button>}
                 <Button small icon="play" onClick={() => act(() => call("missions.run_now", { mission_id: m.id }), "Started - see Tasks")}>Run now</Button>
                 <Button small kind="ghost" icon="edit" onClick={() => setEdit({ ...m, schedule: m.schedule })}>Edit</Button>
-                <Button small kind="ghost" icon="trash" onClick={() => confirm("Cancel this mission?") && act(() => call("missions.set_status", { mission_id: m.id, status: "CANCELLED" }), "Cancelled")} />
+                <Button small kind="ghost" icon="trash" title="Cancel" onClick={() => deferDelete({ key: `mission:${m.id}`, label: `Cancelled "${m.name}"`, commit: () => call("missions.set_status", { mission_id: m.id, status: "CANCELLED" }), after: () => void load() })} />
               </div>
             </Card>
           ))}
@@ -69,12 +71,21 @@ function DescribeDialog({ onClose, onForm }: { onClose: () => void; onForm: (f: 
   );
 }
 
+const OUTPUT_FORMATS: [string, string][] = [["markdown", "Report (Markdown, headings and bullets)"], ["bullets", "Short bullet list"], ["digest", "Digest (headline + 3 bullets + sources)"],
+  ["detailed", "Detailed report with sources"], ["table", "Table"], ["email", "Email-style message"], ["plain", "Plain text"], ["json", "JSON (for other tools)"]];
+
 function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () => void; onSaved: () => void }) {
-  const { call, toast } = useApp();
+  const { call, toast, go } = useApp();
   const [m, setM] = useState<any>({ ...initial, schedule: typeof initial.schedule === "string" ? initial.schedule : initial.schedule?.cron ?? JSON.stringify(initial.schedule) });
   const [catalog, setCatalog] = useState<any[]>([]);
   const [preview, setPreview] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [web, setWeb] = useState<any>(null);
+  useEffect(() => { call<any>("connectors.list").then((r) => setWeb(r.connectors?.find((c: any) => c.id === "web") ?? null)).catch(() => undefined); }, [call]);
+  const tools: string[] = m.allowed_tools ?? [];
+  const webNeeded = web && tools.some((t) => t.startsWith("web.")) ? (!web.enabled || !web.use_missions
+    ? "Web tools are selected but the Web connector is turned off for missions (Settings > Connectors)."
+    : tools.includes("web.search") && !web.search_ready ? "Web search needs a search provider (Exa, Brave, Tavily or a SearXNG server) and its API key. Until that is set up this mission cannot search and will report an error each time it runs." : "") : "";
   useEffect(() => { call<any>("tools.catalog").then((c) => setCatalog(c.tools.filter((t: any) => t.enabled))).catch(() => undefined); }, [call]);
   useEffect(() => {
     if (!m.schedule) return;
@@ -102,9 +113,11 @@ function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () 
           <Field label="Type"><select className="input" value={m.kind ?? "routine"} onChange={(e) => set("kind", e.target.value)}>
             <option value="routine">Routine (simple recurring prompt)</option><option value="mission">Mission</option></select></Field>
           <Field label="What should it do?"><textarea className="input" rows={5} value={m.objective ?? ""} onChange={(e) => set("objective", e.target.value)} /></Field>
-          <Field label="When" help={preview?.schedule ? `Understood as ${JSON.stringify(preview.schedule)}${preview.next_run ? ` · next: ${new Date(preview.next_run).toLocaleString()}` : ""}` : "e.g. 'every weekday at 07:30', 'every 2 hours', 'when new mail arrives', or a cron expression"}>
-            <input className="input" value={m.schedule ?? ""} onChange={(e) => set("schedule", e.target.value)} />
-          </Field>
+          <SchedulePicker value={initial.schedule} onChange={(t) => set("schedule", t)} />
+          <div className="small muted" role="status">
+            {preview?.schedule ? <>Runs: <b>{preview.text ?? "as set"}</b>{preview.next_run ? <> · next: {new Date(preview.next_run).toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</> : null}</>
+              : m.schedule ? <span style={{ color: "var(--warn)" }}>Could not understand this schedule yet.</span> : null}
+          </div>
           {m.schedule_note && <div className="banner warn small">{m.schedule_note}</div>}
         </div>
         <div className="col">
@@ -123,7 +136,14 @@ function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () 
             <option value="RUN_ONCE">Run once when I'm back</option><option value="SKIP">Skip</option><option value="RUN_ALL">Run all missed (max 5)</option></select></Field>
           <Field label="Notify me"><select className="input" value={m.notification_level ?? "notify"} onChange={(e) => set("notification_level", e.target.value)}>
             <option value="notify">When finished</option><option value="silent">Silently (Home only)</option></select></Field>
-          <Field label="Output format"><input className="input" value={m.output_format ?? "markdown"} onChange={(e) => set("output_format", e.target.value)} /></Field>
+          <Field label="Output format" help="How the result should be written.">
+            <select className="input" value={m.output_format ?? "markdown"} onChange={(e) => set("output_format", e.target.value)}>
+              {OUTPUT_FORMATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select></Field>
+          {webNeeded && (
+            <div className="banner warn small" role="alert"><Icon name="alert" /><span className="grow">{webNeeded}</span>
+              <Button small tone="warn" onClick={() => go("settings", { section: "web" })}>Open Web Access</Button></div>
+          )}
           <div className="banner info small"><Icon name="info" />Runs while this PC is on and you're signed in to Windows (locked is fine).</div>
         </div>
       </div>

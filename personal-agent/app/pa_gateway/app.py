@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from pa_common.devmode import dev_mode
+from pa_common.winpaths import system32
 from pa_common.errors import AuthError, LockedError, PAError
 from pa_common.ids import new_id
 from pa_common.paths import DataPaths, looks_cloud_synced
@@ -27,6 +28,14 @@ from . import backup as backup_mod
 from .agentdata.history import HistoryService
 from .agentdata.home import HomeService
 from .agentdata.memory import MemoryService
+from .agentdata.email_skills import EmailSkills
+from .localfiles import LocalFiles
+from .vision import VisionReader
+from .agentdata.memory_learn import MemoryLearner
+from .files.insights import FileInsights
+from .agentdata.home_widgets import HomeWidgets
+from .netlog import NetLog
+from .sysmon import GpuMonitor
 from .agentdata.missions import MissionService
 from .agentdata.reminders import ReminderService
 from .agentdata.runs import RunService
@@ -58,7 +67,7 @@ from .settings import SettingsService
 from .tools.builtin import register_builtin_tools
 from .tools.gateway import ToolGateway
 from .vault import recovery
-from .vault.protector import ProtectorError, TpmLockedOut, default_protector
+from .vault.protector import ProtectorError, TpmLockedOut, default_protector, tpm_friendly_message
 from .vault.vault import HeaderTampered, UnlockedKeys, Vault, WrongPassword, WrongRecovery
 
 TICK_SECONDS = 15
@@ -124,11 +133,11 @@ class Gateway:
         if self.db is not None:
             self.home.event(kind, severity, title, detail, ref_id)
 
-    def notify(self, kind: str, title: str, body: str | None, sensitivity: int, screen: str | None, ref_id: str | None) -> None:
+    def notify(self, kind: str, title: str, body: str | None, sensitivity: int, screen: str | None, ref_id: str | None, **named: Any) -> None:
         if self.db is not None:
             if kind == "reminder":
                 sensitivity = 0  # reminders show the user's own words (still hidden on the lock screen)
-            self.home.notify(kind, title, body, sensitivity, screen, ref_id)
+            self.home.notify(kind, title, body, sensitivity, screen, ref_id, **named)
 
     # ================================================================== state
     @property
@@ -144,7 +153,7 @@ class Gateway:
             raise LockedError("signed out")
 
     def status(self) -> dict[str, Any]:
-        profile = self.vault.profile if self.vault.header.data else {"display_name": "", "assistant_name": "Personal Agent"}
+        profile = self.vault.profile if self.vault.header.data else {"display_name": "", "assistant_name": "ChiRAG Agent"}
         out: dict[str, Any] = {"state": self.session.state, "username": self.vault.username if self.vault.header.data else "",
                                "display_name": profile["display_name"], "assistant_name": profile["assistant_name"],
                                "dev_mode": dev_mode(), "password_wait": self.auth_state.password_wait_seconds(),
@@ -152,9 +161,11 @@ class Gateway:
         if self.db is not None and self.session.state == UNLOCKED:
             running = self.db.scalar("SELECT count(*) FROM tasks WHERE state IN ('RUNNING','WAITING_FOR_APPROVAL')") or 0
             out.update({"tasks_running": running, "approvals_pending": self.approvals.pending_count(),
+                        "proposals_pending": self.db.scalar("SELECT count(*) FROM missions WHERE status='DRAFT' AND proposed_by='agent'") or 0,
+                        "outlook_unseen": self.emailskills.unseen(),
                         "killswitch": self.killswitch.state(), "needs_pin_setup": self._needs_pin_setup(),
                         "unread_notifications": self.db.scalar("SELECT count(*) FROM notifications WHERE read=0") or 0,
-                        "ui": {k: self.settings.get(k) for k in ("ui.theme", "ui.text_scale", "ui.reduce_motion", "chat.show_steps",
+                        "ui": {k: self.settings.get(k) for k in ("ui.theme", "ui.background", "ui.accent", "ui.show_outlook_nav", "ui.show_gpu_meter", "ui.assistant_icon", "ui.user_icon", "ui.day_starts", "ui.night_starts", "ui.font", "ui.font_size", "memory.auto_learn", "home.widgets", "ui.text_scale", "ui.reduce_motion", "chat.show_steps",
                                                                  "voice.enabled", "security.auto_lock_minutes", "emergency.hotkey")}})
         return out
 
@@ -186,7 +197,7 @@ class Gateway:
             errs = passwords.validate_username(username) + passwords.validate_password(password, username, pin) + \
                 passwords.validate_pin(pin, allow_letters, password)
             display_name = display_name.strip() or username
-            assistant_name = assistant_name.strip() or "Personal Agent"
+            assistant_name = assistant_name.strip() or "ChiRAG Agent"
             errs += passwords.validate_profile_name(display_name, "Your name") + \
                 passwords.validate_profile_name(assistant_name, "Assistant name")
             if errs:
@@ -195,7 +206,11 @@ class Gateway:
                 protector = default_protector()
             except ProtectorError as e:
                 raise PAError(str(e), code="tpm_unavailable") from e
-            keys, rk = self.vault.create(username, password, pin, protector, display_name, assistant_name)
+            try:
+                keys, rk = self.vault.create(username, password, pin, protector, display_name, assistant_name)
+            except ProtectorError as e:
+                self.audit.write("setup.protector_failed", "authentication", severity="medium", error=type(e).__name__)
+                raise PAError(tpm_friendly_message(e), code="tpm_throttled" if "0x80290409" in str(e) else "tpm_unavailable") from e
             self.auth_state.data["rk_confirmed"] = False
             self.auth_state.data["pin_allow_letters"] = allow_letters
             self.auth_state.password_ok()
@@ -485,7 +500,16 @@ class Gateway:
         self.runtime = BuiltinRuntime(self)
         self.llm = LLMService(self)
         self.memory = MemoryService(self.db, self.audit, self.settings, embed=self._embed_safe)
+        self.netlog = NetLog(self)
+        self.gpu = GpuMonitor()
+        self.vision = VisionReader(self)
+        self.memory_learner = MemoryLearner(self)
+        self.insights = FileInsights(self)
+        self.widgets = HomeWidgets(self)
+        self.web_grants: dict[str, str] = {}      # chat id -> app session in which the user allowed web access for that chat
+        self.localfiles = LocalFiles(self)
         self.missions = MissionService(self)
+        self.emailskills = EmailSkills(self)
         self.reminders = ReminderService(self)
         self.skills = SkillService(self)
         self.sandbox = SandboxService(self)
@@ -751,7 +775,16 @@ class CoreSupervisor:
             backoff = min(backoff * 2, 60)
 
     def _spawn_and_wait(self) -> None:
+        from .posture import require_firewall_rules
         from .workers import scrubbed_env, worker_command
+        try:
+            require_firewall_rules()
+        except PAError as e:
+            self.gw.audit.write("core.start_blocked", "security", reason="firewall_rules_missing", severity="high")
+            self.gw.home_event("firewall_missing", "high", "The agent cannot start: firewall rules are missing",
+                               "Open Settings > Security Posture and choose Repair.")
+            self._stop.wait(30)
+            raise e
         server = self.gw.pipe_server
         assert server is not None
         self.proc = subprocess.Popen(worker_command("pa_core"), stdin=subprocess.PIPE, env=scrubbed_env(),
@@ -785,7 +818,7 @@ def secure_data_folder(root: Path) -> None:
     user = os.environ.get("USERNAME", "")
     domain = os.environ.get("USERDOMAIN", "")
     who = f"{domain}\\{user}" if domain else user
-    subprocess.run(["icacls", str(root), "/inheritance:r", "/grant:r", f"{who}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "/Q"],
+    subprocess.run([system32("icacls.exe"), str(root), "/inheritance:r", "/grant:r", f"{who}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "/Q"],
                    capture_output=True, check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
