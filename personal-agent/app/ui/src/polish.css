@@ -285,3 +285,16 @@ h2, h3, .card-title { letter-spacing: var(--tr-title); line-height: var(--lh-tit
 .panel-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
 .panel-row .small { overflow-wrap: anywhere; }
 @media (max-width: 900px) { .home-body { flex-direction: column; } .widget-panel { width: 100%; position: static; max-height: none; } }
+
+/* Resource meters (Settings > Diagnostics & About): red at >= 90 %, orange at >= 75 % */
+.res-track { position: relative; height: 8px; border-radius: 999px; background: var(--surface-2, color-mix(in srgb, var(--text) 10%, transparent)); overflow: hidden; margin: 4px 0 3px; }
+.res-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--ok); opacity: .55; transition: width .4s ease; }
+.res-app { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+.res-fill.lvl-warn { background: var(--warn); opacity: .7; }
+.res-fill.lvl-critical { background: var(--danger-solid); opacity: 1; }
+.res-pct.lvl-warn { color: var(--warn); font-weight: 700; }
+.res-pct.lvl-critical { color: var(--danger); font-weight: 800; }
+.res-meter.lvl-critical { border-left: 3px solid var(--danger-solid); padding-left: 8px; }
+@media (prefers-reduced-motion: reduce) { .res-fill { transition: none; } }
+:root[data-motion="reduce"] .res-fill { transition: none; }
+.link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }

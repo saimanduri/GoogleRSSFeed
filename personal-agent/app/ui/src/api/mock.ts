@@ -1,5 +1,6 @@
 // Browser-preview mock of pa-gateway. Used ONLY when the UI runs outside the Tauri app (npm run dev),
 // so the interface can be designed and tested on any OS. It is never bundled into security decisions.
+import schemaJson from "./settings_schema.json";
 type Listener = (topic: string, data: any) => void;
 let emit: Listener = () => {};
 export function mockListen(fn: Listener) {
@@ -36,25 +37,8 @@ const S: any = {
   ],
 };
 
-const SCHEMA = {
-  groups: [
-    ["account", "Account & Security"], ["connectors", "Connectors"], ["model", "AI Model"], ["autonomy", "Autonomy & Budgets"],
-    ["rules", "Rules & Safety"], ["approvals", "Approvals"], ["tools", "Tools & Skills"], ["web", "Web Access"], ["files", "Files & Storage"],
-    ["memory", "Memory"], ["notifications", "Notifications"], ["logs", "Logs & SIEM"], ["backup", "Backup & Restore"],
-    ["emergency", "Emergency Stop"], ["updates", "Updates"], ["privacy", "Privacy & Data"], ["diagnostics", "Diagnostics & About"], ["ui", "Appearance & Voice"], ["emailmon", "Email monitoring"],
-  ].map(([id, label]) => ({ id, label })),
-  settings: [
-    { key: "security.auto_lock_minutes", group: "account", label: "Auto-lock after idle (minutes)", type: "int", default: 10, value: 10, min: 1, max: 60, options: [], help: "Auto-lock cannot be switched off.", risk: "A longer timeout leaves the app open for longer.", loosen: "up", stepup: false, floor: false },
-    { key: "security.lock_on_windows_lock", group: "account", label: "Lock when Windows locks", type: "bool", default: true, value: true, options: [], help: "", risk: "", loosen: "false", stepup: false, floor: false },
-    { key: "web.fetch_any_site", group: "web", label: "Fetch any site", type: "bool", default: false, value: false, options: [], help: "", risk: "The agent may fetch any public website.", loosen: "true", stepup: false, floor: false },
-    { key: "web.allowlist", group: "web", label: "Allowed domains", type: "list", default: [], value: ["wikipedia.org", "github.com"], options: [], help: "", risk: "", loosen: "list_add", stepup: false, floor: false },
-    { key: "autonomy.profile", group: "autonomy", label: "Autonomy profile", type: "enum", default: "cautious", value: "cautious", options: ["cautious", "balanced"], help: "", risk: "", loosen: ["cautious", "balanced"], stepup: false, floor: false },
-    { key: "budget.task.tool_calls", group: "autonomy", label: "Per task: max tool calls", type: "int", default: 100, value: 100, min: 1, max: 2000, options: [], help: "", risk: "", loosen: "up", stepup: false, floor: false },
-    { key: "notifications.show_names", group: "notifications", label: "Show names in Windows notifications", type: "bool", default: true, value: true, options: [], help: "The notification title is the name of the reminder, routine or chat it is about.", risk: "Names can be read on screen.", loosen: "true", stepup: false, floor: false },
-    { key: "notifications.content_level", group: "notifications", label: "Notification content", type: "enum", default: "notify", value: "notify", options: ["notify", "summary"], help: "", risk: "", loosen: ["notify", "summary"], stepup: false, floor: false },
-    { key: "ui.theme", group: "ui", label: "Theme", type: "enum", default: "system", value: "system", options: ["system", "time_of_day", "light", "dark", "aurora", "ocean", "forest", "sunset"], help: "", risk: "", loosen: null, stepup: false, floor: false },
-  ],
-};
+// generated from pa_gateway/settings_schema.py by scripts/gen_mock_schema.py (a test keeps it current)
+const SCHEMA: { groups: any[]; settings: any[] } = schemaJson as any;
 
 function status() {
   const base: any = { state: S.state, username: S.username, display_name: S.display_name || S.username, assistant_name: S.assistant_name, dev_mode: true, password_wait: 0, pin_available: S.state === "UI_LOCKED", recovery_wait: 0 };
@@ -310,7 +294,17 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "skills.list": return [];
     case "backup.status": return { folder: "", last: null, files: [], scheduled_enabled: false, warn: true };
     case "privacy.data_map": return [];
-    case "diagnostics.health": return { gateway: { ok: true, uptime_s: 100 }, core: { ok: true }, model: {}, sandbox: { strength: "UNAVAILABLE" }, metrics: {} };
+    case "diagnostics.resources": {
+      const j = (b: number) => Math.max(0, Math.min(100, b + (Math.random() - 0.5) * 6));
+      const lv = (x: number) => (x >= 90 ? "critical" : x >= 75 ? "warn" : "ok");
+      const cpu = j(34), mem = j(92), gpu = j(61), disk = 71;
+      return { red_at: 90, orange_at: 75, processes: [{ name: "pa-gateway.exe", pid: 4120, memory_mb: 182 }, { name: "pa-core.exe", pid: 4188, memory_mb: 96 }, { name: "pa-ui.exe", pid: 3904, memory_mb: 141 }],
+        meters: [{ label: "CPU", pct: cpu, app_pct: 3.1, detail: "16 logical processors", app_detail: "this app", level: lv(cpu) },
+          { label: "Memory", pct: mem, app_pct: 1.3, detail: "29.4 of 31.7 GB used", app_detail: "this app 419 MB", level: lv(mem) },
+          { label: "GPU", pct: gpu, app_pct: null, detail: "whole PC · 9120 MB video memory in use", app_detail: "", level: lv(gpu) },
+          { label: "Storage", pct: disk, app_pct: 0.2, detail: "268.1 GB free of 931 GB on the data drive", app_detail: "app data 1840 MB", level: lv(disk) }] };
+    }
+    case "diagnostics.health": return { gateway: { ok: true, uptime_s: 100 }, core: { ok: true }, model: {}, sandbox: { strength: "UNAVAILABLE" }, metrics: { tasks: { COMPLETED: 12, FAILED: 1 }, approvals: { PENDING: 1, APPROVED: 7 } } };
     case "about": return { name: "Personal Agent - Desktop Edition", version: "0.1.1", build: "mock", licences: [] };
     case "updates.status": return { current: "0.1.0", auto_check: true, available: null, note: "mock" };
     case "account.signin_history": return [];

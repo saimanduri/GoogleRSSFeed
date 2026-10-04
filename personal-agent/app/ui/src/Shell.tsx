@@ -1,3 +1,4 @@
+import { APP_LOGO } from "./brand";
 import { useEffect, useMemo, useState } from "react";
 import { native } from "./api/gateway";
 import { Screen, useApp } from "./app";
@@ -93,7 +94,7 @@ export function Shell() {
     <div className={`shell ${collapsed ? "collapsed" : ""}`}>
       <header className="topbar">
         <Button kind="ghost" icon="menu" title="Collapse navigation" onClick={() => setCollapsed(!collapsed)} />
-        <div className="brand"><div className="brand-logo logo-img"><img src={status?.ui?.["ui.assistant_icon"] || "/chirag-logo.png"} alt="" /></div><span className="ellipsis">{status?.assistant_name ?? "ChiRAG Agent"}</span></div>
+        <div className="brand"><div className="brand-logo logo-img"><img src={status?.ui?.["ui.assistant_icon"] || APP_LOGO} alt="" onError={(e) => { if (!e.currentTarget.src.endsWith(APP_LOGO)) e.currentTarget.src = APP_LOGO; }} /></div><span className="ellipsis">{status?.assistant_name ?? "ChiRAG Agent"}</span></div>
         {here && <nav className="crumbs" aria-label="You are here"><span className="sep" aria-hidden="true">/</span><span className="here" aria-current="page">{here}</span></nav>}
         {status?.dev_mode && <span className="badge warn" title="Developer mode - never use with real data">DEV MODE</span>}
         <div className="spacer" />

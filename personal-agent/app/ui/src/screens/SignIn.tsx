@@ -1,4 +1,5 @@
 // Cold start (password), quick unlock (PIN), forgot password (PIN + recovery key) - spec 4.5/4.6.
+import { APP_LOGO } from "../brand";
 import { useEffect, useState } from "react";
 import { pickFile, rpc } from "../api/gateway";
 import { errText, useApp } from "../app";
@@ -53,7 +54,7 @@ export function SignIn() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="row" style={{ marginBottom: 18 }}>
-          <div className="brand-logo logo-img" style={{ width: 52, height: 52, borderRadius: 14 }}><img src="/chirag-logo.png" alt="" /></div>
+          <div className="brand-logo logo-img" style={{ width: 52, height: 52, borderRadius: 14 }}><img src={APP_LOGO} alt="" /></div>
           <div><h1 style={{ margin: 0 }}>{locked ? `${status.assistant_name ?? "ChiRAG Agent"} is locked` : `Welcome back${status.display_name ? ", " + status.display_name : ""}`}</h1>
             <div className="muted small">{locked ? "It keeps working in the background." : `Sign in to unlock ${status.assistant_name ?? "your assistant"}.`}</div></div>
         </div>

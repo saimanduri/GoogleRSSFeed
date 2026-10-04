@@ -2536,6 +2536,17 @@
    }
   },
   {
+   "id": "diagnostics.resources",
+   "ui": "Settings > Diagnostics & About > Resource use",
+   "call": "diagnostics.resources",
+   "expect": {
+    "has": [
+     "meters",
+     "red_at"
+    ]
+   }
+  },
+  {
    "id": "diagnostics.bundle",
    "ui": "Diagnostics > Export bundle (no secrets)",
    "call": "diagnostics.bundle",

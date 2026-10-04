@@ -1,6 +1,6 @@
 # Action catalogue (generated - do not edit; run `python scripts/gen_action_catalog.py`)
 
-159 backend actions (RPC methods): **148 covered by automated scenarios**, 11 manual-only (reason given), **0 gaps**. UI calls to unknown RPCs: none.
+160 backend actions (RPC methods): **149 covered by automated scenarios**, 11 manual-only (reason given), **0 gaps**. UI calls to unknown RPCs: none.
 
 Columns: state = required session state, step-up = re-auth category, UI = where the UI calls it, Scenarios = ids in tests/e2e/scenarios.json.
 
@@ -17,18 +17,18 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `activity.what_did_agent_do` | unlocked | - | since*, until* | screens/Activity.tsx:146 | activity.what_did_agent_do |
 | `approvals.decide` | unlocked | - | approval_id*, approve, edited_payload*, payload_hash*, opened_at_ms | components/ApprovalCard.tsx:23 | approvals.bad_hash, approvals.approve, approvals.single_use |
 | `approvals.list` | unlocked | - | status | screens/Approvals.tsx:13 | approvals.pending, approvals.history |
-| `auth.forgot_password` | any | - | pin*, recovery_key*, new_password* | screens/SignIn.tsx:104 | auth.forgot_password |
-| `auth.lock` | any | - | reason | screens/Chat.tsx:213, Shell.tsx:41, Shell.tsx:104 … | auth.lock |
-| `auth.quick_unlock` | any | - | pin* | screens/SignIn.tsx:33 | auth.quick_unlock |
-| `auth.sign_in` | any | - | username*, password* | screens/SignIn.tsx:34 | auth.sign_in_wrong, auth.sign_in, auth.sign_in_after_reset |
+| `auth.forgot_password` | any | - | pin*, recovery_key*, new_password* | screens/SignIn.tsx:105 | auth.forgot_password |
+| `auth.lock` | any | - | reason | screens/Chat.tsx:213, Shell.tsx:42, Shell.tsx:105 … | auth.lock |
+| `auth.quick_unlock` | any | - | pin* | screens/SignIn.tsx:34 | auth.quick_unlock |
+| `auth.sign_in` | any | - | username*, password* | screens/SignIn.tsx:35 | auth.sign_in_wrong, auth.sign_in, auth.sign_in_after_reset |
 | `auth.sign_out` | any | - | reason | - | auth.sign_out |
-| `auth.step_up` | unlocked | - | category*, method*, secret* | app.tsx:228, screens/Onboarding.tsx:298 | auth.stepup_password, auth.stepup_pin |
-| `backup.enable_schedule` | unlocked | - | password* | screens/Onboarding.tsx:300, screens/settings/Misc.tsx:23 | backup.enable_schedule |
-| `backup.restore` | unlocked | backup_restore | path*, password* | screens/settings/Misc.tsx:29, screens/settings/Misc.tsx:33 | manual: destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1 |
-| `backup.restore_signed_out` | any | - | path*, password* | screens/SignIn.tsx:146 | manual: needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1 |
-| `backup.run_now` | unlocked | - | folder, password* | screens/settings/Misc.tsx:22 | backup.run_now, backup.wrong_password |
-| `backup.status` | unlocked | - | - | screens/settings/Misc.tsx:10 | backup.status |
-| `backup.verify` | unlocked | - | path*, password* | screens/settings/Misc.tsx:28 | backup.verify |
+| `auth.step_up` | unlocked | - | category*, method*, secret* | app.tsx:228, screens/Onboarding.tsx:299 | auth.stepup_password, auth.stepup_pin |
+| `backup.enable_schedule` | unlocked | - | password* | screens/Onboarding.tsx:301, screens/settings/Misc.tsx:25 | backup.enable_schedule |
+| `backup.restore` | unlocked | backup_restore | path*, password* | screens/settings/Misc.tsx:31, screens/settings/Misc.tsx:35 | manual: destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1 |
+| `backup.restore_signed_out` | any | - | path*, password* | screens/SignIn.tsx:147 | manual: needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1 |
+| `backup.run_now` | unlocked | - | folder, password* | screens/settings/Misc.tsx:24 | backup.run_now, backup.wrong_password |
+| `backup.status` | unlocked | - | - | screens/settings/Misc.tsx:12 | backup.status |
+| `backup.verify` | unlocked | - | path*, password* | screens/settings/Misc.tsx:30 | backup.verify |
 | `chat.create` | unlocked | - | title, allow_tools | screens/Chat.tsx:137, screens/Chat.tsx:233 | chat.create, approvals.create_via_chat |
 | `chat.delete` | unlocked | - | chat_id* | screens/Chat.tsx:310 | chat.delete |
 | `chat.get` | unlocked | - | chat_id* | screens/Chat.tsx:79 | chat.reply_arrives, chat.canary_never_returned |
@@ -36,12 +36,13 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `chat.send` | unlocked | - | chat_id*, text*, voice | screens/Chat.tsx:238 | chat.send, approvals.ask, killswitch.chat_blocked |
 | `chat.update` | unlocked | - | chat_id*, title, allow_tools, archived, pinned, folder | screens/Chat.tsx:83, screens/Chat.tsx:215, screens/Chat.tsx:277 … | chat.update, chat.update_bad_folder, chat.archive |
 | `connectors.disconnect` | unlocked | connectors | connector*, delete_data | screens/settings/ConnectorSettings.tsx:35 | connectors.disconnect_web |
-| `connectors.list` | unlocked | - | - | screens/Missions.tsx:84, screens/Onboarding.tsx:242, screens/settings/ConnectorSettings.tsx:9 | connectors.list |
+| `connectors.list` | unlocked | - | - | screens/Missions.tsx:84, screens/Onboarding.tsx:243, screens/settings/ConnectorSettings.tsx:9 | connectors.list |
 | `connectors.m365_sign_in` | unlocked | connectors | custom_scheme | - | manual: opens the browser and needs a Microsoft tenant: checklist D4 |
 | `connectors.pause_all` | unlocked | - | paused | screens/settings/ConnectorSettings.tsx:17 | connectors.pause_all, connectors.resume_all |
-| `connectors.set` | unlocked | - | connector* | screens/Onboarding.tsx:252, screens/settings/ConnectorSettings.tsx:11 | connectors.enable_web, connectors.disable_web |
-| `diagnostics.bundle` | unlocked | - | path | screens/settings/Misc.tsx:97, screens/settings/Misc.tsx:101 | diagnostics.bundle |
-| `diagnostics.health` | unlocked | - | - | screens/settings/Misc.tsx:85 | diagnostics.health |
+| `connectors.set` | unlocked | - | connector* | screens/Onboarding.tsx:253, screens/settings/ConnectorSettings.tsx:11 | connectors.enable_web, connectors.disable_web |
+| `diagnostics.bundle` | unlocked | - | path | screens/settings/Misc.tsx:106, screens/settings/Misc.tsx:110 | diagnostics.bundle |
+| `diagnostics.health` | unlocked | - | - | screens/settings/Misc.tsx:93 | diagnostics.health |
+| `diagnostics.resources` | unlocked | - | - | components/ResourceMeters.tsx:14 | diagnostics.resources |
 | `emailskills.list` | unlocked | - | mark_seen | components/EmailSkillList.tsx:18 | emailskills.list |
 | `emailskills.run` | unlocked | - | skill* | components/EmailSkillList.tsx:46 | emailskills.run_needs_setup |
 | `emailskills.set` | unlocked | - | skill*, enabled | components/EmailSkillList.tsx:41, screens/settings/EmailMonitoring.tsx:21 | emailskills.set_needs_setup, emailskills.set_off |
@@ -56,13 +57,13 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `files.set_label` | unlocked | - | file_id*, level* | screens/Files.tsx:102 | files.label |
 | `files.update` | unlocked | - | file_id*, folder, tags*, in_knowledge, name | screens/Files.tsx:105, screens/Files.tsx:107, screens/Files.tsx:109 | files.update |
 | `files.upload` | unlocked | - | path, name*, sensitivity, folder, tags* | screens/Chat.tsx:184, screens/Files.tsx:22, screens/Files.tsx:33 | files.upload, files.missing_upload |
-| `history.search` | unlocked | - | query*, limit, kinds* | screens/Activity.tsx:163, screens/History.tsx:41, Shell.tsx:168 | history.search |
+| `history.search` | unlocked | - | query*, limit, kinds* | screens/Activity.tsx:163, screens/History.tsx:41, Shell.tsx:169 | history.search |
 | `home.dismiss` | unlocked | - | id* | screens/Home.tsx:75 | home.dismiss |
 | `home.summary` | unlocked | - | since | components/UsageMeter.tsx:9, screens/Activity.tsx:14, screens/Home.tsx:88 | home.summary |
 | `home.widgets` | unlocked | - | refresh | screens/Home.tsx:87 | home.widgets |
 | `home.widgets_set` | unlocked | - | enabled* | screens/Home.tsx:97 | home.widgets_set |
-| `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:46, screens/SignIn.tsx:78, Shell.tsx:62 | killswitch.activate, killswitch.partial, killswitch.bad_level |
-| `killswitch.release` | unlocked | - | level | screens/settings/Misc.tsx:47 | killswitch.release_needs_password, killswitch.release, killswitch.partial_release |
+| `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:48, screens/SignIn.tsx:79, Shell.tsx:63 | killswitch.activate, killswitch.partial, killswitch.bad_level |
+| `killswitch.release` | unlocked | - | level | screens/settings/Misc.tsx:49 | killswitch.release_needs_password, killswitch.release, killswitch.partial_release |
 | `killswitch.state` | unlocked | - | - | - | killswitch.state |
 | `llm.add` | unlocked | - | model*, make_default, auto_test | screens/settings/ModelSettings.tsx:118 | llm.add_mock, llm.add_second, llm.remote_needs_password |
 | `llm.complete` | keys | - | task_id*, messages*, role, json_mode, action_schema, max_tokens, stream, purpose | - | manual: core-role RPC (pa-core only): exercised by every chat.send; UI role is refused (tests/integration/test_agent_security.py) |
@@ -81,11 +82,11 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `localfiles.reapprove` | unlocked | - | grant_id*, include_subfolders, confirm_subfolders | components/LocalShare.tsx:21, components/LocalShare.tsx:54 | localfiles.reapprove |
 | `localfiles.requests` | unlocked | - | chat_id* | components/LocalShare.tsx:78 | localfiles.requests |
 | `localfiles.revoke` | unlocked | - | grant_id* | components/LocalShare.tsx:66 | localfiles.revoke |
-| `logs.export` | unlocked | export | path* | screens/settings/Misc.tsx:121 | logs.export |
+| `logs.export` | unlocked | export | path* | screens/settings/Misc.tsx:130 | logs.export |
 | `logs.rotate` | unlocked | - | - | - | logs.rotate |
-| `logs.siem_test` | unlocked | security_settings | - | screens/settings/Misc.tsx:122 | logs.siem_not_configured |
-| `logs.status` | unlocked | - | - | screens/settings/Misc.tsx:117 | logs.status |
-| `logs.verify` | unlocked | - | - | screens/Activity.tsx:119, screens/settings/Misc.tsx:120 | logs.verify, logs.verify_after_rotate |
+| `logs.siem_test` | unlocked | security_settings | - | screens/settings/Misc.tsx:131 | logs.siem_not_configured |
+| `logs.status` | unlocked | - | - | screens/settings/Misc.tsx:126 | logs.status |
+| `logs.verify` | unlocked | - | - | screens/Activity.tsx:119, screens/settings/Misc.tsx:129 | logs.verify, logs.verify_after_rotate |
 | `memory.about_me` | unlocked | - | - | screens/Memory.tsx:20 | memory.about_me |
 | `memory.action` | unlocked | - | id*, action*, content | screens/Home.tsx:61, screens/Memory.tsx:25, screens/Memory.tsx:34 | memory.edit, memory.disable, memory.enable, memory.bad_action … |
 | `memory.add` | unlocked | - | content*, type | screens/Memory.tsx:44, screens/Memory.tsx:45 | memory.add |
@@ -105,9 +106,9 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `notifications.mark_read` | unlocked | - | id | - | notifications.mark_read |
 | `posture.fix` | unlocked | security_settings | action* | screens/settings/AccountSettings.tsx:89 | posture.fix_unknown, posture.fix_verify_log |
 | `posture.run` | unlocked | - | - | screens/settings/AccountSettings.tsx:79 | posture.run |
-| `privacy.data_map` | unlocked | - | - | screens/settings/Misc.tsx:60 | privacy.data_map |
-| `privacy.delete_everything` | unlocked | - | password*, confirmation* | screens/settings/Misc.tsx:73 | privacy.delete_wrong_confirm, privacy.delete_everything |
-| `privacy.export` | unlocked | export | password*, folder* | screens/settings/Misc.tsx:68 | privacy.export |
+| `privacy.data_map` | unlocked | - | - | screens/settings/Misc.tsx:62 | privacy.data_map |
+| `privacy.delete_everything` | unlocked | - | password*, confirmation* | screens/settings/Misc.tsx:75 | privacy.delete_wrong_confirm, privacy.delete_everything |
+| `privacy.export` | unlocked | export | password*, folder* | screens/settings/Misc.tsx:70 | privacy.export |
 | `reminders.action` | unlocked | - | id*, action*, minutes | screens/Reminders.tsx:14 | reminders.snooze, reminders.cancel, reminders.bad_action |
 | `reminders.create` | unlocked | - | text*, due_at*, timezone | screens/Reminders.tsx:24 | reminders.create |
 | `reminders.list` | unlocked | - | include_done | screens/Reminders.tsx:12 | reminders.list, reminders.show_done |
@@ -137,19 +138,19 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `settings.begin_loosen` | unlocked | - | changes* | components/LoosenDialog.tsx:14 | settings.begin_loosen |
 | `settings.classify` | unlocked | - | changes* | screens/settings/GenericGroup.tsx:16 | settings.classify_tighten |
 | `settings.describe` | unlocked | - | - | screens/settings/Settings.tsx:20 | settings.describe |
-| `settings.history` | unlocked | - | - | screens/settings/Misc.tsx:176 | settings.history |
-| `settings.profile_preview` | unlocked | - | profile* | screens/Onboarding.tsx:265 | settings.profile_preview |
-| `settings.rules_plain` | unlocked | - | - | screens/settings/Misc.tsx:176 | settings.rules_plain |
-| `setup.check_password` | any | - | password*, username | screens/Onboarding.tsx:35, screens/SignIn.tsx:98 | setup.weak_password, setup.strong_password |
-| `setup.check_pin` | any | - | pin*, allow_letters, password | screens/Onboarding.tsx:40 | setup.trivial_pin, setup.good_pin |
-| `setup.confirm_recovery` | unlocked | - | answers* | screens/Onboarding.tsx:210 | setup.confirm_wrong, setup.confirm_recovery |
-| `setup.create` | any | - | username*, password*, pin*, allow_letters, display_name, assistant_name | screens/Onboarding.tsx:48 | setup.create |
-| `setup.preflight` | any | - | - | screens/Onboarding.tsx:32 | setup.preflight |
-| `setup.recovery_pdf` | unlocked | - | path* | screens/Onboarding.tsx:205 | setup.recovery_pdf |
-| `skills.activate` | unlocked | skills | skill_id* | screens/settings/Misc.tsx:160 | skills.activate |
-| `skills.import` | unlocked | - | path* | screens/settings/Misc.tsx:146 | skills.import |
-| `skills.list` | unlocked | - | - | screens/settings/Misc.tsx:135 | skills.list |
-| `skills.set_status` | unlocked | - | skill_id*, status* | screens/settings/Misc.tsx:158, screens/settings/Misc.tsx:159 | skills.disable |
+| `settings.history` | unlocked | - | - | screens/settings/Misc.tsx:186 | settings.history |
+| `settings.profile_preview` | unlocked | - | profile* | screens/Onboarding.tsx:266 | settings.profile_preview |
+| `settings.rules_plain` | unlocked | - | - | screens/settings/Misc.tsx:187 | settings.rules_plain |
+| `setup.check_password` | any | - | password*, username | screens/Onboarding.tsx:36, screens/SignIn.tsx:99 | setup.weak_password, setup.strong_password |
+| `setup.check_pin` | any | - | pin*, allow_letters, password | screens/Onboarding.tsx:41 | setup.trivial_pin, setup.good_pin |
+| `setup.confirm_recovery` | unlocked | - | answers* | screens/Onboarding.tsx:211 | setup.confirm_wrong, setup.confirm_recovery |
+| `setup.create` | any | - | username*, password*, pin*, allow_letters, display_name, assistant_name | screens/Onboarding.tsx:49 | setup.create |
+| `setup.preflight` | any | - | - | screens/Onboarding.tsx:33 | setup.preflight |
+| `setup.recovery_pdf` | unlocked | - | path* | screens/Onboarding.tsx:206 | setup.recovery_pdf |
+| `skills.activate` | unlocked | skills | skill_id* | screens/settings/Misc.tsx:169 | skills.activate |
+| `skills.import` | unlocked | - | path* | screens/settings/Misc.tsx:155 | skills.import |
+| `skills.list` | unlocked | - | - | screens/settings/Misc.tsx:144 | skills.list |
+| `skills.set_status` | unlocked | - | skill_id*, status* | screens/settings/Misc.tsx:167, screens/settings/Misc.tsx:168 | skills.disable |
 | `system.usage` | unlocked | - | - | components/GpuMeter.tsx:25 | system.usage |
 | `task.context` | keys | - | task_id* | - | manual: core-role RPC: pa-core reads it at task start (chat.send) |
 | `task.finish` | keys | - | task_id*, status*, result, reason | - | manual: core-role RPC: pa-core ends each task (chat.send) |
@@ -158,10 +159,10 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `tasks.list` | unlocked | - | states*, limit | screens/Tasks.tsx:14 | tasks.list |
 | `tasks.resume` | unlocked | - | task_id* | screens/Tasks.tsx:30 | tasks.resume_invalid |
 | `tasks.stop` | unlocked | - | task_id* | screens/Tasks.tsx:29 | tasks.stop |
-| `tools.catalog` | unlocked | - | - | screens/Missions.tsx:89, screens/settings/Misc.tsx:135 | tools.catalog |
+| `tools.catalog` | unlocked | - | - | screens/Missions.tsx:89, screens/settings/Misc.tsx:144 | tools.catalog |
 | `tools.invoke` | keys | - | task_id*, tool*, args* | - | manual: core-role RPC: the only way tools run; policy/red-team tests: tests/unit/test_policy.py, tests/redteam |
 | `ui.open_link` | any | - | url* | - | ui.open_link_screen, ui.open_link_cannot_change_settings, ui.open_link_unknown |
-| `updates.status` | unlocked | - | - | screens/settings/Misc.tsx:110 | updates.status |
+| `updates.status` | unlocked | - | - | screens/settings/Misc.tsx:119 | updates.status |
 | `voice.transcribe` | unlocked | - | mime | components/VoiceButton.tsx:48 | voice.no_stt |
 | `web.test_search` | unlocked | - | - | screens/settings/ConnectorSettings.tsx:41 | web.test_search_not_set_up |
 | `work.next` | keys | - | wait | - | manual: core-role RPC: pa-core long-poll for tasks (chat.send) |

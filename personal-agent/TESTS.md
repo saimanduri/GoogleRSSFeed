@@ -218,3 +218,8 @@ UI behaviour checked in the browser preview (`/?demo`) with scripted DOM checks;
 NOT yet verified in the real window (needs the new bundle installed): H11-H16 above. Never test against the real TPM (CLAUDE.md).
 
 - [ ] H20 Exa web search: Secrets > Add (type API key, value = your Exa key, Used by: web.search) > Settings > Web Access > Search provider exa (password) > Settings > Connectors > Web on > Test web search shows "works"; then ask in chat "search the web for ...".
+
+### 0.1.14 - pending on the laptop (real window; built in the cloud, checked in the browser preview + Windows CI only)
+- [ ] H40 App logo: the top-left logo in the window, the title bar icon (top-left of the window frame) and the taskbar all show the new ChiRAG icon. If the top bar still shows an old picture: Settings > Appearance & Voice > Assistant icon > Remove (a custom picture you uploaded replaces the logo).
+- [ ] H41 Settings > Rules & Safety: four headed sections (What new data counts as / Sending data to the internet / Text that must never leave this PC / Routines started by new mail); choices read "Allowed / Ask me first / Never"; change one, see it in Change history with readable names, press Revert.
+- [ ] H42 Settings > Diagnostics & About > Resource use: CPU, Memory, GPU, Storage bars move every 3 s; the darker part is this app; open a heavy program and see a bar turn orange (75 %) / red (90 %); "Show this app's processes" lists pa-gateway, pa-core, pa-ui (and workers when running).

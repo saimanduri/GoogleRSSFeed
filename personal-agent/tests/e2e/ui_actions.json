@@ -681,14 +681,15 @@
   },
   {
    "screen": "Settings > Diagnostics & About",
-   "find": "health, 'Preview' / export bundle",
+   "find": "Resource use (CPU / Memory / GPU / Storage meters), health, 'Preview' / export bundle",
    "rpc": [
+    "diagnostics.resources",
     "diagnostics.health",
     "diagnostics.bundle",
     "about"
    ],
    "scenario": "diagnostics.* / meta.about",
-   "expect_ui": "health cards; bundle contains no secrets"
+   "expect_ui": "meters refresh every 3 s; a value of 90 % or more is red, 75 % or more orange; health cards; bundle contains no secrets"
   },
   {
    "screen": "Settings > Appearance & Voice",

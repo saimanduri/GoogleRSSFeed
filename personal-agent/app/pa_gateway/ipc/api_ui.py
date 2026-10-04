@@ -1320,6 +1320,12 @@ def diagnostics_health(gw, p: P, c: ClientInfo) -> Any:
     }
 
 
+@rpc("diagnostics.resources")
+def diagnostics_resources(gw, p: P, c: ClientInfo) -> Any:
+    """CPU / memory / GPU / storage of this app and the whole PC; 'critical' at 90 % or more (shown in red)."""
+    return gw.resources.snapshot()
+
+
 @rpc("diagnostics.bundle")
 def diagnostics_bundle(gw, p: P, c: ClientInfo) -> Any:
     """Metadata only (no content, no secrets). Preview first; saving writes the same JSON."""
