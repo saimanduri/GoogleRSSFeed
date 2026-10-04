@@ -89,9 +89,10 @@ def register_builtin_tools(gw) -> None:
                           trust=Trust.TRUSTED)
 
     def missions_propose(a: dict[str, Any], c: ExecContext) -> ToolResult:
-        mid = gw.missions.create({"name": a["name"], "objective": a["objective"], "schedule": a["schedule"],
-                                  "allowed_tools": a["tools"], "kind": "routine"}, proposed_by="agent")
-        gw.home_event("mission_proposed", "warn", f"Routine proposed: {a['name']}", "Waiting for you in Approvals > Proposed routines.", mid)
+        with gw.db.tx():                       # the proposal and its Home notice appear together (never a count without the notice)
+            mid = gw.missions.create({"name": a["name"], "objective": a["objective"], "schedule": a["schedule"],
+                                      "allowed_tools": a["tools"], "kind": "routine"}, proposed_by="agent")
+            gw.home_event("mission_proposed", "warn", f"Routine proposed: {a['name']}", "Waiting for you in Approvals > Proposed routines.", mid)
         gw.notify("approval", f"Routine proposed: {a['name']}", None, 0, "approvals", mid, subject=a["name"], status="Routine proposed - review it in Approvals")
         gw.emit("missions.changed", {"mission_id": mid})
         return ToolResult(f"Saved the routine '{a['name']}' as a PROPOSAL. It is NOT running yet: tell the user to open Approvals > "

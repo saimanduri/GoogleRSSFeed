@@ -130,6 +130,8 @@ class LLMService:
             try:
                 passed = bool(self.test_model(mid).get("passed"))
                 state = "passed" if passed else "failed"
+                with self._lock:                      # done testing BEFORE it can show up as the default (no "default but still testing")
+                    self._testing.discard(mid)
                 if passed and make_default:
                     self._default_if_unset(mid)
             except Exception:  # noqa: BLE001

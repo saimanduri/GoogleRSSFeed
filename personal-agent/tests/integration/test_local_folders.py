@@ -60,6 +60,7 @@ def test_folder_grant_lists_and_reads_direct_files_only(env_nocore, tree):
     assert _tool(env_nocore, cid, "text", {"file_id": g["id"], "path": "notes.txt"}).content.startswith("top level note")
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_subfolders_need_a_separate_explicit_approval(env_nocore, tree):
     cid = _setup(env_nocore)
     ui = env_nocore.ui
@@ -85,6 +86,7 @@ def test_subfolders_need_a_separate_explicit_approval(env_nocore, tree):
     assert "plan.txt" in _tool(env_nocore, cid, "browse", {"grant_id": g["id"], "subpath": "2026"}).content
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_denying_a_request_removes_it(env_nocore, tree):
     cid = _setup(env_nocore)
     g = env_nocore.ui.call("localfiles.grant_folder", {"chat_id": cid, "path": str(tree), "include_subfolders": False, "confirm_subfolders": False})
@@ -106,6 +108,7 @@ def test_paths_cannot_leave_the_folder_or_reach_forbidden_things(env_nocore, tre
         _tool(env_nocore, cid, "text", {"file_id": g["id"], "path": rel})
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_junction_pointing_outside_is_refused(env_nocore, tree, tmp_path):
     cid = _setup(env_nocore)
     out_dir = tmp_path / "elsewhere"
@@ -122,6 +125,7 @@ def test_junction_pointing_outside_is_refused(env_nocore, tree, tmp_path):
     assert "shortcut" not in _tool(env_nocore, cid, "browse", {"grant_id": g["id"]}).content       # links are not even listed
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_dangerous_folders_cannot_be_granted(env_nocore, tmp_path):
     cid = _setup(env_nocore)
     home = os.path.expanduser("~")
@@ -206,6 +210,7 @@ def test_model_cannot_create_or_widen_grants(env_nocore):
         assert REGISTRY[name].roles == ("ui",) or list(REGISTRY[name].roles) == ["ui"], name
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_chat_flow_browse_read_and_subfolder_question(env, tree, monkeypatch):
     import pa_gateway.llm.mock as mock
     env.setup()
@@ -233,6 +238,7 @@ def test_chat_flow_browse_read_and_subfolder_question(env, tree, monkeypatch):
     assert "top level note" in events and "plan inside a subfolder" not in events and "PRIVATE KEY" not in events
 
 
+@pytest.mark.windows  # uses Windows paths (backslash separators, junctions)
 def test_digest_gives_an_overview_of_the_folder_in_one_call(env_nocore, tree):
     cid = _setup(env_nocore)
     g = env_nocore.ui.call("localfiles.grant_folder", {"chat_id": cid, "path": str(tree), "include_subfolders": False, "confirm_subfolders": False})
