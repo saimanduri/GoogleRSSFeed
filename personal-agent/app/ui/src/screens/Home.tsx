@@ -77,6 +77,86 @@ function Widget({ id, title, d, reload }: { id: string; title: string; d: Item; 
   return <Shell title={title} icon={ic}><div className="small muted">{JSON.stringify(d).slice(0, 80)}</div></Shell>;
 }
 
+// ---------------------------------------------------------------- calm layout: which widget goes where
+const KPI = ["mail_unread", "mail_to_me", "mail_awaiting_reply", "mail_approvals", "mail_deadlines", "activity_today", "storage", "models_health"];
+const UPCOMING = ["reminders", "routines_next"];
+const RECENT = ["updates", "recent_files", "memory_recent"];
+const ATTENTION = ["attention", "approvals"];
+
+/** "Needs you now": one row of chips (approvals, attention items, overdue mail deadlines). Hidden behind "All clear" when empty. */
+function NeedsYou({ ids, data, mail }: { ids: string[]; data: Record<string, Item>; mail: Record<string, Item> }) {
+  const { go } = useApp();
+  const chips: { text: string; go?: any; tone: string }[] = [];
+  if (ids.includes("approvals") && data.approvals?.value > 0) chips.push({ text: `${data.approvals.value} approval${data.approvals.value === 1 ? "" : "s"} waiting`, go: data.approvals.go, tone: "warn" });
+  if (ids.includes("attention")) for (const a of data.attention?.items ?? []) chips.push({ text: a.text, go: a.go, tone: "warn" });
+  for (const [k, label] of [["mail_approvals", "mails wait for your approval"], ["mail_deadlines", "mail deadlines within 7 days"]] as const) {
+    const m = mail[k];
+    if (m && Number(m.value) > 0 && m.tone === "warn") chips.push({ text: `${m.value} ${label}`, go: m.go, tone: "warn" });
+  }
+  return (
+    <div className={`needs-you ${chips.length ? "" : "clear"}`} role="region" aria-label="Needs you now">
+      <span className="needs-title"><Icon name={chips.length ? "alert" : "check"} size={15} />{chips.length ? "Needs you now" : "All clear - nothing needs you right now"}</span>
+      {chips.map((c, i) => <button key={i} className={`chip ${c.tone}`} onClick={() => c.go && go(c.go.screen, c.go.params)}>{c.text}<Icon name="up" size={11} /></button>)}
+    </div>
+  );
+}
+
+function Tile({ id, title, d }: { id: string; title: string; d: Item }) {
+  const { go } = useApp();
+  const open = d?.go ? () => go(d.go.screen, d.go.params) : undefined;
+  let value: ReactNode = "-", sub: ReactNode = "";
+  if (!d || d.state === "loading") { value = <span className="skeleton" style={{ display: "inline-block", width: 40, height: 22 }} />; sub = d?.note ?? ""; }
+  else if (d.state === "off") { value = "off"; sub = "Outlook not connected"; }
+  else if (d.state === "error") { value = "?"; sub = "could not read now"; }
+  else if (id === "activity_today") { value = d.done; sub = `done today${d.failed ? ` · ${d.failed} failed` : ""}`; }
+  else if (id === "storage") { const pct = Math.min(100, Math.round((d.used / (d.quota || 1)) * 100)); value = `${pct}%`; sub = `storage · ${bytes(d.used)}`; }
+  else if (id === "models_health") { const kinds = Object.values(d.kinds ?? {}) as Item[]; const ready = kinds.filter((k) => k.ready).length; value = `${ready}/${kinds.length}`; sub = d.reachable === false ? "model server not answering" : "model kinds ready"; }
+  else { value = d.value; sub = d.sub; }
+  const warn = d?.tone === "warn" || (id === "activity_today" && d?.failed > 0) || (id === "models_health" && d?.reachable === false);
+  return (
+    <button className={`kpi ${warn ? "warn" : ""}`} onClick={open} disabled={!open} title={title}>
+      <span className="kpi-label">{title}</span><span className="kpi-value">{value}</span><span className="kpi-sub">{sub}</span>
+    </button>
+  );
+}
+
+/** Reminders and routine runs in ONE time-ordered list. */
+function ComingUp({ ids, data }: { ids: string[]; data: Record<string, Item> }) {
+  const { go } = useApp();
+  const items: { key: string; when: string; text: string; kind: string; go?: any }[] = [];
+  if (ids.includes("reminders")) for (const r of data.reminders?.items ?? []) items.push({ key: `r${r.id}`, when: r.due_at, text: r.text, kind: "reminder", go: data.reminders.go });
+  if (ids.includes("routines_next")) for (const r of data.routines_next?.items ?? []) items.push({ key: `m${r.id}`, when: r.next_run_at, text: String(r.name).replace(/^Email: /, ""), kind: "routine", go: data.routines_next.go });
+  items.sort((a, b) => String(a.when).localeCompare(String(b.when)));
+  return (
+    <section className="home-col">
+      <h2 className="home-h"><Icon name="clock" size={15} />Coming up</h2>
+      {!items.length ? <div className="small muted">No reminders or routine runs coming up.</div> : items.slice(0, 8).map((i) => (
+        <button key={i.key} className="home-row" onClick={() => i.go && go(i.go.screen, i.go.params)}>
+          <span className="home-when"><Time iso={i.when} smart /></span><span className="grow ellipsis">{i.text}</span><Badge>{i.kind}</Badge>
+        </button>))}
+    </section>
+  );
+}
+
+function Recently({ ids, data, reload }: { ids: string[]; data: Record<string, Item>; reload: () => void }) {
+  const { go, call, toast } = useApp();
+  return (
+    <section className="home-col">
+      <h2 className="home-h"><Icon name="activity" size={15} />Recently</h2>
+      {ids.includes("updates") && (data.updates?.items ?? []).slice(0, 5).map((e: Item) => (
+        <div key={e.id} className="home-row static"><Badge tone={e.severity === "high" ? "danger" : e.severity === "medium" ? "warn" : "info"}>{String(e.kind).replace(/mission/g, "routine").replace(/_/g, " ")}</Badge>
+          <span className="grow ellipsis" title={e.detail}><b>{e.title}</b></span><span className="small faint"><Time iso={e.created_at} /></span>
+          <Button small kind="ghost" icon="x" title="Dismiss" onClick={async () => { await call("home.dismiss", { id: e.id }); reload(); }} /></div>))}
+      {ids.includes("recent_files") && (data.recent_files?.items ?? []).slice(0, 4).map((f: Item) => (
+        <button key={f.id} className="home-row" onClick={() => go("files")}><Icon name="files" size={14} /><span className="grow ellipsis"><b>{f.name}</b> <span className="small faint">{(f.summary || "").slice(0, 70)}</span></span>{f.doc_type && <Badge>{f.doc_type}</Badge>}</button>))}
+      {ids.includes("memory_recent") && (data.memory_recent?.items ?? []).slice(0, 3).map((m: Item) => (
+        <div key={m.id} className="home-row static"><Icon name="memory" size={14} /><span className="grow ellipsis" title={m.content}>Learned: {m.content}</span>
+          <Button small kind="ghost" icon="trash" title="Forget this" onClick={async () => { try { await call("memory.action", { id: m.id, action: "delete" }); toast("Forgotten - it will not be learned again", "ok"); reload(); } catch (er: any) { toast(errText(er), "danger"); } }} /></div>))}
+      {!RECENT.some((r) => ids.includes(r) && (data[r]?.items ?? []).length) && <div className="small muted">Nothing new.</div>}
+    </section>
+  );
+}
+
 export function Home() {
   const { call, go, status, toast } = useApp();
   const [w, setW] = useState<any>(null);
@@ -112,14 +192,24 @@ export function Home() {
       {status?.needs_pin_setup && <div className="banner warn"><Icon name="alert" />This vault was restored on a new PC. Create a new PIN and recovery key in Settings &gt; Account &amp; Security.
         <Button small onClick={() => go("settings", { section: "account" })}>Open</Button></div>}
       <div className="home-body">
-        <div className="widget-grid">
+        <div className="home-main">
           {!enabled.length && <div className="muted" style={{ padding: 20 }}>No widgets are switched on. Press <b>Widgets</b> to choose what Home shows.</div>}
-          {enabled.map((id) => <Widget key={id} id={id} title={titleOf(id)} d={w.data[id]} reload={(r) => void load(r)} />)}
+          {enabled.some((id) => ATTENTION.includes(id) || id === "mail_approvals" || id === "mail_deadlines") && <NeedsYou ids={enabled} data={w.data} mail={w.data} />}
+          {enabled.some((id) => KPI.includes(id)) && <div className="kpi-row">{enabled.filter((id) => KPI.includes(id)).map((id) => <Tile key={id} id={id} title={titleOf(id)} d={w.data[id]} />)}</div>}
+          {(enabled.some((id) => UPCOMING.includes(id)) || enabled.some((id) => RECENT.includes(id))) && (
+            <div className="home-cols">
+              {enabled.some((id) => UPCOMING.includes(id)) && <ComingUp ids={enabled} data={w.data} />}
+              {enabled.some((id) => RECENT.includes(id)) && <Recently ids={enabled} data={w.data} reload={() => void load()} />}
+            </div>)}
+          {/* any widget without a place in the zones keeps its own card */}
+          {enabled.filter((id) => ![...KPI, ...UPCOMING, ...RECENT, ...ATTENTION].includes(id)).length > 0 && <div className="widget-grid">
+            {enabled.filter((id) => ![...KPI, ...UPCOMING, ...RECENT, ...ATTENTION].includes(id)).map((id) => <Widget key={id} id={id} title={titleOf(id)} d={w.data[id]} reload={(r) => void load(r)} />)}
+          </div>}
         </div>
         {panel && (
           <aside className="widget-panel" aria-label="Choose widgets">
             <div className="row"><b className="grow">Widgets</b><Button small kind="ghost" icon="x" onClick={() => setPanel(false)} aria-label="Close" /></div>
-            <div className="small muted">Switch widgets on or off. Only switched-on widgets are shown. Use the arrows to change their order.</div>
+            <div className="small muted">Switch widgets on or off. Home groups them by kind: what needs you, numbers at a glance, what is coming up, and what happened recently. The arrows change the order inside a group.</div>
             {groups.map((g) => (
               <div key={g}>
                 <div className="group-title">{g}</div>
