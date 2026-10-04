@@ -12,6 +12,7 @@ import json
 import time
 from dataclasses import replace
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 from pydantic import ValidationError as PydValidationError
 
@@ -157,7 +158,10 @@ class ToolGateway:
         web_gate = (decision.decision == ALLOW and tool.connector == "web" and bool(task.get("chat_id")) and bool(gw.settings.get("web.ask_per_chat"))
                     and gw.web_grants.get(task["chat_id"]) != gw.session.s.nonce)
         if web_gate:
-            what = f"search the web for \"{str(args.get('query', ''))[:80]}\"" if tool.name == "web.search" else f"open {str(args.get('url', ''))[:100]}"
+            what = {"web.search": f"search the web for \"{str(args.get('query', ''))[:80]}\"",
+                    "web.answer": f"look up \"{str(args.get('query', ''))[:80]}\" on the web",
+                    "web.research": f"start a web research task: \"{str(args.get('instructions', ''))[:80]}\"",
+                    "web.read": f"read {len(args.get('urls') or [])} web page(s), e.g. {str((args.get('urls') or [''])[0])[:80]}"}.get(tool.name, f"open {str(args.get('url', ''))[:100]}")
             decision = replace(decision, decision=REQUIRE_APPROVAL, risk="medium", rules=decision.rules + ["web_ask_per_chat"],
                                approval_reason=f"The assistant wants to {what}. Approving allows web search and page fetching in THIS chat until you sign out or restart. "
                                                "Nothing from your files or mail is sent unless you approve it separately.")
@@ -281,6 +285,14 @@ class ToolGateway:
             return args["url"]
         if tool.name == "web.search":
             return f"search:{gw.settings.get('web.provider')}"
+        if tool.name in ("web.answer", "web.research"):
+            return "search:exa"
+        if tool.name == "web.read":
+            ok, refused = gw.connectors.web.check_targets(list(args["urls"]))
+            if not ok:
+                raise PAError("none of these pages may be read: " + "; ".join(refused)[:300], code="egress_denied")
+            hosts = sorted({(urlsplit(u).hostname or "") for u in ok})
+            return ("exa:" if gw.settings.get("web.provider") == "exa" else "") + ",".join(hosts)
         if tool.side_effect == EXTERNAL_WRITE and "to" in args:
             return ",".join(sorted(x.lower() for x in args["to"] + args.get("cc", [])))
         if tool.name == "agent.subtask":

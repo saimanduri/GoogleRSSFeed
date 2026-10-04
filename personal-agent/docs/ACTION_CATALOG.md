@@ -58,10 +58,10 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `files.update` | unlocked | - | file_id*, folder, tags*, in_knowledge, name | screens/Files.tsx:105, screens/Files.tsx:107, screens/Files.tsx:109 | files.update |
 | `files.upload` | unlocked | - | path, name*, sensitivity, folder, tags* | screens/Chat.tsx:184, screens/Files.tsx:22, screens/Files.tsx:33 | files.upload, files.missing_upload |
 | `history.search` | unlocked | - | query*, limit, kinds* | screens/Activity.tsx:221, screens/History.tsx:41, Shell.tsx:167 | history.search |
-| `home.dismiss` | unlocked | - | id* | screens/Home.tsx:75 | home.dismiss |
-| `home.summary` | unlocked | - | since | components/UsageMeter.tsx:9, screens/Activity.tsx:14, screens/Home.tsx:88 | home.summary |
-| `home.widgets` | unlocked | - | refresh | screens/Home.tsx:87 | home.widgets |
-| `home.widgets_set` | unlocked | - | enabled* | screens/Home.tsx:97 | home.widgets_set |
+| `home.dismiss` | unlocked | - | id* | screens/Home.tsx:75, screens/Home.tsx:149 | home.dismiss |
+| `home.summary` | unlocked | - | since | components/UsageMeter.tsx:9, screens/Activity.tsx:14, screens/Home.tsx:168 | home.summary |
+| `home.widgets` | unlocked | - | refresh | screens/Home.tsx:167 | home.widgets |
+| `home.widgets_set` | unlocked | - | enabled* | screens/Home.tsx:177 | home.widgets_set |
 | `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:48, screens/SignIn.tsx:79, Shell.tsx:62 | killswitch.activate, killswitch.partial, killswitch.bad_level |
 | `killswitch.release` | unlocked | - | level | screens/settings/Misc.tsx:49 | killswitch.release_needs_password, killswitch.release, killswitch.partial_release |
 | `killswitch.state` | unlocked | - | - | - | killswitch.state |
@@ -89,7 +89,7 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `logs.status` | unlocked | - | - | screens/settings/Misc.tsx:126 | logs.status |
 | `logs.verify` | unlocked | - | - | screens/Activity.tsx:177, screens/settings/Misc.tsx:129 | logs.verify, logs.verify_after_rotate |
 | `memory.about_me` | unlocked | - | - | screens/Memory.tsx:20 | memory.about_me |
-| `memory.action` | unlocked | - | id*, action*, content | screens/Home.tsx:61, screens/Memory.tsx:25, screens/Memory.tsx:34 | memory.edit, memory.disable, memory.enable, memory.bad_action … |
+| `memory.action` | unlocked | - | id*, action*, content | screens/Home.tsx:61, screens/Home.tsx:154, screens/Memory.tsx:25 … | memory.edit, memory.disable, memory.enable, memory.bad_action … |
 | `memory.add` | unlocked | - | content*, type | screens/Memory.tsx:44, screens/Memory.tsx:45 | memory.add |
 | `memory.delete_all` | unlocked | - | - | screens/Memory.tsx:64 | memory.delete_all |
 | `memory.list` | unlocked | - | status | screens/Memory.tsx:22 | memory.list |

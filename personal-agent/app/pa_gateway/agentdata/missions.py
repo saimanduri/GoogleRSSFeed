@@ -271,7 +271,7 @@ class MissionService:
             form["allowed_tools"] += ["m365.search_mail", "m365.get_message"] if self.gw.connectors.usable("m365", "mission")[0] \
                 else ["outlook_local.search", "outlook_local.get_message"]
         if "news" in low or "research" in low or "web" in low:
-            form["allowed_tools"] += ["web.search", "web.fetch"]
+            form["allowed_tools"] += ["web.search", "web.fetch", "web.read"]
         if "calendar" in low or "meeting" in low:
             form["allowed_tools"].append("m365.calendar_read" if self.gw.connectors.usable("m365", "mission")[0] else "outlook_local.calendar_read")
         if "report" in low or "save" in low or "file" in low:

@@ -1409,7 +1409,8 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:75"
+   "screens/Home.tsx:75",
+   "screens/Home.tsx:149"
   ],
   "scenarios": [
    "home.dismiss"
@@ -1433,7 +1434,7 @@
   "ui_callers": [
    "components/UsageMeter.tsx:9",
    "screens/Activity.tsx:14",
-   "screens/Home.tsx:88"
+   "screens/Home.tsx:168"
   ],
   "scenarios": [
    "home.summary"
@@ -1455,7 +1456,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:87"
+   "screens/Home.tsx:167"
   ],
   "scenarios": [
    "home.widgets"
@@ -1477,7 +1478,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:97"
+   "screens/Home.tsx:177"
   ],
   "scenarios": [
    "home.widgets_set"
@@ -2195,6 +2196,7 @@
   ],
   "ui_callers": [
    "screens/Home.tsx:61",
+   "screens/Home.tsx:154",
    "screens/Memory.tsx:25",
    "screens/Memory.tsx:34"
   ],

@@ -56,6 +56,15 @@ Empty-reply rescue (`_run_with_rescue`), history search prefix + fallback, AMSI 
 ## 3e. Memory / summaries / widgets round (VERSION_HISTORY 0.1.13)
 `memory_learn.py`, `files/insights.py`, `pii.py`, `home_widgets.py`, `Home.tsx`, `FileMeta.tsx`, `installer\windows\update-app.ps1`. Live scripts: `live_memory_check.py`. Build: `npx tauri build --no-bundle` then `scripts\build.ps1 -OutDir dist\PersonalAgent-0.1.13` and copy pa-ui.exe in.
 
+## 3f. 0.1.14 round (2026-10-04, cloud session, branch `claude/v0.1.14`, draft PR saimanduri/GoogleRSSFeed#1)
+Done: CI race fixes, logo/title-bar icon, Rules & Safety layout, resource meters (`resmon.py`), per-model context length + temperature
+(Ollama now via native `/api/chat` - it ignored `num_ctx` before), Tasks merged into Activity log, "Routines" as the only name, Home
+redesign, web research (`web.read` / `web.answer` / `web.research`, `EgressClient.check_target`). Details: `docs/CHANGES_2026-10-04.md`.
+Remaining (step by step): PENDING_WORK.md "0.1.14 - remaining work" (W1 Outlook work memory, W2 code review + Guide, W3 meeting minutes +
+diarizer, W4 Word/Excel/PowerPoint output, W5 finance, W6 local file safety, W7 version bump + zip + security assessment).
+Decisions still open with the user: Office libraries, diarizer choice, sandbox Python bundle. New dev tools: `scripts/gen_mock_schema.py`
+(run after changing settings), Linux runs of the tests (Windows-only tests are marked), CI also runs `scripts/e2e_runner.py`.
+
 ## 4. Open items, most important first (full list in PENDING_WORK.md)
 1. **Install the new bundle on the user's PC (admin) and have them verify H11-H16 in `TESTS.md` in the real window** (new screens were only seen in the browser preview).
 2. TPM: confirm key creation works again (`scripts` probe snippet in this file's section 6) before any real first-time setup; do not hammer it.

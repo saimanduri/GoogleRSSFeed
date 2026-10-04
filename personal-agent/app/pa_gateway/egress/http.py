@@ -62,6 +62,9 @@ def system_resolver(host: str, port: int) -> list[str]:
     return list(dict.fromkeys(i[4][0] for i in infos))
 
 
+LOCAL_SUFFIXES = (".local", ".localhost", ".internal", ".intranet", ".lan", ".home", ".corp", ".home.arpa", ".localdomain")
+
+
 def host_matches(host: str, domains: Iterable[str]) -> bool:
     host = host.lower().rstrip(".")
     for d in domains:
@@ -113,6 +116,42 @@ class EgressClient:
                 self.on_event(info)
             except Exception:  # noqa: BLE001
                 pass
+
+    def check_target(self, url: str, pol: EgressPolicy) -> tuple[str, int, str]:
+        """Every rule that does not need DNS: scheme, credentials, port, metadata hosts, local / private names, turned-off connectors,
+        blocklist, allowlist. Used on its own for URLs that a provider (Exa) crawls from its own servers, so a third-party crawler can
+        never be used to reach what this PC itself may not reach. Returns (scheme, port, host) or raises EgressDenied."""
+        parts = urlsplit(url)
+        scheme = (parts.scheme or "").lower()
+        if scheme not in ("https", "http") or (scheme == "http" and not pol.allow_http):
+            raise EgressDenied(BLOCKED_SCHEMES_MSG, "scheme_blocked")
+        if parts.username or parts.password:
+            raise EgressDenied("credentials in URLs are not allowed", "userinfo_blocked")
+        host = (parts.hostname or "").lower().rstrip(".")
+        if not host:
+            raise EgressDenied("URL has no host", "bad_url")
+        try:
+            port = parts.port or (443 if scheme == "https" else 80)
+        except ValueError as e:
+            raise EgressDenied("invalid port", "bad_url") from e
+        allowed_ports = {443} | ({80} if pol.allow_http else set()) | set(pol.extra_ports)
+        if port not in allowed_ports:
+            raise EgressDenied(f"port {port} is not allowed", "port_blocked")
+        if host in METADATA_HOSTS:
+            raise EgressDenied("metadata endpoints are blocked", "ssrf_blocked")
+        try:
+            if not ip_is_public(ipaddress.ip_address(host)):
+                raise EgressDenied("destination is a private or reserved address", "ssrf_blocked")
+        except ValueError:
+            if "." not in host or host.endswith(LOCAL_SUFFIXES):
+                raise EgressDenied("local network names are not allowed", "ssrf_blocked") from None
+        if host_matches(host, pol.denied_domains):
+            raise EgressDenied("this destination belongs to a connector that is turned off", "connector_off")
+        if host_matches(host, pol.blocklist):
+            raise EgressDenied("domain is on your blocklist", "domain_blocked")
+        if pol.enforce_domain_list and not pol.any_site and not host_matches(host, pol.allowlist):
+            raise EgressDenied("domain is not on the allowlist (Settings > Web Access)", "domain_not_allowed")
+        return scheme, port, host
 
     def check_url(self, url: str, pol: EgressPolicy) -> tuple[str, int, str, str]:
         """Returns (scheme, port, host, pinned_ip) or raises EgressDenied."""
