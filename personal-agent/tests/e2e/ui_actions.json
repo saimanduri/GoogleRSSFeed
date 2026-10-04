@@ -556,7 +556,7 @@
   },
   {
    "screen": "Settings > AI Model",
-   "find": "provider cards, Discover, Add model, Test model, default per role, remove",
+   "find": "provider cards, Discover, Add model, Test model, default per role, remove, 'Adjust' (context length + temperature per model)",
    "rpc": [
     "llm.discover",
     "llm.inspect",
@@ -564,10 +564,11 @@
     "llm.test",
     "llm.set_role",
     "llm.remove",
-    "llm.models"
+    "llm.models",
+    "llm.update"
    ],
    "scenario": "llm.*",
-   "expect_ui": "model listed; a model must pass 'Test model' before it can be a default; remote endpoints ask for the password"
+   "expect_ui": "model listed with its context length and temperature; a model must pass 'Test model' before it can be a default; remote endpoints ask for the password; Adjust saves per-model values, 'Use defaults' clears them"
   },
   {
    "screen": "Settings (any group)",

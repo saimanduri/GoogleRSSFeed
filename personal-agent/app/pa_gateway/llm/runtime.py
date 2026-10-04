@@ -99,7 +99,7 @@ class BuiltinRuntime:
             self.api_key = secrets.token_hex(32)
             s = self.gw.settings
             cmd = [str(exe), "--host", "127.0.0.1", "--port", str(self.port), "--api-key", self.api_key,
-                   "-m", str(path), "--ctx-size", str(s.get("llm.context_tokens")), "--n-gpu-layers", str(s.get("llm.gpu_layers")),
+                   "-m", str(path), "--ctx-size", str(int(model.get("context_length") or s.get("llm.context_tokens"))), "--n-gpu-layers", str(s.get("llm.gpu_layers")),
                    "--parallel", str(s.get("llm.max_concurrent")), "--no-webui"]
             # prompt/response logging stays off; there is no slot persistence to disk (spec 20.5)
             env = scrubbed_env({"LLAMA_ARG_HOST": "127.0.0.1"})

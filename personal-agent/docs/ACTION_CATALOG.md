@@ -1,6 +1,6 @@
 # Action catalogue (generated - do not edit; run `python scripts/gen_action_catalog.py`)
 
-160 backend actions (RPC methods): **149 covered by automated scenarios**, 11 manual-only (reason given), **0 gaps**. UI calls to unknown RPCs: none.
+161 backend actions (RPC methods): **150 covered by automated scenarios**, 11 manual-only (reason given), **0 gaps**. UI calls to unknown RPCs: none.
 
 Columns: state = required session state, step-up = re-auth category, UI = where the UI calls it, Scenarios = ids in tests/e2e/scenarios.json.
 
@@ -65,14 +65,15 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:48, screens/SignIn.tsx:79, Shell.tsx:63 | killswitch.activate, killswitch.partial, killswitch.bad_level |
 | `killswitch.release` | unlocked | - | level | screens/settings/Misc.tsx:49 | killswitch.release_needs_password, killswitch.release, killswitch.partial_release |
 | `killswitch.state` | unlocked | - | - | - | killswitch.state |
-| `llm.add` | unlocked | - | model*, make_default, auto_test | screens/settings/ModelSettings.tsx:118 | llm.add_mock, llm.add_second, llm.remote_needs_password |
+| `llm.add` | unlocked | - | model*, make_default, auto_test | screens/settings/ModelSettings.tsx:158 | llm.add_mock, llm.add_second, llm.remote_needs_password |
 | `llm.complete` | keys | - | task_id*, messages*, role, json_mode, action_schema, max_tokens, stream, purpose | - | manual: core-role RPC (pa-core only): exercised by every chat.send; UI role is refused (tests/integration/test_agent_security.py) |
-| `llm.discover` | unlocked | - | provider*, endpoint*, api_key | screens/settings/ModelSettings.tsx:143 | llm.discover_ollama |
-| `llm.inspect` | unlocked | - | provider*, endpoint*, model_name*, api_key | screens/settings/ModelSettings.tsx:108 | llm.inspect_ollama |
-| `llm.models` | unlocked | - | - | screens/settings/ModelSettings.tsx:28 | llm.models_empty |
-| `llm.remove` | unlocked | - | model_id* | screens/settings/ModelSettings.tsx:57 | llm.remove |
-| `llm.set_role` | unlocked | - | role*, model_id | screens/settings/ModelSettings.tsx:61 | llm.set_role |
-| `llm.test` | unlocked | - | model_id* | screens/settings/ModelSettings.tsx:41 | llm.test_mock |
+| `llm.discover` | unlocked | - | provider*, endpoint*, api_key | screens/settings/ModelSettings.tsx:183 | llm.discover_ollama |
+| `llm.inspect` | unlocked | - | provider*, endpoint*, model_name*, api_key | screens/settings/ModelSettings.tsx:148 | llm.inspect_ollama |
+| `llm.models` | unlocked | - | - | screens/settings/ModelSettings.tsx:29 | llm.models_empty |
+| `llm.remove` | unlocked | - | model_id* | screens/settings/ModelSettings.tsx:61 | llm.remove |
+| `llm.set_role` | unlocked | - | role*, model_id | screens/settings/ModelSettings.tsx:65 | llm.set_role |
+| `llm.test` | unlocked | - | model_id* | screens/settings/ModelSettings.tsx:42 | llm.test_mock |
+| `llm.update` | unlocked | - | model_id* | screens/settings/ModelSettings.tsx:104 | llm.update_params, llm.update_params_reset |
 | `localfiles.allow_subfolders` | unlocked | - | grant_id*, confirm | components/LocalShare.tsx:88 | localfiles.allow_subfolders_unconfirmed, localfiles.allow_subfolders |
 | `localfiles.deny_request` | unlocked | - | request_id* | components/LocalShare.tsx:89 | localfiles.deny_request |
 | `localfiles.folder_info` | unlocked | - | path* | components/LocalShare.tsx:17 | localfiles.folder_info |

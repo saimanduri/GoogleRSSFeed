@@ -1578,7 +1578,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:118"
+   "screens/settings/ModelSettings.tsx:158"
   ],
   "scenarios": [
    "llm.add_mock",
@@ -1665,7 +1665,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:143"
+   "screens/settings/ModelSettings.tsx:183"
   ],
   "scenarios": [
    "llm.discover_ollama"
@@ -1702,7 +1702,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:108"
+   "screens/settings/ModelSettings.tsx:148"
   ],
   "scenarios": [
    "llm.inspect_ollama"
@@ -1718,7 +1718,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:28"
+   "screens/settings/ModelSettings.tsx:29"
   ],
   "scenarios": [
    "llm.models_empty"
@@ -1740,7 +1740,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:57"
+   "screens/settings/ModelSettings.tsx:61"
   ],
   "scenarios": [
    "llm.remove"
@@ -1767,7 +1767,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:61"
+   "screens/settings/ModelSettings.tsx:65"
   ],
   "scenarios": [
    "llm.set_role"
@@ -1789,10 +1789,33 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:41"
+   "screens/settings/ModelSettings.tsx:42"
   ],
   "scenarios": [
    "llm.test_mock"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:104"
+  ],
+  "scenarios": [
+   "llm.update_params",
+   "llm.update_params_reset"
   ],
   "manual_reason": null
  },

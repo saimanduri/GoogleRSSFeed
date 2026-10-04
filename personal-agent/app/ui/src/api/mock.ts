@@ -27,7 +27,10 @@ const S: any = {
   files: [] as any[],
   memories: [] as any[],
   secrets: [] as any[],
-  models: [] as any[],
+  models: (typeof location !== "undefined" && new URLSearchParams(location.search).has("demo")
+    ? [{ id: "mdl_demo1", name: "qwen3-coder:latest", provider: "ollama", kind: "chat", endpoint: "http://127.0.0.1:11434", model_name: "qwen3-coder:latest", tested: 1, isolation: "Reduced isolation", location: "loopback", context_length: 32768, temperature: 0.1 },
+       { id: "mdl_demo2", name: "gemma4:latest", provider: "ollama", kind: "chat", endpoint: "http://127.0.0.1:11434", model_name: "gemma4:latest", tested: 1, isolation: "Reduced isolation", location: "loopback" }]
+    : []) as any[],
   settings: {} as Record<string, any>,
   kill: { pause_agent: false, stop_tasks: false, disable_connectors: false, disable_web: false, disable_sandbox: false, stop_all: false },
   connectors: [
@@ -269,7 +272,10 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "secrets.binding_targets": return ["web.search"];
     case "connectors.list": return { connectors: S.connectors, pause_all: false };
     case "connectors.set": Object.assign(S.connectors.find((c: any) => c.id === p.connector), p); return { ok: true };
-    case "llm.models": return { models: S.models, roles: {}, builtin_runtime: false };
+    case "llm.models": return { models: S.models.map((m: any) => ({ ...m, effective: { context_length: m.context_length ?? 8192, temperature: m.temperature ?? 0.2,
+      context_from: m.context_length ? "model" : "default", temperature_from: m.temperature === null || m.temperature === undefined ? "default" : "model" } })), roles: {}, builtin_runtime: false };
+    case "llm.update": { const m = S.models.find((x: any) => x.id === p.model_id); m.context_length = p.context_length; m.temperature = p.temperature; emit("llm.models_changed", { model_id: m.id, state: "updated" });
+      return { context_length: m.context_length ?? 8192, temperature: m.temperature ?? 0.2 }; }
     case "llm.add": S.models.push({ id: id("mdl"), name: p.model.name || p.model.model_name || p.model.provider, provider: p.model.provider, kind: p.model.kind ?? "chat", endpoint: p.model.endpoint, tested: 0, isolation: "Reduced isolation", location: "loopback" }); return { id: "m" };
     case "llm.test": { const m = S.models.find((x: any) => x.id === p.model_id); m.tested = 1; return { passed: true, checks: [{ name: "follows_instructions", ok: true }, { name: "json_action_protocol", ok: true }, { name: "attack_attempt_rate", ok: true, note: "0/3" }] }; }
     case "web.test_search": return { ok: true, provider: "exa", results: 1, ms: 420 };

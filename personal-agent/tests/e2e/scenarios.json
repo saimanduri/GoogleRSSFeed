@@ -671,6 +671,37 @@
    ]
   },
   {
+   "id": "llm.update_params",
+   "ui": "AI Model > a model's 'Adjust' (context length, temperature)",
+   "call": "llm.update",
+   "params": {
+    "model_id": "${MOCK}",
+    "context_length": 16384,
+    "temperature": 0.3
+   },
+   "expect": {
+    "has": [
+     "context_length",
+     "temperature"
+    ]
+   }
+  },
+  {
+   "id": "llm.update_params_reset",
+   "ui": "AI Model > Adjust > Use defaults",
+   "call": "llm.update",
+   "params": {
+    "model_id": "${MOCK}",
+    "context_length": null,
+    "temperature": null
+   },
+   "expect": {
+    "has": [
+     "context_from"
+    ]
+   }
+  },
+  {
    "id": "llm.set_role",
    "ui": "AI Model > default chat model",
    "call": "llm.set_role",
