@@ -298,3 +298,6 @@ h2, h3, .card-title { letter-spacing: var(--tr-title); line-height: var(--lh-tit
 @media (prefers-reduced-motion: reduce) { .res-fill { transition: none; } }
 :root[data-motion="reduce"] .res-fill { transition: none; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
+/* Activity log > Requests & steps: the task behind the selected request (was the Tasks screen) */
+.task-panel { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; background: color-mix(in srgb, var(--accent) 4%, transparent); }
+.task-budget { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 16px; margin: 10px 0 6px; }

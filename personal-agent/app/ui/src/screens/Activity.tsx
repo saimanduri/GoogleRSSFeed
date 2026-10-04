@@ -38,9 +38,10 @@ function Usage() {
 export function Activity() {
   const { call, route } = useApp();
   const [tab, setTab] = useState<"runs" | "log" | "what" | "search" | "network" | "usage">((route.params?.tab as any) ?? "runs");
+  useEffect(() => { if (route.params?.tab) setTab(route.params.tab); }, [route.params?.tab]);
   return (
     <div className="page">
-      <div className="page-header"><div><h1>Activity</h1><div className="muted">Every request and every step, plus the tamper-evident security log.</div></div></div>
+      <div className="page-header"><div><h1>Activity</h1><div className="muted">Every request and every step (with what is running now, Stop and Resume), plus the tamper-evident security log.</div></div></div>
       <Tabs tabs={[["runs", "Requests & steps"], ["log", "Security log"], ["what", "What did the agent do?"], ["search", "Search history"], ["network", "Network Logs"], ["usage", "Usage & budgets"]]} value={tab} onChange={setTab} />
       {tab === "runs" && <Runs initial={route.params?.ref} />}
       {tab === "log" && <SecurityLog />}
@@ -52,15 +53,70 @@ export function Activity() {
   );
 }
 
+const TASK_TONE: Record<string, string> = { RUNNING: "accent", QUEUED: "info", COMPLETED: "ok", FAILED: "danger", CANCELLED: "", TIMED_OUT: "danger",
+  WAITING_FOR_APPROVAL: "warn", WAITING_FOR_RESOURCE: "warn", OUTCOME_UNKNOWN: "danger", PAUSED: "warn", SUSPENDED: "warn" };
+const ACTIVE = ["RUNNING", "QUEUED", "WAITING_FOR_APPROVAL", "WAITING_FOR_RESOURCE", "PAUSED", "SUSPENDED", "OUTCOME_UNKNOWN"];
+const STOPPABLE = ["RUNNING", "QUEUED", "WAITING_FOR_APPROVAL"];
+const RESUMABLE = ["WAITING_FOR_RESOURCE", "SUSPENDED", "PAUSED"];
+const words = (s: string) => s.toLowerCase().replace(/_/g, " ");
+
+function TaskButtons({ t, onDone }: { t: any; onDone: () => void }) {
+  const { call, toast } = useApp();
+  const act = async (m: string, ok: string) => { try { await call(m, { task_id: t.id }); toast(ok, "ok"); onDone(); } catch (e: any) { toast(errText(e), "danger"); } };
+  return <>
+    {STOPPABLE.includes(t.state) && <Button small kind="danger" onClick={(e?: any) => { e?.stopPropagation?.(); void act("tasks.stop", "Stopped"); }}>Stop</Button>}
+    {RESUMABLE.includes(t.state) && <Button small onClick={(e?: any) => { e?.stopPropagation?.(); void act("tasks.resume", "Resumed"); }}>Resume</Button>}
+  </>;
+}
+
+/** What used to be the Tasks screen, for the selected request: state, trigger, budget, state history, Stop / Resume. */
+function TaskPanel({ taskId, onChanged }: { taskId: string; onChanged: () => void }) {
+  const { call } = useApp();
+  const [t, setT] = useState<any>(null);
+  const [hist, setHist] = useState(false);
+  const load = () => call<any>("tasks.get", { task_id: taskId }).then(setT).catch(() => setT(null));
+  useEffect(() => { void load(); return onEvent((topic) => topic === "tasks.changed" && void load()); /* eslint-disable-next-line */ }, [taskId]);
+  if (!t) return null;
+  return (
+    <div className="task-panel">
+      <div className="row wrap" style={{ gap: 8 }}>
+        <Badge tone={TASK_TONE[t.state]}>{words(t.state)}</Badge>
+        <span className="small muted">started by {words(t.trigger_type ?? "user")}</span>
+        <div className="spacer" /><TaskButtons t={t} onDone={() => { void load(); onChanged(); }} />
+      </div>
+      {t.error && <div className="banner danger small" style={{ marginTop: 8 }}>{t.error}</div>}
+      <div className="task-budget">{Object.entries(t.limits ?? {}).map(([k, v]: any) => {
+        const used = Math.round(t.usage?.[k] ?? 0), pct = v ? Math.min(100, Math.round((used / v) * 100)) : 0;
+        return <div key={k} className="small"><div className="row"><span className="grow">{words(k)}</span><span className="faint">{used.toLocaleString()} / {Math.round(v).toLocaleString()}</span></div>
+          <div className="meter"><div style={{ width: `${pct}%`, background: pct > 80 ? "var(--warn)" : "var(--accent)" }} /></div></div>;
+      })}</div>
+      {t.transitions?.length > 0 && <button className="link-btn small" onClick={() => setHist(!hist)}>{hist ? "Hide" : "Show"} state history ({t.transitions.length})</button>}
+      {hist && <div className="col" style={{ gap: 2, marginTop: 4 }}>{t.transitions.map((tr: any) => <div key={tr.id} className="small"><Badge tone={TASK_TONE[tr.to_state]}>{words(tr.to_state)}</Badge> <span className="faint">{tr.reason}</span> · <Time iso={tr.ts} /></div>)}</div>}
+    </div>
+  );
+}
+
 function Runs({ initial }: { initial?: string }) {
   const { call, toast } = useApp();
   const [runs, setRuns] = useState<any[]>([]);
+  const [active, setActive] = useState<any[]>([]);
   const [archived, setArchived] = useState(false);
   const [sel, setSel] = useState<string | null>(initial ?? null);
   const [raw, setRaw] = useState<any[] | null>(null);
   const load = () => call<any[]>("runs.list", { limit: archived ? 2000 : 100, archived }).then((r) => { setRuns(r); if (!sel && r[0]) setSel(r[0].id); }).catch(() => undefined);
-  useEffect(() => { void load(); return onEvent((t) => (t === "run.started" || t === "run.finished") && void load()); /* eslint-disable-next-line */ }, [archived]);
+  const loadActive = () => call<any[]>("tasks.list", { states: ACTIVE, limit: 50 }).then(setActive).catch(() => undefined);
+  useEffect(() => { void load(); void loadActive(); return onEvent((t) => { if (t === "run.started" || t === "run.finished") void load(); if (t === "tasks.changed" || t === "run.started" || t === "run.finished") void loadActive(); }); /* eslint-disable-next-line */ }, [archived]);
+  const selRun = runs.find((r) => r.id === sel);
   return (
+    <div className="col">
+    {active.length > 0 && <Card title={`Active now (${active.length})`}>
+      <div className="list">{active.map((t) => (
+        <div key={t.id} className={`list-item ${t.run_id ? "clickable" : ""}`} onClick={() => t.run_id && setSel(t.run_id)}>
+          <Badge tone={TASK_TONE[t.state]}>{words(t.state)}</Badge>
+          <div className="grow"><div className="ellipsis">{t.objective}</div><div className="small faint">{words(t.trigger_type ?? "user")} · <Time iso={t.updated_at} /> · {t.usage?.tool_calls ?? 0}/{t.limits?.tool_calls} tools</div></div>
+          <TaskButtons t={t} onDone={() => { void loadActive(); void load(); }} />
+        </div>))}</div>
+    </Card>}
     <div className="grid-2" style={{ gridTemplateColumns: "minmax(320px, 1fr) 1.3fr" }}>
       <Card title={`Last ${archived ? "all" : "100"} requests`} actions={<Button small kind="ghost" onClick={() => setArchived(!archived)}>{archived ? "Recent only" : "Include archived"}</Button>}>
         {!runs.length ? <Empty title="No requests yet" icon="activity" /> : (
@@ -73,6 +129,7 @@ function Runs({ initial }: { initial?: string }) {
         )}
       </Card>
       <Card title="Steps" actions={sel && <Button small onClick={async () => { try { setRaw(await call("runs.transcript", { run_id: sel })); } catch (e: any) { toast(errText(e), "danger"); } }}>Full transcript</Button>}>
+        {selRun?.task_id && <TaskPanel taskId={selRun.task_id} onChanged={() => { void load(); void loadActive(); }} />}
         <RunTimeline runId={sel} />
       </Card>
       {raw && (
@@ -85,6 +142,7 @@ function Runs({ initial }: { initial?: string }) {
               <pre className="code" style={{ marginTop: 6 }}>{e.content.slice(0, 20000)}</pre></div>))}</div>
         </Modal>
       )}
+    </div>
     </div>
   );
 }

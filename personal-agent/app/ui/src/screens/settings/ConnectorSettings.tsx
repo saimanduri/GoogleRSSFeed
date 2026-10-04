@@ -23,7 +23,7 @@ export function ConnectorSettings({ generic }: { generic: ReactNode }) {
           {!c.connection_ok && c.connection_reason && <div className="banner warn small">{c.connection_reason}</div>}
           <div className="row wrap small">
             <span className="row">Use in chat <Toggle on={c.use_chat} onChange={(v) => set(c.id, { use_chat: v })} /></span>
-            <span className="row">Use in missions <Toggle on={c.use_missions} onChange={(v) => set(c.id, { use_missions: v })} /></span>
+            <span className="row">Use in routines <Toggle on={c.use_missions} onChange={(v) => set(c.id, { use_missions: v })} /></span>
             <span className="faint">Last used: <Time iso={c.last_used_at} /></span>
           </div>
           {c.manifest && <div className="small faint" style={{ marginTop: 6 }}>Declares: sends to {c.manifest.destinations?.join(", ")} · data: {c.manifest.data_types?.join(", ")} · effects: {c.manifest.side_effects?.join(", ")}</div>}

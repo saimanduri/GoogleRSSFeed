@@ -70,7 +70,7 @@ function seedDemo() {
       created_at: ago(h - k * 0.01), sources: ["model only"], sensitivity: 0 }));
   });
   ["Morning mail summary", "Weekly report", "Reminder fired", "Web search: LLM news"].forEach((t, i) =>
-    S.runs.push({ id: `run_demo${i}`, kind: i === 1 ? "mission" : "chat", status: i === 2 ? "FAILED" : "COMPLETED", title: t, started_at: ago(2 + i * 30), created_at: ago(2 + i * 30) }));
+    S.runs.push({ id: `run_demo${i}`, task_id: `run_demo${i}`, kind: i === 1 ? "mission" : "chat", status: i === 0 ? "RUNNING" : i === 2 ? "FAILED" : "COMPLETED", title: t, started_at: ago(2 + i * 30), created_at: ago(2 + i * 30), tool_calls: 2 + i, tokens_in: 900, tokens_out: 300, hwm: 1 }));
 }
 function seedDemoFiles() {
   const mk = (id: string, name: string, status: string, extra: any) => ({ id, name, folder: "/Identity", status, status_reason: null, sensitivity: 2, size_bytes: 120000, created_at: ago(3), in_knowledge: 0, tags_json: [], source: "upload", sha256: "ab12cd34".repeat(8), sniffed_type: "pdf", scan_json: { antivirus: { engine: "defender", clean: true } }, ...extra });
@@ -256,7 +256,13 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "emailskills.run": return { task_id: id("task") };
     case "missions.parse_schedule": return { schedule: { type: "cron", cron: String(p.text) }, text: String(p.text), next_run: new Date(Date.now() + 3600e3).toISOString() };
     case "missions.run_now": return { task_id: "t" };
-    case "tasks.list": return S.runs.map((r: any) => ({ id: r.id, objective: r.title, state: r.status, trigger_type: "USER", updated_at: r.started_at, usage: { tool_calls: 1, tokens: 900 }, limits: { tool_calls: 100, tokens: 200000 } }));
+    case "tasks.list": { const st = (r: any) => (r.status === "RUNNING" ? "RUNNING" : r.status === "FAILED" ? "FAILED" : r.status === "WAITING" ? "WAITING_FOR_APPROVAL" : "COMPLETED");
+      return S.runs.map((r: any) => ({ id: r.id, run_id: r.id, objective: r.title, state: st(r), trigger_type: r.kind === "mission" ? "SCHEDULE" : "USER", updated_at: r.started_at, usage: { tool_calls: 1, tokens: 900 }, limits: { tool_calls: 100, tokens: 200000 } }))
+        .filter((t: any) => !p.states || p.states.includes(t.state)); }
+    case "tasks.get": { const r = S.runs.find((x: any) => x.id === p.task_id) ?? {}; return { id: p.task_id, run_id: p.task_id, objective: r.title, state: r.status === "FAILED" ? "FAILED" : r.status === "RUNNING" ? "RUNNING" : "COMPLETED",
+      trigger_type: r.kind === "mission" ? "SCHEDULE" : "USER", error: r.status === "FAILED" ? "The model server did not answer (model_unreachable)." : null, usage: { tool_calls: 3, tokens: 14200, runtime_seconds: 41 },
+      limits: { tool_calls: 100, tokens: 200000, runtime_seconds: 1800 }, transitions: [{ id: "t1", to_state: "QUEUED", reason: "created", ts: r.started_at }, { id: "t2", to_state: "RUNNING", reason: "picked up", ts: r.started_at }] }; }
+    case "tasks.stop": case "tasks.resume": return { ok: true };
     case "files.list": return { files: S.files, storage: { used_bytes: 1234567, quota_bytes: 10737418240, count: S.files.length, quarantined: 0 } };
     case "files.upload": { const f = { id: id("file"), name: p.name ?? String(p.path).split(/[\\/]/).pop(), folder: "/", size_bytes: 2048, status: "READY", sensitivity: 1, source: "upload", created_at: now(), tags_json: [] }; S.files.unshift(f); return f; }
     case "files.preview": { const f: any = S.files.find((x: any) => x.id === p.file_id); return { ...f, meta: f?.meta_full ?? null, text: "Extracted text preview (mock)." }; }

@@ -39,7 +39,7 @@ function Widget({ id, title, d, reload }: { id: string; title: string; d: Item; 
     </Shell>);
   if (id === "routines_next") return (
     <Shell title={title} icon={ic} onClick={open}>
-      {!d.items.length ? <div className="small muted">No active routines. Create one in Missions &amp; Routines or Settings &gt; Email monitoring.</div>
+      {!d.items.length ? <div className="small muted">No active routines. Create one in Routines or Settings &gt; Email monitoring.</div>
         : d.items.map((r: Item) => <div key={r.id} className="wrow"><span className="ellipsis grow">{String(r.name).replace(/^Email: /, "")}</span><span className="small faint"><Time iso={r.next_run_at} smart /></span></div>)}
     </Shell>);
   if (id === "attention") return (

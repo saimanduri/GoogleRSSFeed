@@ -199,7 +199,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:106"
+   "screens/Activity.tsx:164"
   ],
   "scenarios": [
    "activity.events"
@@ -226,7 +226,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:146"
+   "screens/Activity.tsx:204"
   ],
   "scenarios": [
    "activity.what_did_agent_do"
@@ -348,9 +348,9 @@
   ],
   "ui_callers": [
    "screens/Chat.tsx:213",
-   "Shell.tsx:42",
-   "Shell.tsx:105",
-   "Shell.tsx:160"
+   "Shell.tsx:41",
+   "Shell.tsx:103",
+   "Shell.tsx:158"
   ],
   "scenarios": [
    "auth.lock"
@@ -453,7 +453,7 @@
    }
   ],
   "ui_callers": [
-   "app.tsx:228",
+   "app.tsx:229",
    "screens/Onboarding.tsx:299"
   ],
   "scenarios": [
@@ -834,7 +834,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Missions.tsx:84",
+   "screens/Missions.tsx:82",
    "screens/Onboarding.tsx:243",
    "screens/settings/ConnectorSettings.tsx:9"
   ],
@@ -1385,9 +1385,9 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:163",
+   "screens/Activity.tsx:221",
    "screens/History.tsx:41",
-   "Shell.tsx:169"
+   "Shell.tsx:167"
   ],
   "scenarios": [
    "history.search"
@@ -1506,7 +1506,7 @@
   "ui_callers": [
    "screens/settings/Misc.tsx:48",
    "screens/SignIn.tsx:79",
-   "Shell.tsx:63"
+   "Shell.tsx:62"
   ],
   "scenarios": [
    "killswitch.activate",
@@ -2144,7 +2144,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Activity.tsx:119",
+   "screens/Activity.tsx:177",
    "screens/settings/Misc.tsx:129"
   ],
   "scenarios": [
@@ -2305,7 +2305,7 @@
   ],
   "ui_callers": [
    "screens/Approvals.tsx:28",
-   "screens/Missions.tsx:45"
+   "screens/Missions.tsx:43"
   ],
   "scenarios": [
    "missions.activate"
@@ -2327,7 +2327,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:102"
+   "screens/Missions.tsx:100"
   ],
   "scenarios": [
    "missions.create"
@@ -2349,7 +2349,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:67"
+   "screens/Missions.tsx:65"
   ],
   "scenarios": [
    "missions.describe"
@@ -2366,7 +2366,7 @@
   "params": [],
   "ui_callers": [
    "screens/Approvals.tsx:10",
-   "screens/Missions.tsx:16"
+   "screens/Missions.tsx:15"
   ],
   "scenarios": [
    "missions.list"
@@ -2393,7 +2393,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:92"
+   "screens/Missions.tsx:90"
   ],
   "scenarios": [
    "missions.parse_schedule"
@@ -2415,7 +2415,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:47"
+   "screens/Missions.tsx:45"
   ],
   "scenarios": [
    "missions.run_now"
@@ -2443,8 +2443,8 @@
   ],
   "ui_callers": [
    "screens/Approvals.tsx:30",
-   "screens/Missions.tsx:46",
-   "screens/Missions.tsx:49"
+   "screens/Missions.tsx:44",
+   "screens/Missions.tsx:47"
   ],
   "scenarios": [
    "missions.pause",
@@ -2473,7 +2473,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:102"
+   "screens/Missions.tsx:100"
   ],
   "scenarios": [
    "missions.update"
@@ -2847,7 +2847,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:61",
+   "screens/Activity.tsx:106",
    "screens/History.tsx:30"
   ],
   "scenarios": [
@@ -2875,7 +2875,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:96"
+   "screens/Activity.tsx:154"
   ],
   "scenarios": [
    "runs.replay"
@@ -2897,7 +2897,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:75"
+   "screens/Activity.tsx:131"
   ],
   "scenarios": [
    "runs.transcript",
@@ -3826,7 +3826,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Tasks.tsx:23"
+   "screens/Activity.tsx:77"
   ],
   "scenarios": [
    "tasks.get_missing"
@@ -3853,7 +3853,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Tasks.tsx:14"
+   "screens/Activity.tsx:107"
   ],
   "scenarios": [
    "tasks.list"
@@ -3874,9 +3874,7 @@
     "required": true
    }
   ],
-  "ui_callers": [
-   "screens/Tasks.tsx:30"
-  ],
+  "ui_callers": [],
   "scenarios": [
    "tasks.resume_invalid"
   ],
@@ -3896,9 +3894,7 @@
     "required": true
    }
   ],
-  "ui_callers": [
-   "screens/Tasks.tsx:29"
-  ],
+  "ui_callers": [],
   "scenarios": [
    "tasks.stop"
   ],
@@ -3913,7 +3909,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Missions.tsx:89",
+   "screens/Missions.tsx:87",
    "screens/settings/Misc.tsx:144"
   ],
   "scenarios": [

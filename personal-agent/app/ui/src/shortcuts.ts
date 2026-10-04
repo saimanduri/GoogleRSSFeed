@@ -4,7 +4,8 @@ import type { Screen } from "./app";
 
 export const NAV_KEYS: Record<Screen, { key: string; label: string }> = {
   home: { key: "h", label: "Alt+H" }, chat: { key: "c", label: "Alt+C" }, history: { key: "i", label: "Alt+I" }, missions: { key: "m", label: "Alt+M" },
-  reminders: { key: "r", label: "Alt+R" }, tasks: { key: "t", label: "Alt+T" }, approvals: { key: "a", label: "Alt+A" }, files: { key: "f", label: "Alt+F" },
+  reminders: { key: "r", label: "Alt+R" }, tasks: { key: "t", label: "Alt+T" },  // Alt+T opens Activity log > Requests & steps (Tasks merged there)
+  approvals: { key: "a", label: "Alt+A" }, files: { key: "f", label: "Alt+F" },
   memory: { key: "e", label: "Alt+E" }, secrets: { key: "s", label: "Alt+S" }, activity: { key: "l", label: "Alt+L" }, outlook: { key: "o", label: "Alt+O" },
   guide: { key: "g", label: "Alt+G" }, settings: { key: ",", label: "Alt+," },
 };

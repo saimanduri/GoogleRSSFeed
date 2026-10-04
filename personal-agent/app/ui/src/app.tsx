@@ -16,7 +16,7 @@ const SCREENS: Screen[] = ["home", "chat", "missions", "reminders", "tasks", "ap
 const LAST_SCREEN = "pa.lastScreen";
 const UNDO_MS = 8000;
 function savedScreen(): Screen {
-  try { const s = localStorage.getItem(LAST_SCREEN) as Screen | null; if (s && SCREENS.includes(s)) return s; } catch { /* storage unavailable */ }
+  try { const s = localStorage.getItem(LAST_SCREEN) as Screen | null; if (s === "tasks") return "activity"; if (s && SCREENS.includes(s)) return s; } catch { /* storage unavailable */ }
   return "home";
 }
 
@@ -184,6 +184,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [status?.ui]);
 
   const go = useCallback((screen: Screen, params?: Record<string, any>) => {
+    if (screen === "tasks") { screen = "activity"; params = { tab: "runs", ...(params ?? {}) }; }   // Tasks now lives in Activity log
     setRoute({ screen, params });
     try { localStorage.setItem(LAST_SCREEN, screen); } catch { /* storage unavailable */ }
   }, []);

@@ -13,16 +13,16 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `account.set_pin` | unlocked | - | password*, pin*, recovery_key | screens/settings/AccountSettings.tsx:68 | account.set_pin |
 | `account.set_profile` | unlocked | - | display_name*, assistant_name* | screens/settings/AccountSettings.tsx:29 | account.profile |
 | `account.signin_history` | unlocked | - | - | screens/settings/AccountSettings.tsx:99 | account.signin_history |
-| `activity.events` | unlocked | - | filters*, limit, since, until | screens/Activity.tsx:106 | activity.events |
-| `activity.what_did_agent_do` | unlocked | - | since*, until* | screens/Activity.tsx:146 | activity.what_did_agent_do |
+| `activity.events` | unlocked | - | filters*, limit, since, until | screens/Activity.tsx:164 | activity.events |
+| `activity.what_did_agent_do` | unlocked | - | since*, until* | screens/Activity.tsx:204 | activity.what_did_agent_do |
 | `approvals.decide` | unlocked | - | approval_id*, approve, edited_payload*, payload_hash*, opened_at_ms | components/ApprovalCard.tsx:23 | approvals.bad_hash, approvals.approve, approvals.single_use |
 | `approvals.list` | unlocked | - | status | screens/Approvals.tsx:13 | approvals.pending, approvals.history |
 | `auth.forgot_password` | any | - | pin*, recovery_key*, new_password* | screens/SignIn.tsx:105 | auth.forgot_password |
-| `auth.lock` | any | - | reason | screens/Chat.tsx:213, Shell.tsx:42, Shell.tsx:105 … | auth.lock |
+| `auth.lock` | any | - | reason | screens/Chat.tsx:213, Shell.tsx:41, Shell.tsx:103 … | auth.lock |
 | `auth.quick_unlock` | any | - | pin* | screens/SignIn.tsx:34 | auth.quick_unlock |
 | `auth.sign_in` | any | - | username*, password* | screens/SignIn.tsx:35 | auth.sign_in_wrong, auth.sign_in, auth.sign_in_after_reset |
 | `auth.sign_out` | any | - | reason | - | auth.sign_out |
-| `auth.step_up` | unlocked | - | category*, method*, secret* | app.tsx:228, screens/Onboarding.tsx:299 | auth.stepup_password, auth.stepup_pin |
+| `auth.step_up` | unlocked | - | category*, method*, secret* | app.tsx:229, screens/Onboarding.tsx:299 | auth.stepup_password, auth.stepup_pin |
 | `backup.enable_schedule` | unlocked | - | password* | screens/Onboarding.tsx:301, screens/settings/Misc.tsx:25 | backup.enable_schedule |
 | `backup.restore` | unlocked | backup_restore | path*, password* | screens/settings/Misc.tsx:31, screens/settings/Misc.tsx:35 | manual: destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1 |
 | `backup.restore_signed_out` | any | - | path*, password* | screens/SignIn.tsx:147 | manual: needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1 |
@@ -36,7 +36,7 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `chat.send` | unlocked | - | chat_id*, text*, voice | screens/Chat.tsx:238 | chat.send, approvals.ask, killswitch.chat_blocked |
 | `chat.update` | unlocked | - | chat_id*, title, allow_tools, archived, pinned, folder | screens/Chat.tsx:83, screens/Chat.tsx:215, screens/Chat.tsx:277 … | chat.update, chat.update_bad_folder, chat.archive |
 | `connectors.disconnect` | unlocked | connectors | connector*, delete_data | screens/settings/ConnectorSettings.tsx:35 | connectors.disconnect_web |
-| `connectors.list` | unlocked | - | - | screens/Missions.tsx:84, screens/Onboarding.tsx:243, screens/settings/ConnectorSettings.tsx:9 | connectors.list |
+| `connectors.list` | unlocked | - | - | screens/Missions.tsx:82, screens/Onboarding.tsx:243, screens/settings/ConnectorSettings.tsx:9 | connectors.list |
 | `connectors.m365_sign_in` | unlocked | connectors | custom_scheme | - | manual: opens the browser and needs a Microsoft tenant: checklist D4 |
 | `connectors.pause_all` | unlocked | - | paused | screens/settings/ConnectorSettings.tsx:17 | connectors.pause_all, connectors.resume_all |
 | `connectors.set` | unlocked | - | connector* | screens/Onboarding.tsx:253, screens/settings/ConnectorSettings.tsx:11 | connectors.enable_web, connectors.disable_web |
@@ -57,12 +57,12 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `files.set_label` | unlocked | - | file_id*, level* | screens/Files.tsx:102 | files.label |
 | `files.update` | unlocked | - | file_id*, folder, tags*, in_knowledge, name | screens/Files.tsx:105, screens/Files.tsx:107, screens/Files.tsx:109 | files.update |
 | `files.upload` | unlocked | - | path, name*, sensitivity, folder, tags* | screens/Chat.tsx:184, screens/Files.tsx:22, screens/Files.tsx:33 | files.upload, files.missing_upload |
-| `history.search` | unlocked | - | query*, limit, kinds* | screens/Activity.tsx:163, screens/History.tsx:41, Shell.tsx:169 | history.search |
+| `history.search` | unlocked | - | query*, limit, kinds* | screens/Activity.tsx:221, screens/History.tsx:41, Shell.tsx:167 | history.search |
 | `home.dismiss` | unlocked | - | id* | screens/Home.tsx:75 | home.dismiss |
 | `home.summary` | unlocked | - | since | components/UsageMeter.tsx:9, screens/Activity.tsx:14, screens/Home.tsx:88 | home.summary |
 | `home.widgets` | unlocked | - | refresh | screens/Home.tsx:87 | home.widgets |
 | `home.widgets_set` | unlocked | - | enabled* | screens/Home.tsx:97 | home.widgets_set |
-| `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:48, screens/SignIn.tsx:79, Shell.tsx:63 | killswitch.activate, killswitch.partial, killswitch.bad_level |
+| `killswitch.activate` | keys | - | level*, source | screens/settings/Misc.tsx:48, screens/SignIn.tsx:79, Shell.tsx:62 | killswitch.activate, killswitch.partial, killswitch.bad_level |
 | `killswitch.release` | unlocked | - | level | screens/settings/Misc.tsx:49 | killswitch.release_needs_password, killswitch.release, killswitch.partial_release |
 | `killswitch.state` | unlocked | - | - | - | killswitch.state |
 | `llm.add` | unlocked | - | model*, make_default, auto_test | screens/settings/ModelSettings.tsx:158 | llm.add_mock, llm.add_second, llm.remote_needs_password |
@@ -87,21 +87,21 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `logs.rotate` | unlocked | - | - | - | logs.rotate |
 | `logs.siem_test` | unlocked | security_settings | - | screens/settings/Misc.tsx:131 | logs.siem_not_configured |
 | `logs.status` | unlocked | - | - | screens/settings/Misc.tsx:126 | logs.status |
-| `logs.verify` | unlocked | - | - | screens/Activity.tsx:119, screens/settings/Misc.tsx:129 | logs.verify, logs.verify_after_rotate |
+| `logs.verify` | unlocked | - | - | screens/Activity.tsx:177, screens/settings/Misc.tsx:129 | logs.verify, logs.verify_after_rotate |
 | `memory.about_me` | unlocked | - | - | screens/Memory.tsx:20 | memory.about_me |
 | `memory.action` | unlocked | - | id*, action*, content | screens/Home.tsx:61, screens/Memory.tsx:25, screens/Memory.tsx:34 | memory.edit, memory.disable, memory.enable, memory.bad_action … |
 | `memory.add` | unlocked | - | content*, type | screens/Memory.tsx:44, screens/Memory.tsx:45 | memory.add |
 | `memory.delete_all` | unlocked | - | - | screens/Memory.tsx:64 | memory.delete_all |
 | `memory.list` | unlocked | - | status | screens/Memory.tsx:22 | memory.list |
 | `memory.review` | unlocked | - | - | screens/Memory.tsx:21 | memory.review |
-| `missions.activate` | unlocked | - | mission_id* | screens/Approvals.tsx:28, screens/Missions.tsx:45 | missions.activate |
-| `missions.create` | unlocked | - | mission* | screens/Missions.tsx:102 | missions.create |
-| `missions.describe` | unlocked | - | text* | screens/Missions.tsx:67 | missions.describe |
-| `missions.list` | unlocked | - | - | screens/Approvals.tsx:10, screens/Missions.tsx:16 | missions.list |
-| `missions.parse_schedule` | unlocked | - | text*, timezone | screens/Missions.tsx:92 | missions.parse_schedule |
-| `missions.run_now` | unlocked | - | mission_id* | screens/Missions.tsx:47 | missions.run_now |
-| `missions.set_status` | unlocked | - | status*, mission_id* | screens/Approvals.tsx:30, screens/Missions.tsx:46, screens/Missions.tsx:49 | missions.pause, missions.bad_status, missions.cancel |
-| `missions.update` | unlocked | - | mission_id*, mission* | screens/Missions.tsx:102 | missions.update |
+| `missions.activate` | unlocked | - | mission_id* | screens/Approvals.tsx:28, screens/Missions.tsx:43 | missions.activate |
+| `missions.create` | unlocked | - | mission* | screens/Missions.tsx:100 | missions.create |
+| `missions.describe` | unlocked | - | text* | screens/Missions.tsx:65 | missions.describe |
+| `missions.list` | unlocked | - | - | screens/Approvals.tsx:10, screens/Missions.tsx:15 | missions.list |
+| `missions.parse_schedule` | unlocked | - | text*, timezone | screens/Missions.tsx:90 | missions.parse_schedule |
+| `missions.run_now` | unlocked | - | mission_id* | screens/Missions.tsx:45 | missions.run_now |
+| `missions.set_status` | unlocked | - | status*, mission_id* | screens/Approvals.tsx:30, screens/Missions.tsx:44, screens/Missions.tsx:47 | missions.pause, missions.bad_status, missions.cancel |
+| `missions.update` | unlocked | - | mission_id*, mission* | screens/Missions.tsx:100 | missions.update |
 | `network.logs` | unlocked | - | days, host, component, outcome, limit, offset, include_local | screens/NetworkLogs.tsx:40 | network.logs, network.logs_filtered |
 | `notifications.list` | unlocked | - | - | - | notifications.list |
 | `notifications.mark_read` | unlocked | - | id | - | notifications.mark_read |
@@ -115,9 +115,9 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `reminders.list` | unlocked | - | include_done | screens/Reminders.tsx:12 | reminders.list, reminders.show_done |
 | `run.step` | keys | - | task_id*, type*, title*, text | - | manual: core-role RPC: written by pa-core during chat.send; see runs.get steps |
 | `runs.get` | unlocked | - | run_id* | components/RunTimeline.tsx:17, components/RunTimeline.tsx:30 | runs.get |
-| `runs.list` | unlocked | - | limit, archived, chat_id | screens/Activity.tsx:61, screens/History.tsx:30 | runs.list |
-| `runs.replay` | unlocked | - | event_id*, model_id | screens/Activity.tsx:96 | runs.replay |
-| `runs.transcript` | unlocked | - | run_id* | screens/Activity.tsx:75 | runs.transcript, runs.transcript_event |
+| `runs.list` | unlocked | - | limit, archived, chat_id | screens/Activity.tsx:106, screens/History.tsx:30 | runs.list |
+| `runs.replay` | unlocked | - | event_id*, model_id | screens/Activity.tsx:154 | runs.replay |
+| `runs.transcript` | unlocked | - | run_id* | screens/Activity.tsx:131 | runs.transcript, runs.transcript_event |
 | `secrets.binding_targets` | unlocked | - | - | screens/Secrets.tsx:72 | secrets.binding_targets |
 | `secrets.copy` | unlocked | secrets | id*, clear_after | screens/Secrets.tsx:28 | secrets.copy |
 | `secrets.create` | unlocked | - | item*, bindings* | screens/Secrets.tsx:77 | secrets.create |
@@ -156,11 +156,11 @@ Columns: state = required session state, step-up = re-auth category, UI = where 
 | `task.context` | keys | - | task_id* | - | manual: core-role RPC: pa-core reads it at task start (chat.send) |
 | `task.finish` | keys | - | task_id*, status*, result, reason | - | manual: core-role RPC: pa-core ends each task (chat.send) |
 | `task.heartbeat` | keys | - | task_id* | - | manual: core-role RPC: pa-core lease heartbeat during long tasks |
-| `tasks.get` | unlocked | - | task_id* | screens/Tasks.tsx:23 | tasks.get_missing |
-| `tasks.list` | unlocked | - | states*, limit | screens/Tasks.tsx:14 | tasks.list |
-| `tasks.resume` | unlocked | - | task_id* | screens/Tasks.tsx:30 | tasks.resume_invalid |
-| `tasks.stop` | unlocked | - | task_id* | screens/Tasks.tsx:29 | tasks.stop |
-| `tools.catalog` | unlocked | - | - | screens/Missions.tsx:89, screens/settings/Misc.tsx:144 | tools.catalog |
+| `tasks.get` | unlocked | - | task_id* | screens/Activity.tsx:77 | tasks.get_missing |
+| `tasks.list` | unlocked | - | states*, limit | screens/Activity.tsx:107 | tasks.list |
+| `tasks.resume` | unlocked | - | task_id* | - | tasks.resume_invalid |
+| `tasks.stop` | unlocked | - | task_id* | - | tasks.stop |
+| `tools.catalog` | unlocked | - | - | screens/Missions.tsx:87, screens/settings/Misc.tsx:144 | tools.catalog |
 | `tools.invoke` | keys | - | task_id*, tool*, args* | - | manual: core-role RPC: the only way tools run; policy/red-team tests: tests/unit/test_policy.py, tests/redteam |
 | `ui.open_link` | any | - | url* | - | ui.open_link_screen, ui.open_link_cannot_change_settings, ui.open_link_unknown |
 | `updates.status` | unlocked | - | - | screens/settings/Misc.tsx:119 | updates.status |

@@ -20,12 +20,11 @@ import { Memory } from "./screens/Memory";
 import { Missions } from "./screens/Missions";
 import { Reminders } from "./screens/Reminders";
 import { Secrets } from "./screens/Secrets";
-import { Tasks } from "./screens/Tasks";
 import { Settings } from "./screens/settings/Settings";
 
 const NAV: [Screen, string, string][] = [
-  ["home", "Home", "home"], ["chat", "Chat", "chat"], ["history", "History", "history"], ["missions", "Missions & Routines", "missions"], ["reminders", "Reminders", "reminders"],
-  ["tasks", "Tasks", "tasks"], ["approvals", "Approvals", "approvals"], ["files", "My Files", "files"], ["memory", "Memory", "memory"],
+  ["home", "Home", "home"], ["chat", "Chat", "chat"], ["history", "History", "history"], ["missions", "Routines", "missions"], ["reminders", "Reminders", "reminders"],
+  ["approvals", "Approvals", "approvals"], ["files", "My Files", "files"], ["memory", "Memory", "memory"],
   ["secrets", "Secrets", "secrets"], ["activity", "Activity log", "activity"], ["outlook", "Outlook", "mail"], ["guide", "Guide", "help"],
 ];
 
@@ -78,7 +77,6 @@ export function Shell() {
       case "outlook": return <Outlook />;
       case "missions": return <Missions />;
       case "reminders": return <Reminders />;
-      case "tasks": return <Tasks />;
       case "approvals": return <Approvals />;
       case "files": return <Files />;
       case "memory": return <Memory />;
@@ -98,7 +96,7 @@ export function Shell() {
         {here && <nav className="crumbs" aria-label="You are here"><span className="sep" aria-hidden="true">/</span><span className="here" aria-current="page">{here}</span></nav>}
         {status?.dev_mode && <span className="badge warn" title="Developer mode - never use with real data">DEV MODE</span>}
         <div className="spacer" />
-        <button className="status-pill" onClick={() => go(ks?.any ? "settings" : "tasks", ks?.any ? { section: "emergency" } : undefined)} style={{ cursor: "pointer" }}>
+        <button className="status-pill" onClick={() => go(ks?.any ? "settings" : "activity", ks?.any ? { section: "emergency" } : { tab: "runs" })} style={{ cursor: "pointer" }}>
           <span className={`dot ${pill.dot}`} />{pill.text}
         </button>
         <Button kind="ghost" icon="search" title="Search / commands (Ctrl+K)" onClick={() => setPalette(true)} />

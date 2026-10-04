@@ -30,7 +30,7 @@ const sourceLabel = (s: string): string | null => (s in SOURCE_NAMES ? SOURCE_NA
 const SLASH: { cmd: string; help: string; arg?: string }[] = [
   { cmd: "/new", help: "Start a new chat" },
   { cmd: "/remind", help: "Create a reminder (asks you to confirm)", arg: "what and when" },
-  { cmd: "/mission", help: "Describe a routine in plain words", arg: "e.g. every weekday at 7:30 summarise mail" },
+  { cmd: "/routine", help: "Describe a routine in plain words", arg: "e.g. every weekday at 7:30 summarise mail" },
   { cmd: "/search", help: "Search the web", arg: "query" },
   { cmd: "/attach", help: "Attach a file from this PC (read in place, not uploaded)" },
   { cmd: "/folder", help: "Share a folder from this PC with this chat (read-only)" },
@@ -219,7 +219,7 @@ export function Chat() {
         await call("settings.apply", { changes: { "ui.theme": arg } }); await refresh(); break;
       }
       case "/remind": if (!arg) { toast("Usage: /remind what and when"); setText("/remind "); break; } await send(`Remind me ${arg}`); break;
-      case "/mission": if (!arg) { toast("Usage: /mission every weekday at 7:30 summarise important mail"); setText("/mission "); break; } await send(`Create a routine: ${arg}`); break;
+      case "/routine": case "/mission": if (!arg) { toast("Usage: /routine every weekday at 7:30 summarise important mail"); setText("/routine "); break; } await send(`Create a routine: ${arg}`); break;
       case "/search": if (!arg) { toast("Usage: /search query"); setText("/search "); break; } await send(`Search the web for ${arg}`); break;
     }
     return true;

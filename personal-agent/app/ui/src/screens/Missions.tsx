@@ -3,7 +3,7 @@ import { onEvent } from "../api/gateway";
 import { errText, useApp } from "../app";
 import { Icon } from "../components/Icon";
 import { SchedulePicker } from "../components/SchedulePicker";
-import { Badge, Button, Card, ChipInput, Empty, Field, Modal, Notice, Tabs, Time, toneOf } from "../components/ui";
+import { Badge, Button, Card, ChipInput, Empty, Field, Modal, Notice, Time, toneOf } from "../components/ui";
 
 const TONE: Record<string, string> = { ACTIVE: "ok", DRAFT: "accent", PAUSED: "warn", SUSPENDED: "warn", FAILED: "danger", COMPLETED: "info" };
 
@@ -12,25 +12,23 @@ export function Missions() {
   const [list, setList] = useState<any[]>([]);
   const [edit, setEdit] = useState<any>(null);
   const [describe, setDescribe] = useState(false);
-  const [tab, setTab] = useState<"all" | "routine" | "mission">("all");
   const load = () => call<any[]>("missions.list").then(setList).catch(() => undefined);
   useEffect(() => { void load(); return onEvent((t) => t === "missions.changed" && void load()); /* eslint-disable-next-line */ }, []);
   useEffect(() => { if (route.params?.create) setDescribe(true); }, [route.params?.create]);
   const act = async (fn: () => Promise<any>, ok: string) => { try { await fn(); toast(ok, "ok"); void load(); } catch (e: any) { toast(errText(e), e?.code === "needs_setup" ? "warn" : "danger"); } };
-  const shown = list.filter((m) => !isHidden(`mission:${m.id}`) && (tab === "all" || m.kind === tab));
+  const shown = list.filter((m) => !isHidden(`mission:${m.id}`));
   return (
     <div className="page">
       <div className="page-header">
-        <div className="grow"><h1>Missions &amp; Routines</h1><div className="muted">Work that runs on a schedule or when something happens - even while the window is closed.</div></div>
+        <div className="grow"><h1>Routines</h1><div className="muted">Work that runs on a schedule or when something happens - even while the window is closed.</div></div>
         <Button icon="sparkle" onClick={() => setDescribe(true)}>Describe in plain words</Button>
         <Button kind="primary" icon="plus" onClick={() => setEdit({ kind: "routine", schedule: "every weekday at 07:30", allowed_tools: ["notify.user"], missed_run_policy: "RUN_ONCE" })}>New</Button>
       </div>
-      <Tabs tabs={[["all", "All"], ["routine", "Routines"], ["mission", "Missions"]]} value={tab} onChange={setTab} />
-      {!shown.length ? <Card><Empty icon="missions" title="No missions yet">Try "Every weekday at 7:30 summarise important mail".</Empty></Card> : (
+      {!shown.length ? <Card><Empty icon="missions" title="No routines yet">Try "Every weekday at 7:30 summarise important mail".</Empty></Card> : (
         <div className="grid-2">
           {shown.map((m) => (
             <Card key={m.id} title={<span>{m.name} {m.proposed_by === "agent" && <Badge tone="info">proposed by agent</Badge>}</span>}
-              actions={<Badge tone={TONE[m.status]}>{m.status}</Badge>} icon={m.kind === "routine" ? "refresh" : "missions"}>
+              actions={<Badge tone={TONE[m.status]}>{m.status}</Badge>} icon="refresh">
               <p className="small muted">{m.objective.slice(0, 220)}</p>
               <div className="kv small">
                 <span>Schedule</span><span>{m.schedule_text} <span className="faint">({m.timezone})</span></span>
@@ -44,7 +42,7 @@ export function Missions() {
               <div className="row wrap" style={{ marginTop: 12 }}>
                 {m.status !== "ACTIVE" && <Button small kind="primary" icon="play" onClick={() => act(() => call("missions.activate", { mission_id: m.id }), "Activated")}>Activate</Button>}
                 {m.status === "ACTIVE" && <Button small icon="pause" onClick={() => act(() => call("missions.set_status", { mission_id: m.id, status: "PAUSED" }), "Paused")}>Pause</Button>}
-                <Button small icon="play" onClick={() => act(() => call("missions.run_now", { mission_id: m.id }), "Started - see Tasks")}>Run now</Button>
+                <Button small icon="play" onClick={() => act(() => call("missions.run_now", { mission_id: m.id }), "Started - see Activity log")}>Run now</Button>
                 <Button small kind="ghost" icon="edit" onClick={() => setEdit({ ...m, schedule: m.schedule })}>Edit</Button>
                 <Button small kind="ghost" icon="trash" title="Cancel" onClick={() => deferDelete({ key: `mission:${m.id}`, label: `Cancelled "${m.name}"`, commit: () => call("missions.set_status", { mission_id: m.id, status: "CANCELLED" }), after: () => void load() })} />
               </div>
@@ -63,7 +61,7 @@ function DescribeDialog({ onClose, onForm }: { onClose: () => void; onForm: (f: 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   return (
-    <Modal title="Describe a mission" onClose={onClose} actions={<><Button onClick={onClose}>Cancel</Button>
+    <Modal title="Describe a routine" onClose={onClose} actions={<><Button onClick={onClose}>Cancel</Button>
       <Button kind="primary" busy={busy} disabled={!text.trim()} onClick={async () => { setBusy(true); try { onForm(await call("missions.describe", { text })); } catch (e: any) { toast(errText(e), "danger"); } finally { setBusy(false); } }}>Fill in the form</Button></>}>
       <p className="muted">Say what you want in your own words. The form is filled in for you to review - nothing is saved or activated until you confirm, and it cannot exceed your current settings.</p>
       <textarea className="input" autoFocus rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Every weekday at 7:30, summarise important emails and list what needs action." />
@@ -84,8 +82,8 @@ function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () 
   useEffect(() => { call<any>("connectors.list").then((r) => setWeb(r.connectors?.find((c: any) => c.id === "web") ?? null)).catch(() => undefined); }, [call]);
   const tools: string[] = m.allowed_tools ?? [];
   const webNeeded = web && tools.some((t) => t.startsWith("web.")) ? (!web.enabled || !web.use_missions
-    ? "Web tools are selected but the Web connector is turned off for missions (Settings > Connectors)."
-    : tools.includes("web.search") && !web.search_ready ? "Web search needs a search provider (Exa, Brave, Tavily or a SearXNG server) and its API key. Until that is set up this mission cannot search and will report an error each time it runs." : "") : "";
+    ? "Web tools are selected but the Web connector is turned off for routines (Settings > Connectors)."
+    : tools.includes("web.search") && !web.search_ready ? "Web search needs a search provider (Exa, Brave, Tavily or a SearXNG server) and its API key. Until that is set up this routine cannot search and will report an error each time it runs." : "") : "";
   useEffect(() => { call<any>("tools.catalog").then((c) => setCatalog(c.tools.filter((t: any) => t.enabled))).catch(() => undefined); }, [call]);
   useEffect(() => {
     if (!m.schedule) return;
@@ -105,13 +103,12 @@ function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () 
     } catch (e: any) { toast(errText(e), "danger"); } finally { setBusy(false); }
   };
   return (
-    <Modal wide title={m.id ? "Edit mission" : "New mission / routine"} onClose={onClose}
+    <Modal wide title={m.id ? "Edit routine" : "New routine"} onClose={onClose}
       actions={<><Button onClick={onClose}>Cancel</Button><Button kind="primary" busy={busy} disabled={!m.name || !m.objective} onClick={save}>Save</Button></>}>
       <div className="grid-2">
         <div className="col">
           <Field label="Name"><input className="input" value={m.name ?? ""} onChange={(e) => set("name", e.target.value)} /></Field>
-          <Field label="Type"><select className="input" value={m.kind ?? "routine"} onChange={(e) => set("kind", e.target.value)}>
-            <option value="routine">Routine (simple recurring prompt)</option><option value="mission">Mission</option></select></Field>
+{/* one kind only: 'Routines' (the old Mission type behaved identically) */}
           <Field label="What should it do?"><textarea className="input" rows={5} value={m.objective ?? ""} onChange={(e) => set("objective", e.target.value)} /></Field>
           <SchedulePicker value={initial.schedule} onChange={(t) => set("schedule", t)} />
           <div className="small muted" role="status">
@@ -121,7 +118,7 @@ function MissionForm({ initial, onClose, onSaved }: { initial: any; onClose: () 
           {m.schedule_note && <div className="banner warn small">{m.schedule_note}</div>}
         </div>
         <div className="col">
-          <Field label="Allowed tools" help="The mission can use only these. Widening an active mission pauses it until you re-activate.">
+          <Field label="Allowed tools" help="The routine can use only these. Widening an active routine pauses it until you re-activate.">
             <div className="card flat" style={{ maxHeight: 220, overflowY: "auto", padding: 8 }}>
               {catalog.map((t) => (
                 <label key={t.name} className="row small" style={{ padding: 3 }}>
