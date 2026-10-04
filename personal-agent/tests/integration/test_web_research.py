@@ -106,7 +106,7 @@ def test_answer_with_sources(web):
 
 
 def test_research_polls_until_done_and_lists_sources(web, monkeypatch):
-    monkeypatch.setattr("pa_gateway.connectors.web.time.sleep", lambda s: None)
+    monkeypatch.setattr("pa_gateway.connectors.web._pause", lambda s: None)
     REPLIES["https://api.exa.ai/research/v0/tasks/rt_1"] = [{"status": "running"}, {"status": "running"},
                                                             {"status": "completed", "data": {"report": "Top 5 AI items for Indian banking ..."},
                                                              "citations": {"report": [{"url": "https://rbi.example/c1"}, {"url": "https://news.example/c2"}]}}]
@@ -119,7 +119,7 @@ def test_research_polls_until_done_and_lists_sources(web, monkeypatch):
 
 
 def test_research_stops_on_emergency_stop(web, monkeypatch):
-    monkeypatch.setattr("pa_gateway.connectors.web.time.sleep", lambda s: None)
+    monkeypatch.setattr("pa_gateway.connectors.web._pause", lambda s: None)
     REPLIES["https://api.exa.ai/research/v0/tasks/rt_2"] = [{"status": "running"}]
     REPLIES["https://api.exa.ai/research/v0/tasks"] = [{"id": "rt_2"}]
     with monkeypatch.context() as m, pytest.raises(ToolFailed) as e:     # restored before teardown (shutdown must not see a stop forever)

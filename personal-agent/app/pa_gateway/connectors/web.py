@@ -15,6 +15,11 @@ from ..egress.http import EgressClient, EgressDenied, EgressPolicy
 from ..tools.base import ExecContext, ToolFailed, ToolResult
 from .service import ConnectorAdapter
 
+def _pause(seconds: float) -> None:
+    """Waiting between research polls (a module function so tests can replace it without touching time.sleep for every thread)."""
+    time.sleep(seconds)
+
+
 PROVIDER_HOSTS = {
     "brave": ("api.search.brave.com",),
     "exa": ("api.exa.ai",),
@@ -200,7 +205,7 @@ class WebConnector(ConnectorAdapter):
                 raise ToolFailed("Exa research failed")
             if time.monotonic() > deadline:
                 raise ToolFailed(f"the research did not finish within {args['max_minutes']} minutes (it may still finish on Exa's side)")
-            time.sleep(5)
+            _pause(5)
         result = data.get("data")
         if isinstance(result, dict) and len(result) == 1 and isinstance(next(iter(result.values())), str):
             result = next(iter(result.values()))
