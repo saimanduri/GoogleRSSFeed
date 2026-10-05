@@ -1,6 +1,16 @@
 # Pending work
 
 ## 0.1.14 - remaining work (step by step; remove an item when it is done)
+**Decisions made by the user (2026-10-05)** - follow these:
+- Diarizer: **pyannote Community-1** (pyannote.audio + PyTorch; weights from Hugging Face need the user's own token stored in Secrets,
+  downloaded once through the gateway, SHA-256 recorded; runs locally, CPU or GPU). Output: segments {start, end, speaker} -> W3.
+- Office output: **python-docx, openpyxl, python-pptx** (add to requirements.txt + hash-pinned lock files, used only in the gateway) -> W4.
+- Finance sandbox: **bundle a pinned embeddable Python with numpy + pandas** (+ openpyxl to read Excel statements) as `sandbox-python\`
+  in `scripts/build.ps1` (download official zip + wheels, verify SHA-256, no network in the sandbox) -> W5. The claude-skills finance
+  scripts use only the Python standard library, so they need nothing more than numpy / pandas / openpyxl.
+- Security / bug review: NOT done yet (W2 code review, W7 independent assessment). Do them before using the app with real data.
+Suggested order with a small budget: W4 (Office output, smallest) -> W2 (code review) -> W6 (file safety) -> W5 -> W3 -> W1 -> W7.
+
 Context: branch `claude/v0.1.14` (from `update-0.1.13`), draft PR https://github.com/saimanduri/GoogleRSSFeed/pull/1. Read
 `docs/PLAN_0.1.14.md` (design for every item below) and `docs/CHANGES_2026-10-04.md` (what is already done). Rules: CLAUDE.md;
 every change gets tests, a Guide entry for UI (`screens/guideData.ts`), mock support (`api/mock.ts`), `tests/e2e/ui_actions.json` +
