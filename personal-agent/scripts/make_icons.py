@@ -124,6 +124,9 @@ def main() -> None:
         (ICONS / name).write_bytes(png_encode(resize(src, s)))
     PUBLIC.mkdir(parents=True, exist_ok=True)
     (PUBLIC / "chirag-logo.png").write_bytes(png_encode(resize(src, 128)))
+    # the logo in the window (top bar, sign-in, wizard) is imported from src/assets so its name changes with its content
+    (ROOT / "app" / "ui" / "src" / "assets").mkdir(parents=True, exist_ok=True)
+    (ROOT / "app" / "ui" / "src" / "assets" / "app-logo.png").write_bytes((PUBLIC / "chirag-logo.png").read_bytes())
     (PUBLIC / "favicon.ico").write_bytes((ICONS / "icon.ico").read_bytes())
     (ROOT / "installer" / "windows" / "ChiRAG.ico").write_bytes((ICONS / "icon.ico").read_bytes())
     print("wrote icons to", ICONS, "and", PUBLIC)

@@ -34,6 +34,7 @@ def test_templates_are_read_only_and_valid():
         assert NOTHING in t["objective"]
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_list_enable_disable_roundtrip(ol):
     ui = ol.ui
     r = ui.call("emailskills.list")
@@ -55,6 +56,7 @@ def test_list_enable_disable_roundtrip(ol):
     assert len([x for x in ui.call("missions.list") if x["template_id"] == "approvals"]) == 1
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_vip_skill_needs_names_and_renders_them(ol):
     _enable_connector(ol)
     with pytest.raises(PAError) as e:
@@ -66,6 +68,7 @@ def test_vip_skill_needs_names_and_renders_them(ol):
     assert '"Anita Rao", "Governor"' in text and "{VIPS}" not in text
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_scripted_run_shows_result_and_unseen_counter(ol, monkeypatch):
     import pa_gateway.connectors.outlook_local as mod
     import pa_gateway.llm.mock as mock
@@ -101,6 +104,7 @@ def test_scripted_run_shows_result_and_unseen_counter(ol, monkeypatch):
     assert not [f for f in ol.ui.call("files.list", {"query": ""})["files"] if f["folder"] == "/Mission outputs"]
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_nothing_new_is_silent(ol, monkeypatch):
     import pa_gateway.connectors.outlook_local as mod
     import pa_gateway.llm.mock as mock
@@ -116,6 +120,7 @@ def test_nothing_new_is_silent(ol, monkeypatch):
     assert ol.ui.call("session.status")["outlook_unseen"] == 0
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_data_is_gathered_by_the_application_before_the_model_starts(ol, monkeypatch):
     """The model that never calls a tool still sees real data: the first tool calls are made by the app itself."""
     import pa_gateway.connectors.outlook_local as mod

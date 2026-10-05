@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useState } from "react";
 import { pickFile, pickSavePath } from "../../api/gateway";
 import { errText, useApp } from "../../app";
 import { Badge, Button, bytes, Card, Field, Modal, Time } from "../../components/ui";
+import { readable } from "./GenericGroup";
+import { ResourceMeters } from "../../components/ResourceMeters";
 
 export function BackupSettings({ generic }: { generic: ReactNode }) {
   const { call, toast, confirmPassword } = useApp();
@@ -77,6 +79,12 @@ export function PrivacySettings() {
   );
 }
 
+/** {"COMPLETED": 3, "FAILED": 1} -> "3 completed · 1 failed" */
+function counts(m: Record<string, number> | undefined): string {
+  const e = Object.entries(m ?? {}).filter(([, n]) => n > 0);
+  return e.length ? e.map(([k, n]) => `${n} ${k.toLowerCase().replace(/_/g, " ")}`).join(" · ") : "none";
+}
+
 export function DiagnosticsSettings() {
   const { call, toast } = useApp();
   const [h, setH] = useState<any>(null);
@@ -85,14 +93,15 @@ export function DiagnosticsSettings() {
   useEffect(() => { call("diagnostics.health").then(setH).catch(() => undefined); call("about").then(setAbout).catch(() => undefined); }, [call]);
   return (
     <div className="col">
+      <ResourceMeters />
       <Card title="Component health">{h && (<div className="kv small">
         <span>Gateway</span><span><Badge tone="ok">running</Badge> uptime {Math.round(h.gateway.uptime_s / 60)} min</span>
         <span>Agent runtime</span><span><Badge tone={h.core.ok ? "ok" : "danger"}>{h.core.ok ? "running" : "stopped"}</Badge> {h.core.mode}</span>
         <span>Model runtime</span><span>{h.model.builtin_running ? "built-in running" : "idle"} · {h.model.models} models</span>
         <span>Outlook worker</span><span>{h.outlook_worker?.running ? "running" : "idle"}</span>
         <span>Sandbox</span><span>{h.sandbox.label ?? h.sandbox.strength}</span>
-        <span>Tasks</span><span className="mono">{JSON.stringify(h.metrics.tasks ?? {})}</span>
-        <span>Approvals</span><span className="mono">{JSON.stringify(h.metrics.approvals ?? {})}</span>
+        <span>Tasks</span><span>{counts(h.metrics.tasks)}</span>
+        <span>Approvals</span><span>{counts(h.metrics.approvals)}</span>
       </div>)}</Card>
       <Card title="Diagnostics bundle" actions={<Button onClick={async () => setBundle(await call("diagnostics.bundle"))}>Preview</Button>}>
         <div className="small muted">Metadata only - no content, no secrets. You see exactly what would be saved.</div></Card>
@@ -169,19 +178,35 @@ export function ToolsExtras() {
   );
 }
 
-export function RulesExtras({ reload }: { reload: () => void }) {
+export function RulesExtras({ reload, schema }: { reload: () => void; schema?: any }) {
   const { call, toast } = useApp();
   const [rules, setRules] = useState<any>(null);
   const [hist, setHist] = useState<any[]>([]);
-  useEffect(() => { call("settings.rules_plain").then(setRules).catch(() => undefined); call<any[]>("settings.history").then(setHist).catch(() => undefined); }, [call]);
+  const [all, setAll] = useState(false);
+  const loadHist = () => call<any[]>("settings.history").then(setHist).catch(() => undefined);
+  useEffect(() => { call("settings.rules_plain").then(setRules).catch(() => undefined); void loadHist(); /* eslint-disable-next-line */ }, [call]);
+  const byKey: Record<string, any> = Object.fromEntries((schema?.settings ?? []).map((s: any) => [s.key, s]));
+  const val = (key: string, json: string) => { try { return readable(byKey[key], JSON.parse(json)); } catch { return json; } };
+  const rows = [...hist].sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  const shown = all ? rows : rows.slice(0, 10);
+  const floor = (rules?.rules ?? []).filter((r: any) => r.floor);
+  const mine = (rules?.rules ?? []).filter((r: any) => !r.floor);
   return (
     <div className="col" style={{ marginTop: 14 }}>
-      {rules && <Card title={`Active rules in plain language · policy ${rules.policy_version}`}>
-        {rules.rules.map((r: any, i: number) => <div key={i} className="list-item"><Badge tone={r.floor ? "info" : ""}>{r.floor ? "security floor" : "your setting"}</Badge><div className="grow small">{r.rule}</div></div>)}</Card>}
-      <Card title="Change history">
-        <table className="table"><tbody>{hist.map((h) => <tr key={h.id}><td className="small"><Time iso={h.ts} /></td><td className="mono small">{h.key}</td>
-          <td className="small">{h.before_json} → {h.after_json}</td><td><Badge tone={h.direction === "loosen" ? "warn" : ""}>{h.direction}</Badge></td>
-          <td><Button small kind="ghost" onClick={async () => { try { await call("settings.apply", { changes: { [h.key]: JSON.parse(h.before_json) } }); toast("Reverted", "ok"); reload(); } catch (e: any) { toast(errText(e), "danger"); } }}>Revert</Button></td></tr>)}</tbody></table>
+      {rules && <Card title="Rules in force right now" actions={<span className="faint small">policy {rules.policy_version}</span>}>
+        {mine.length > 0 && <div className="small muted" style={{ fontWeight: 600, margin: "2px 0 4px" }}>From your settings</div>}
+        {mine.map((r: any, i: number) => <div key={`m${i}`} className="list-item"><Badge>your setting</Badge><div className="grow small">{r.rule}</div></div>)}
+        {floor.length > 0 && <div className="small muted" style={{ fontWeight: 600, margin: "10px 0 4px" }}>Security floor (cannot be switched off)</div>}
+        {floor.map((r: any, i: number) => <div key={`f${i}`} className="list-item"><Badge tone="info">security floor</Badge><div className="grow small">{r.rule}</div></div>)}
+      </Card>}
+      <Card title="Change history" actions={rows.length > 10 ? <Button small kind="ghost" onClick={() => setAll(!all)}>{all ? "Show latest 10" : `Show all ${rows.length}`}</Button> : undefined}>
+        {!rows.length ? <div className="small muted">No settings have been changed yet.</div> : (
+          <table className="table"><thead><tr><th>When</th><th>Setting</th><th>Change</th><th></th><th></th></tr></thead>
+            <tbody>{shown.map((h) => <tr key={h.id}><td className="small"><Time iso={h.ts} /></td>
+              <td className="small" title={h.key}>{byKey[h.key]?.label ?? h.key}</td>
+              <td className="small">{val(h.key, h.before_json)} → {val(h.key, h.after_json)}</td>
+              <td><Badge tone={h.direction === "loosen" ? "warn" : ""}>{h.direction === "loosen" ? "less strict" : h.direction === "tighten" ? "stricter" : "changed"}</Badge></td>
+              <td><Button small kind="ghost" onClick={async () => { try { await call("settings.apply", { changes: { [h.key]: JSON.parse(h.before_json) } }); toast("Reverted", "ok"); reload(); void loadHist(); } catch (e: any) { toast(errText(e), "danger"); } }}>Revert</Button></td></tr>)}</tbody></table>)}
       </Card>
     </div>
   );

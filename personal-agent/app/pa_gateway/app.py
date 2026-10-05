@@ -35,6 +35,7 @@ from .agentdata.memory_learn import MemoryLearner
 from .files.insights import FileInsights
 from .agentdata.home_widgets import HomeWidgets
 from .netlog import NetLog
+from .resmon import ResourceMonitor
 from .sysmon import GpuMonitor
 from .agentdata.missions import MissionService
 from .agentdata.reminders import ReminderService
@@ -502,6 +503,7 @@ class Gateway:
         self.memory = MemoryService(self.db, self.audit, self.settings, embed=self._embed_safe)
         self.netlog = NetLog(self)
         self.gpu = GpuMonitor()
+        self.resources = ResourceMonitor(self.paths.root, gpu=self.gpu)
         self.vision = VisionReader(self)
         self.memory_learner = MemoryLearner(self)
         self.insights = FileInsights(self)

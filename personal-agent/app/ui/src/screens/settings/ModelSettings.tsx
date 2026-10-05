@@ -25,6 +25,7 @@ export function ModelSettings({ generic }: { generic: ReactNode }) {
   const [d, setD] = useState<any>(null);
   const [report, setReport] = useState<any>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [tune, setTune] = useState<any>(null);
   const load = () => call("llm.models").then(setD).catch(() => undefined);
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
   // a model added with "Add" is tested in the background: refresh when it finishes (event) and keep polling as a fallback
@@ -50,7 +51,10 @@ export function ModelSettings({ generic }: { generic: ReactNode }) {
             {models.length > 0 && <table className="table"><tbody>{models.map((m: any) => (
               <tr key={m.id}>
                 <td><b>{m.name}</b><div className="small faint">{m.provider}{m.endpoint ? ` · ${m.endpoint}` : ""}{m.model_name ? ` · ${m.model_name}` : ""}</div>
-                  {m.sha256 && <div className="small faint mono">sha256 {m.sha256.slice(0, 16)}…</div>}</td>
+                  {m.sha256 && <div className="small faint mono">sha256 {m.sha256.slice(0, 16)}…</div>}
+                  {(sec.kind === "chat" || sec.kind === "vision") && m.effective && <div className="small muted">
+                    Context {m.effective.context_length.toLocaleString()} tokens{m.effective.context_from === "default" ? " (default)" : ""} · Temperature {m.effective.temperature}{m.effective.temperature_from === "default" ? " (default)" : ""}
+                    {" "}<button className="link-btn" onClick={() => setTune(m)}>Adjust</button></div>}</td>
                 <td><Badge tone={m.location === "remote" ? "danger" : m.location === "builtin" ? "ok" : "warn"}>{m.isolation}</Badge></td>
                 <td>{m.testing ? <Badge tone="warn">testing…</Badge> : m.tested ? <Badge tone="ok">tested</Badge> : <Badge tone="warn">not tested</Badge>}</td>
                 <td style={{ textAlign: "right" }}><Button small busy={busy === m.id || !!m.testing} onClick={() => test(m.id)}>Test model</Button>
@@ -71,6 +75,7 @@ export function ModelSettings({ generic }: { generic: ReactNode }) {
       })}
       <h2>Runtime options</h2>
       {generic}
+      {tune && <TuneModel m={tune} onClose={() => setTune(null)} onSaved={() => { setTune(null); void load(); }} />}
       {report && (
         <Modal title={report.passed ? "Model passed" : "Model did not pass"} onClose={() => setReport(null)}>
           <div className="list">{report.checks.map((c: any) => (
@@ -82,6 +87,41 @@ export function ModelSettings({ generic }: { generic: ReactNode }) {
         </Modal>
       )}
     </div>
+  );
+}
+
+const CONTEXT_PRESETS = [4096, 8192, 16384, 32768, 65536, 131072];
+
+/** Context length + temperature of ONE model. Empty = use the defaults in "Runtime options" below. */
+function TuneModel({ m, onClose, onSaved }: { m: any; onClose: () => void; onSaved: () => void }) {
+  const { call, toast } = useApp();
+  const [ctx, setCtx] = useState<string>(m.context_length ? String(m.context_length) : "");
+  const [temp, setTemp] = useState<string>(m.temperature === null || m.temperature === undefined ? "" : String(m.temperature));
+  const [busy, setBusy] = useState(false);
+  const save = async (reset = false) => {
+    setBusy(true);
+    try {
+      await call("llm.update", { model_id: m.id, context_length: reset || !ctx ? null : Number(ctx), temperature: reset || temp === "" ? null : Number(temp) });
+      toast(reset ? "Back to the defaults" : "Saved - used from the next message", "ok");
+      onSaved();
+    } catch (e: any) { toast(errText(e), "danger"); } finally { setBusy(false); }
+  };
+  const t = temp === "" ? m.effective.temperature : Number(temp);
+  return (
+    <Modal title={`Adjust ${m.name}`} onClose={onClose} actions={<>
+      <Button kind="ghost" onClick={() => save(true)} disabled={busy}>Use defaults</Button>
+      <Button kind="primary" busy={busy} onClick={() => save(false)}>Save</Button></>}>
+      <Field label="Context length (tokens)" help={`How much text the model can look at in one go: your question, the conversation, files and tool results. Larger = handles long documents and mail threads but needs more memory (VRAM) and is slower. Empty = default (${m.effective.context_from === "default" ? m.effective.context_length.toLocaleString() : "Runtime options"}).${m.provider === "openai" ? " For vLLM / LM Studio / Run:ai the server's own limit applies; this value keeps requests inside it." : ""}`}>
+        <div className="row wrap" style={{ gap: 6, marginBottom: 6 }}>{CONTEXT_PRESETS.map((n) => (
+          <Button key={n} small kind={Number(ctx) === n ? "primary" : "ghost"} onClick={() => setCtx(String(n))}>{n >= 1024 ? `${n / 1024}k` : n}</Button>))}</div>
+        <input className="input" type="number" min={1024} max={1048576} step={1024} placeholder="default" value={ctx} onChange={(e) => setCtx(e.target.value)} />
+      </Field>
+      <Field label={`Temperature: ${Number.isFinite(t) ? t : "-"}`} help="Lower = steadier, factual, repeatable (good for routines, finance, tool use; 0-0.3). Higher = more varied wording (0.7-1.0). Empty = default.">
+        <input type="range" min={0} max={2} step={0.05} value={Number.isFinite(t) ? t : 0.2} onChange={(e) => setTemp(e.target.value)} aria-label="Temperature" style={{ width: "100%" }} />
+        <div className="row" style={{ justifyContent: "space-between" }}><span className="small faint">0 steady</span>
+          <button className="link-btn small" onClick={() => setTemp("")}>use default</button><span className="small faint">2 creative</span></div>
+      </Field>
+    </Modal>
   );
 }
 

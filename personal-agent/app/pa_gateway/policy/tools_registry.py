@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 NONE = "NONE"
 INTERNAL_WRITE = "INTERNAL_WRITE"
@@ -25,6 +26,59 @@ class _Args(BaseModel):
 class WebSearchArgs(_Args):
     query: str = Field(min_length=1, max_length=400)
     count: int = Field(default=5, ge=1, le=10)
+    # optional filters (Exa supports all; Brave: recent_days, country; Tavily: domains, recent_days)
+    category: Optional[Literal["news", "company", "financial report", "pdf", "research paper", "github", "personal site", "people"]] = None
+    recent_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    include_domains: list[str] = Field(default_factory=list, max_length=10)
+    exclude_domains: list[str] = Field(default_factory=list, max_length=10)
+    mode: Optional[Literal["auto", "fast", "deep"]] = None
+    country: Optional[str] = Field(default=None, pattern=r"^[A-Za-z]{2}$")
+    longer: bool = False
+
+    @field_validator("include_domains", "exclude_domains")
+    @classmethod
+    def _domains(cls, v: list[str]) -> list[str]:
+        out = []
+        for d in v:
+            d = d.strip().lower()
+            if not re.fullmatch(r"[a-z0-9.-]{1,253}", d) or "." not in d:
+                raise ValueError(f"not a domain name: {d[:60]}")
+            out.append(d)
+        return out
+
+
+class WebReadArgs(_Args):
+    urls: list[str] = Field(min_length=1, max_length=10)
+    max_chars: int = Field(default=8000, ge=500, le=50_000)
+    subpages: int = Field(default=0, ge=0, le=10)
+    subpage_target: list[str] = Field(default_factory=list, max_length=5)
+    live: bool = False
+    focus: Optional[str] = Field(default=None, max_length=200)
+
+    @field_validator("urls")
+    @classmethod
+    def _urls(cls, v: list[str]) -> list[str]:
+        for u in v:
+            if not (8 <= len(u) <= 2048) or not u.lower().startswith(("https://", "http://")):
+                raise ValueError("each url must start with https:// (max 2048 characters)")
+        return v
+
+    @field_validator("subpage_target")
+    @classmethod
+    def _targets(cls, v: list[str]) -> list[str]:
+        if any(len(x) > 60 for x in v):
+            raise ValueError("subpage_target words must be short")
+        return v
+
+
+class WebAnswerArgs(_Args):
+    query: str = Field(min_length=3, max_length=400)
+
+
+class WebResearchArgs(_Args):
+    instructions: str = Field(min_length=10, max_length=4000)
+    thorough: bool = False
+    max_minutes: int = Field(default=8, ge=1, le=20)
 
 
 class WebFetchArgs(_Args):
@@ -275,6 +329,16 @@ TOOLS: list[ToolDef] = [
             "Search the public web. The query leaves this PC.", bound_secret="web.search"),
     ToolDef("web.fetch", "1", "web", EGRESS, "medium", "web", WebFetchArgs,
             "Fetch a public web page (https) and return its text."),
+    ToolDef("web.read", "1", "web", EGRESS, "medium", "web", WebReadArgs,
+            "Read up to 10 whole web pages at once (crawl). Options: live=true for fresh content (prices, schedules, status), subpages=N "
+            "to also read N pages of the same site (subpage_target words choose which), focus='...' to get the most relevant sentences. "
+            "Use after web.search to read the best results fully. The URLs leave this PC."),
+    ToolDef("web.answer", "1", "web", EGRESS, "medium", "web", WebAnswerArgs,
+            "Quick factual answer from the web with sources (Exa). The question leaves this PC.", bound_secret="web.search"),
+    ToolDef("web.research", "1", "web", EGRESS, "medium", "web", WebResearchArgs,
+            "Hand a long investigation to Exa's research agent (it searches and reads many pages, takes minutes, costs more). Give clear "
+            "instructions (what to find, period, region, output table columns). Returns a report with sources. The instructions leave this PC.",
+            bound_secret="web.search"),
     ToolDef("outlook_local.list_folders", "1", "outlook_local", NONE, "low", "mail", EmptyArgs,
             "List folders in classic Outlook on this PC."),
     ToolDef("outlook_local.search", "2", "outlook_local", NONE, "low", "mail", OutlookSearchArgs,

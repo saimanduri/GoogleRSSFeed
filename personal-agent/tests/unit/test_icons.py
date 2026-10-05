@@ -31,7 +31,14 @@ def test_png_set_matches_names():
 
 
 def test_ui_uses_the_logo_and_the_installer_makes_shortcuts():
-    assert "chirag-logo.png" in (ROOT / "app" / "ui" / "src" / "Shell.tsx").read_text(encoding="utf-8")
+    ui = ROOT / "app" / "ui"
+    # the top bar, sign-in and wizard use the bundled logo through a hashed import (never a stale cached copy)
+    assert 'import logo from "./assets/app-logo.png"' in (ui / "src" / "brand.ts").read_text(encoding="utf-8")
+    for f in ("Shell.tsx", "screens/SignIn.tsx", "screens/Onboarding.tsx"):
+        src = (ui / "src" / f).read_text(encoding="utf-8")
+        assert "APP_LOGO" in src and '"/chirag-logo.png"' not in src, f
+    assert (ui / "src" / "assets" / "app-logo.png").read_bytes() == (ui / "public" / "chirag-logo.png").read_bytes()
+    assert "builder.icon(icon.clone())" in (ui / "src-tauri" / "src" / "main.rs").read_text(encoding="utf-8")   # title-bar icon
     assert "favicon.png" in (ROOT / "app" / "ui" / "index.html").read_text(encoding="utf-8")
     inst = (ROOT / "installer" / "windows" / "install-dev.ps1").read_text(encoding="utf-8")
     assert "ChiRAG Agent.lnk" in inst and "ChiRAG.ico" in inst

@@ -39,7 +39,7 @@ export function EmailMonitoring({ generic, onChanged }: { generic: React.ReactNo
         </div>
         <div className="small faint" style={{ marginTop: 8 }}>
           Each skill is a read-only routine: it reads your mail in classic Outlook, and nothing is sent, moved or deleted. It runs while this PC is on
-          and you are signed in to Windows. Change a schedule in Missions &amp; Routines.
+          and you are signed in to Windows. Change a schedule in Routines.
         </div>
       </Card>
       <div className="grid-2">{data.skills.map((s) => <SkillCard key={s.id} s={s} onChanged={load} />)}</div>

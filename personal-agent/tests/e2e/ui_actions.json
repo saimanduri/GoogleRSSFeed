@@ -52,7 +52,7 @@
   },
   {
    "screen": "Left nav",
-   "find": "Home, Chat, History, Missions & Routines, Reminders, Tasks, Approvals, My Files, Memory, Secrets, Activity, Settings",
+   "find": "Home, Chat, History, Routines, Reminders, Approvals, My Files, Memory, Secrets, Activity, Settings",
    "rpc": [],
    "expect_ui": "page changes; the item is highlighted; Approvals shows a red count when approvals wait"
   },
@@ -312,7 +312,7 @@
    "expect_ui": "groups Today / Yesterday / Previous 7 days...; search lists hits; clicking opens the chat or the run"
   },
   {
-   "screen": "Missions",
+   "screen": "Routines",
    "find": "'Describe in plain words'",
    "rpc": [
     "missions.describe",
@@ -322,7 +322,7 @@
    "expect_ui": "dialog turns a sentence into a draft mission with a schedule preview"
   },
   {
-   "screen": "Missions",
+   "screen": "Routines",
    "find": "'New' (form), Save",
    "rpc": [
     "missions.create",
@@ -332,7 +332,7 @@
    "expect_ui": "mission appears as DRAFT"
   },
   {
-   "screen": "Missions",
+   "screen": "Routines",
    "find": "'Activate', 'Run now', 'Pause', 'Cancel'",
    "rpc": [
     "missions.activate",
@@ -343,7 +343,7 @@
    "expect_ui": "status badge changes; run now creates a task"
   },
   {
-   "screen": "Missions",
+   "screen": "Routines",
    "find": "tabs All / Routines / Missions",
    "rpc": [
     "missions.list"
@@ -376,12 +376,13 @@
    "expect_ui": "reminder updates; Windows toast + banner at the due time (checklist C5)"
   },
   {
-   "screen": "Tasks",
-   "find": "task rows, 'Stop', 'Resume'",
+   "screen": "Activity log > Requests & steps (Active now + task panel; was the Tasks screen)",
+   "find": "'Active now' rows with 'Stop' / 'Resume'; selected request: state, trigger, budget bars, 'Show state history', Stop / Resume",
    "rpc": [
     "tasks.list",
     "tasks.stop",
-    "tasks.resume"
+    "tasks.resume",
+    "tasks.get"
    ],
    "scenario": "tasks.list / tasks.resume_invalid",
    "expect_ui": "running tasks stop; only paused/suspended tasks can resume"
@@ -556,7 +557,7 @@
   },
   {
    "screen": "Settings > AI Model",
-   "find": "provider cards, Discover, Add model, Test model, default per role, remove",
+   "find": "provider cards, Discover, Add model, Test model, default per role, remove, 'Adjust' (context length + temperature per model)",
    "rpc": [
     "llm.discover",
     "llm.inspect",
@@ -564,10 +565,11 @@
     "llm.test",
     "llm.set_role",
     "llm.remove",
-    "llm.models"
+    "llm.models",
+    "llm.update"
    ],
    "scenario": "llm.*",
-   "expect_ui": "model listed; a model must pass 'Test model' before it can be a default; remote endpoints ask for the password"
+   "expect_ui": "model listed with its context length and temperature; a model must pass 'Test model' before it can be a default; remote endpoints ask for the password; Adjust saves per-model values, 'Use defaults' clears them"
   },
   {
    "screen": "Settings (any group)",
@@ -681,14 +683,15 @@
   },
   {
    "screen": "Settings > Diagnostics & About",
-   "find": "health, 'Preview' / export bundle",
+   "find": "Resource use (CPU / Memory / GPU / Storage meters), health, 'Preview' / export bundle",
    "rpc": [
+    "diagnostics.resources",
     "diagnostics.health",
     "diagnostics.bundle",
     "about"
    ],
    "scenario": "diagnostics.* / meta.about",
-   "expect_ui": "health cards; bundle contains no secrets"
+   "expect_ui": "meters refresh every 3 s; a value of 90 % or more is red, 75 % or more orange; health cards; bundle contains no secrets"
   },
   {
    "screen": "Settings > Appearance & Voice",

@@ -77,11 +77,18 @@ class RunService:
             changes["sources_json"] = sources
         self.db.update("runs", "id", run_id, changes)
         run = self.db.one("SELECT * FROM runs WHERE id=?", (run_id,))
-        if run and summary:
+        if run and summary and not self._chat_deleted(run.get("chat_id")):
+            # the chat may have been deleted while this run was still finishing: never re-add it to search
             self.history.index("run", run_id, run["title"], summary, run["started_at"])
         self.emit("run.finished", {"run_id": run_id, "status": status})
         with self._lock:
             self._seq.pop(run_id, None)
+
+    def _chat_deleted(self, chat_id: str | None) -> bool:
+        if not chat_id:
+            return False
+        c = self.db.one("SELECT deleted FROM chats WHERE id=?", (chat_id,))
+        return bool(c is None or c["deleted"])
 
     def add_usage(self, run_id: str | None, tokens_in: int = 0, tokens_out: int = 0, tool_calls: int = 0) -> None:
         if run_id:

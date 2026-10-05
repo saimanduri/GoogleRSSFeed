@@ -51,6 +51,7 @@ class SettingsService:
                 "key": s.key, "group": s.group, "label": s.label, "type": s.type, "default": s.default,
                 "value": self.get(s.key), "min": s.min, "max": s.max, "options": list(s.options), "help": s.help,
                 "risk": s.risk, "loosen": s.loosen, "stepup": s.stepup, "floor": "floor" in s.tags,
+                "section": s.section, "option_labels": list(s.option_labels),
             } for s in SETTINGS if not s.hidden],
         }
 

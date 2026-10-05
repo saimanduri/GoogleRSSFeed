@@ -1,5 +1,6 @@
 // Browser-preview mock of pa-gateway. Used ONLY when the UI runs outside the Tauri app (npm run dev),
 // so the interface can be designed and tested on any OS. It is never bundled into security decisions.
+import schemaJson from "./settings_schema.json";
 type Listener = (topic: string, data: any) => void;
 let emit: Listener = () => {};
 export function mockListen(fn: Listener) {
@@ -26,7 +27,10 @@ const S: any = {
   files: [] as any[],
   memories: [] as any[],
   secrets: [] as any[],
-  models: [] as any[],
+  models: (typeof location !== "undefined" && new URLSearchParams(location.search).has("demo")
+    ? [{ id: "mdl_demo1", name: "qwen3-coder:latest", provider: "ollama", kind: "chat", endpoint: "http://127.0.0.1:11434", model_name: "qwen3-coder:latest", tested: 1, isolation: "Reduced isolation", location: "loopback", context_length: 32768, temperature: 0.1 },
+       { id: "mdl_demo2", name: "gemma4:latest", provider: "ollama", kind: "chat", endpoint: "http://127.0.0.1:11434", model_name: "gemma4:latest", tested: 1, isolation: "Reduced isolation", location: "loopback" }]
+    : []) as any[],
   settings: {} as Record<string, any>,
   kill: { pause_agent: false, stop_tasks: false, disable_connectors: false, disable_web: false, disable_sandbox: false, stop_all: false },
   connectors: [
@@ -36,25 +40,8 @@ const S: any = {
   ],
 };
 
-const SCHEMA = {
-  groups: [
-    ["account", "Account & Security"], ["connectors", "Connectors"], ["model", "AI Model"], ["autonomy", "Autonomy & Budgets"],
-    ["rules", "Rules & Safety"], ["approvals", "Approvals"], ["tools", "Tools & Skills"], ["web", "Web Access"], ["files", "Files & Storage"],
-    ["memory", "Memory"], ["notifications", "Notifications"], ["logs", "Logs & SIEM"], ["backup", "Backup & Restore"],
-    ["emergency", "Emergency Stop"], ["updates", "Updates"], ["privacy", "Privacy & Data"], ["diagnostics", "Diagnostics & About"], ["ui", "Appearance & Voice"], ["emailmon", "Email monitoring"],
-  ].map(([id, label]) => ({ id, label })),
-  settings: [
-    { key: "security.auto_lock_minutes", group: "account", label: "Auto-lock after idle (minutes)", type: "int", default: 10, value: 10, min: 1, max: 60, options: [], help: "Auto-lock cannot be switched off.", risk: "A longer timeout leaves the app open for longer.", loosen: "up", stepup: false, floor: false },
-    { key: "security.lock_on_windows_lock", group: "account", label: "Lock when Windows locks", type: "bool", default: true, value: true, options: [], help: "", risk: "", loosen: "false", stepup: false, floor: false },
-    { key: "web.fetch_any_site", group: "web", label: "Fetch any site", type: "bool", default: false, value: false, options: [], help: "", risk: "The agent may fetch any public website.", loosen: "true", stepup: false, floor: false },
-    { key: "web.allowlist", group: "web", label: "Allowed domains", type: "list", default: [], value: ["wikipedia.org", "github.com"], options: [], help: "", risk: "", loosen: "list_add", stepup: false, floor: false },
-    { key: "autonomy.profile", group: "autonomy", label: "Autonomy profile", type: "enum", default: "cautious", value: "cautious", options: ["cautious", "balanced"], help: "", risk: "", loosen: ["cautious", "balanced"], stepup: false, floor: false },
-    { key: "budget.task.tool_calls", group: "autonomy", label: "Per task: max tool calls", type: "int", default: 100, value: 100, min: 1, max: 2000, options: [], help: "", risk: "", loosen: "up", stepup: false, floor: false },
-    { key: "notifications.show_names", group: "notifications", label: "Show names in Windows notifications", type: "bool", default: true, value: true, options: [], help: "The notification title is the name of the reminder, routine or chat it is about.", risk: "Names can be read on screen.", loosen: "true", stepup: false, floor: false },
-    { key: "notifications.content_level", group: "notifications", label: "Notification content", type: "enum", default: "notify", value: "notify", options: ["notify", "summary"], help: "", risk: "", loosen: ["notify", "summary"], stepup: false, floor: false },
-    { key: "ui.theme", group: "ui", label: "Theme", type: "enum", default: "system", value: "system", options: ["system", "time_of_day", "light", "dark", "aurora", "ocean", "forest", "sunset"], help: "", risk: "", loosen: null, stepup: false, floor: false },
-  ],
-};
+// generated from pa_gateway/settings_schema.py by scripts/gen_mock_schema.py (a test keeps it current)
+const SCHEMA: { groups: any[]; settings: any[] } = schemaJson as any;
 
 function status() {
   const base: any = { state: S.state, username: S.username, display_name: S.display_name || S.username, assistant_name: S.assistant_name, dev_mode: true, password_wait: 0, pin_available: S.state === "UI_LOCKED", recovery_wait: 0 };
@@ -83,7 +70,7 @@ function seedDemo() {
       created_at: ago(h - k * 0.01), sources: ["model only"], sensitivity: 0 }));
   });
   ["Morning mail summary", "Weekly report", "Reminder fired", "Web search: LLM news"].forEach((t, i) =>
-    S.runs.push({ id: `run_demo${i}`, kind: i === 1 ? "mission" : "chat", status: i === 2 ? "FAILED" : "COMPLETED", title: t, started_at: ago(2 + i * 30), created_at: ago(2 + i * 30) }));
+    S.runs.push({ id: `run_demo${i}`, task_id: `run_demo${i}`, kind: i === 1 ? "mission" : "chat", status: i === 0 ? "RUNNING" : i === 2 ? "FAILED" : "COMPLETED", title: t, started_at: ago(2 + i * 30), created_at: ago(2 + i * 30), tool_calls: 2 + i, tokens_in: 900, tokens_out: 300, hwm: 1 }));
 }
 function seedDemoFiles() {
   const mk = (id: string, name: string, status: string, extra: any) => ({ id, name, folder: "/Identity", status, status_reason: null, sensitivity: 2, size_bytes: 120000, created_at: ago(3), in_knowledge: 0, tags_json: [], source: "upload", sha256: "ab12cd34".repeat(8), sniffed_type: "pdf", scan_json: { antivirus: { engine: "defender", clean: true } }, ...extra });
@@ -269,7 +256,13 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "emailskills.run": return { task_id: id("task") };
     case "missions.parse_schedule": return { schedule: { type: "cron", cron: String(p.text) }, text: String(p.text), next_run: new Date(Date.now() + 3600e3).toISOString() };
     case "missions.run_now": return { task_id: "t" };
-    case "tasks.list": return S.runs.map((r: any) => ({ id: r.id, objective: r.title, state: r.status, trigger_type: "USER", updated_at: r.started_at, usage: { tool_calls: 1, tokens: 900 }, limits: { tool_calls: 100, tokens: 200000 } }));
+    case "tasks.list": { const st = (r: any) => (r.status === "RUNNING" ? "RUNNING" : r.status === "FAILED" ? "FAILED" : r.status === "WAITING" ? "WAITING_FOR_APPROVAL" : "COMPLETED");
+      return S.runs.map((r: any) => ({ id: r.id, run_id: r.id, objective: r.title, state: st(r), trigger_type: r.kind === "mission" ? "SCHEDULE" : "USER", updated_at: r.started_at, usage: { tool_calls: 1, tokens: 900 }, limits: { tool_calls: 100, tokens: 200000 } }))
+        .filter((t: any) => !p.states || p.states.includes(t.state)); }
+    case "tasks.get": { const r = S.runs.find((x: any) => x.id === p.task_id) ?? {}; return { id: p.task_id, run_id: p.task_id, objective: r.title, state: r.status === "FAILED" ? "FAILED" : r.status === "RUNNING" ? "RUNNING" : "COMPLETED",
+      trigger_type: r.kind === "mission" ? "SCHEDULE" : "USER", error: r.status === "FAILED" ? "The model server did not answer (model_unreachable)." : null, usage: { tool_calls: 3, tokens: 14200, runtime_seconds: 41 },
+      limits: { tool_calls: 100, tokens: 200000, runtime_seconds: 1800 }, transitions: [{ id: "t1", to_state: "QUEUED", reason: "created", ts: r.started_at }, { id: "t2", to_state: "RUNNING", reason: "picked up", ts: r.started_at }] }; }
+    case "tasks.stop": case "tasks.resume": return { ok: true };
     case "files.list": return { files: S.files, storage: { used_bytes: 1234567, quota_bytes: 10737418240, count: S.files.length, quarantined: 0 } };
     case "files.upload": { const f = { id: id("file"), name: p.name ?? String(p.path).split(/[\\/]/).pop(), folder: "/", size_bytes: 2048, status: "READY", sensitivity: 1, source: "upload", created_at: now(), tags_json: [] }; S.files.unshift(f); return f; }
     case "files.preview": { const f: any = S.files.find((x: any) => x.id === p.file_id); return { ...f, meta: f?.meta_full ?? null, text: "Extracted text preview (mock)." }; }
@@ -285,7 +278,10 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "secrets.binding_targets": return ["web.search"];
     case "connectors.list": return { connectors: S.connectors, pause_all: false };
     case "connectors.set": Object.assign(S.connectors.find((c: any) => c.id === p.connector), p); return { ok: true };
-    case "llm.models": return { models: S.models, roles: {}, builtin_runtime: false };
+    case "llm.models": return { models: S.models.map((m: any) => ({ ...m, effective: { context_length: m.context_length ?? 8192, temperature: m.temperature ?? 0.2,
+      context_from: m.context_length ? "model" : "default", temperature_from: m.temperature === null || m.temperature === undefined ? "default" : "model" } })), roles: {}, builtin_runtime: false };
+    case "llm.update": { const m = S.models.find((x: any) => x.id === p.model_id); m.context_length = p.context_length; m.temperature = p.temperature; emit("llm.models_changed", { model_id: m.id, state: "updated" });
+      return { context_length: m.context_length ?? 8192, temperature: m.temperature ?? 0.2 }; }
     case "llm.add": S.models.push({ id: id("mdl"), name: p.model.name || p.model.model_name || p.model.provider, provider: p.model.provider, kind: p.model.kind ?? "chat", endpoint: p.model.endpoint, tested: 0, isolation: "Reduced isolation", location: "loopback" }); return { id: "m" };
     case "llm.test": { const m = S.models.find((x: any) => x.id === p.model_id); m.tested = 1; return { passed: true, checks: [{ name: "follows_instructions", ok: true }, { name: "json_action_protocol", ok: true }, { name: "attack_attempt_rate", ok: true, note: "0/3" }] }; }
     case "web.test_search": return { ok: true, provider: "exa", results: 1, ms: 420 };
@@ -310,7 +306,17 @@ async function mockImpl(method: string, p: any): Promise<any> {
     case "skills.list": return [];
     case "backup.status": return { folder: "", last: null, files: [], scheduled_enabled: false, warn: true };
     case "privacy.data_map": return [];
-    case "diagnostics.health": return { gateway: { ok: true, uptime_s: 100 }, core: { ok: true }, model: {}, sandbox: { strength: "UNAVAILABLE" }, metrics: {} };
+    case "diagnostics.resources": {
+      const j = (b: number) => Math.max(0, Math.min(100, b + (Math.random() - 0.5) * 6));
+      const lv = (x: number) => (x >= 90 ? "critical" : x >= 75 ? "warn" : "ok");
+      const cpu = j(34), mem = j(92), gpu = j(61), disk = 71;
+      return { red_at: 90, orange_at: 75, processes: [{ name: "pa-gateway.exe", pid: 4120, memory_mb: 182 }, { name: "pa-core.exe", pid: 4188, memory_mb: 96 }, { name: "pa-ui.exe", pid: 3904, memory_mb: 141 }],
+        meters: [{ label: "CPU", pct: cpu, app_pct: 3.1, detail: "16 logical processors", app_detail: "this app", level: lv(cpu) },
+          { label: "Memory", pct: mem, app_pct: 1.3, detail: "29.4 of 31.7 GB used", app_detail: "this app 419 MB", level: lv(mem) },
+          { label: "GPU", pct: gpu, app_pct: null, detail: "whole PC · 9120 MB video memory in use", app_detail: "", level: lv(gpu) },
+          { label: "Storage", pct: disk, app_pct: 0.2, detail: "268.1 GB free of 931 GB on the data drive", app_detail: "app data 1840 MB", level: lv(disk) }] };
+    }
+    case "diagnostics.health": return { gateway: { ok: true, uptime_s: 100 }, core: { ok: true }, model: {}, sandbox: { strength: "UNAVAILABLE" }, metrics: { tasks: { COMPLETED: 12, FAILED: 1 }, approvals: { PENDING: 1, APPROVED: 7 } } };
     case "about": return { name: "Personal Agent - Desktop Edition", version: "0.1.1", build: "mock", licences: [] };
     case "updates.status": return { current: "0.1.0", auto_check: true, available: null, note: "mock" };
     case "account.signin_history": return [];

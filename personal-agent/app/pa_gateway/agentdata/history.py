@@ -43,9 +43,25 @@ class HistoryService:
             rows = self.db.all(sql, tuple(params))
         except Exception:  # noqa: BLE001 - a malformed query must never break the screen
             rows = []
+        rows = [r for r in rows if self._still_visible(r)]
         if len(rows) < limit and (not kinds or "chat" in kinds):
             rows += self._like_fallback(query, limit - len(rows), {r["ref_id"] for r in rows})
         return rows
+
+    def _still_visible(self, r: dict[str, Any]) -> bool:
+        """Second line of defence (spec 28): a hit whose chat was deleted is dropped and its stale index row removed,
+        even if a run or message was indexed after the delete."""
+        if r["kind"] == "run":
+            row = self.db.one("SELECT c.deleted FROM runs ru LEFT JOIN chats c ON c.id=ru.chat_id WHERE ru.id=?", (r["ref_id"],))
+            gone = row is None or row["deleted"] == 1
+        elif r["kind"] == "chat":
+            row = self.db.one("SELECT c.deleted FROM chat_messages m JOIN chats c ON c.id=m.chat_id WHERE m.id=?", (r["ref_id"],))
+            gone = row is None or row["deleted"] == 1
+        else:
+            return True
+        if gone:
+            self.remove(r["kind"], r["ref_id"])
+        return not gone
 
     def _like_fallback(self, query: str, limit: int, seen: set[str]) -> list[dict[str, Any]]:
         """Safety net: plain substring search over chat messages, for text the index does not have (older chats, interrupted indexing)."""

@@ -45,7 +45,7 @@ export function Settings() {
         {section === "updates" && <UpdatesSettings generic={generic} />}
         {section === "logs" && <>{generic}<LogsExtras /></>}
         {section === "tools" && <>{generic}<ToolsExtras /></>}
-        {section === "rules" && <>{generic}<RulesExtras reload={load} /></>}
+        {section === "rules" && <>{generic}<RulesExtras reload={load} schema={schema} /></>}
         {["autonomy", "approvals", "web", "files", "memory", "notifications"].includes(section) && generic}
         {section === "ui" && <><ThemePicker />{generic}</>}
         {section === "emailmon" && <EmailMonitoring generic={generic} onChanged={load} />}

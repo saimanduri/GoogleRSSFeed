@@ -348,7 +348,12 @@ fn main() {
         .setup(move |app| {
             let handle = app.handle().clone();
             // The single window. It may only show the bundled app; any other navigation is refused.
-            let win = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
+            let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()));
+            // the title bar (top-left) and Alt+Tab use the same bundled ChiRAG icon as the taskbar
+            if let Some(icon) = app.default_window_icon() {
+                builder = builder.icon(icon.clone())?;
+            }
+            let win = builder
                 .title("ChiRAG Agent")
                 .inner_size(1280.0, 820.0)
                 .min_inner_size(900.0, 600.0)

@@ -18,6 +18,7 @@ def test_system_tools_resolve_to_system32():
     assert Path(winpaths.powershell()).exists()
 
 
+@pytest.mark.windows  # needs %WINDIR%
 def test_bare_program_names_are_refused():
     for bad in ("..\\x.exe", "a/b.exe", "C:\\x.exe"):
         with pytest.raises(ValueError):

@@ -1,5 +1,81 @@
 # Pending work
 
+## 0.1.14 - remaining work (step by step; remove an item when it is done)
+**Decisions made by the user (2026-10-05)** - follow these:
+- Diarizer: **pyannote Community-1** (pyannote.audio + PyTorch; weights from Hugging Face need the user's own token stored in Secrets,
+  downloaded once through the gateway, SHA-256 recorded; runs locally, CPU or GPU). Output: segments {start, end, speaker} -> W3.
+- Office output: **python-docx, openpyxl, python-pptx** (add to requirements.txt + hash-pinned lock files, used only in the gateway) -> W4.
+- Finance sandbox: **bundle a pinned embeddable Python with numpy + pandas** (+ openpyxl to read Excel statements) as `sandbox-python\`
+  in `scripts/build.ps1` (download official zip + wheels, verify SHA-256, no network in the sandbox) -> W5. The claude-skills finance
+  scripts use only the Python standard library, so they need nothing more than numpy / pandas / openpyxl.
+- Security / bug review: NOT done yet (W2 code review, W7 independent assessment). Do them before using the app with real data.
+Suggested order with a small budget: W4 (Office output, smallest) -> W2 (code review) -> W6 (file safety) -> W5 -> W3 -> W1 -> W7.
+
+Context: branch `claude/v0.1.14` (from `update-0.1.13`), draft PR https://github.com/saimanduri/GoogleRSSFeed/pull/1. Read
+`docs/PLAN_0.1.14.md` (design for every item below) and `docs/CHANGES_2026-10-04.md` (what is already done). Rules: CLAUDE.md;
+every change gets tests, a Guide entry for UI (`screens/guideData.ts`), mock support (`api/mock.ts`), `tests/e2e/ui_actions.json` +
+`scenarios.json` for new RPCs (then `python scripts/gen_action_catalog.py`), VERSION_HISTORY/PROGRESS/TESTS updates, one commit per step.
+Check commands: `python -m pytest -q -p no:cacheprovider`, `ruff check app tests scripts --select E,F,W,B --ignore E501,B905,B007,B904`,
+`cd app/ui && npx tsc --noEmit && npm run build`, browser preview `npx vite --port 5199` then `http://127.0.0.1:5199/?demo`.
+
+**W1. Outlook work memory (biggest item; requirements in `docs/requirements/OUTLOOK_REQUIREMENTS.md`, design in PLAN section 2).**
+1. DB migration 7 (`db/schema.py`): tables `wm_items` (key = store_id+entry_id UNIQUE, conversation key, folder, direction, sender, to/cc
+   (names only), subject, received/sent time, gist, summary, importance, topic_id, status, processed_at - NEVER body/html/attachments),
+   `wm_topics` (name, gist, status, next_action, updated_at), `wm_topic_items`, `wm_tasks` (type: my_action / waiting_for / delegated /
+   commitment / info; owner, requester, due, status, confidence, source item, completed_at/channel/note), `wm_events` (topic timeline),
+   `wm_changes` (before/after/reason/confidence/source - audit), `wm_queue` (item key, attempts, next_try, state incl. dead), `wm_sync`
+   (per folder checkpoint: last time + EntryIDs seen at that second), FTS5 table `wm_fts`. Update docs/DATABASE.md.
+2. Worker op `changes_since` in `pa_workers/outlook/mailops.py` (table API, Inbox + Sent + chosen folders, returns metadata + a body
+   excerpt of max N KB for analysis only; body never stored). Interface `MailSource` (`detect_changes`, `fetch_for_analysis`,
+   `open_original`) in a new `pa_gateway/workmem/source.py` so Microsoft 365 can implement it later.
+3. `pa_gateway/workmem/monitor.py`: thread every `workmem.interval_seconds` (60) - only when the outlook_local connector is on: detect ->
+   insert-or-ignore into `wm_queue`; `processor.py`: one item at a time, model extracts JSON {topic match, gist, decisions, actions,
+   deadlines, commitments, completion of open tasks, confidence}; merge only changed fields; high confidence auto-complete only if
+   `workmem.auto_complete` is on, medium -> "Likely done - confirm?" (approval card / Outlook screen); retries with back-off, dead-letter.
+4. Settings (`settings_schema.py`, group `outlook` or new `workmem`): on/off, interval, retention days (183), max size per mail, auto
+   complete, deadline window days (7), catch-up on start (ask / auto / off). Daily retention cleanup in `app.py::_daily`.
+5. RPCs: `workmem.status` (last monitored, queue, dead), `workmem.catch_up`, `workmem.dashboard` (today / upcoming / overdue / waiting
+   for / commitments / recent changes), `workmem.topics`, `workmem.topic` (gist, tasks, timeline), `workmem.add_update` (natural language
+   -> proposal card), `workmem.task_set` (complete with channel/note, edit), `workmem.reminder_add` (links `reminders`), `workmem.retry`.
+   Tools for the agent (read-only): `workmem.search` (FTS + embeddings), `workmem.topic_get`.
+6. New Outlook screen (`screens/Outlook.tsx`): header (last monitored, Catch up, queue), left Attention (overdue / today / 3 / 7 days,
+   waiting for you, waiting for others, commitments), middle Topics list with search, right selected topic (gist, tasks with Mark done,
+   timeline, Add update, + Reminder, Open original). Email-monitoring skills become a tab. Startup banner "last monitored at ...".
+7. Tests: idempotency (same mail twice), no body stored (scan DB), checkpoint/catch-up counts, dead-letter after N failures, retention
+   cleanup, confidence rules, fake MailSource (no Windows needed).
+
+**W2. Code review of 0.1.12-0.1.13 + Guide accuracy.** Read the diff `git diff 4f629f3..update-0.1.13 -- personal-agent/app`, fix bugs with
+tests. Known finding: background file-summary thread writes after the DB closed at sign-out (`files/insights.py`: check `gw.db` / a stop
+event before writing; test: sign out while a summary runs). Then check every entry of `screens/guideData.ts` against the code.
+
+**W3. Meeting minutes + diarization.** Decision needed from the user first: diarizer (recommended sherpa-onnx + pyannote segmentation ONNX +
+speaker embedding ONNX). Steps: meeting mode in Chat (mic menu / `/meeting`): every voice piece saved at once into a new table
+`meeting_segments` (crash loses < 2 min), resume after restart, "Make minutes" (summary, decisions, action items -> reminders / work-memory
+tasks); fifth model card "Diarization" in Settings > AI Model; diarize first, then transcribe each speaker turn (Qwen3-ASR has no
+timestamps); match speakers across pieces by embedding; rename speakers. More automated tests for audio/vision (WAV conversion, silence,
+piece joining, wrong kinds, big images, multi-page scans with a fake vision server).
+
+**W4. Routine output as Word / Excel / PowerPoint.** Decision needed: libraries (python-docx, openpyxl, python-pptx - recommended) or a
+small built-in writer. Steps: add formats to `OUTPUT_FORMATS` (`agentdata/missions.py`), convert the Markdown answer by code (headings,
+tables -> real tables / sheets with numbers, bullets -> slides), save into My Files (`/Routine outputs`), link it in the result; tests that
+open the produced files.
+
+**W5. Finance analysis.** Adapt the MIT calculators from https://github.com/alirezarezvani/claude-skills/tree/main/finance (keep the
+licence notice in `pa_gateway/finance/LICENSE-claude-skills.txt`): tools `finance.ratios`, `finance.dcf`, `finance.variance`,
+`finance.forecast`, `finance.investment` (NPV / IRR / payback), `finance.stock_scorecard`; `finance.extract_statements` (find income
+statement / balance sheet / cash flow tables in local files via `localfiles` + `pa_workers/parser/tables.py`, each number traced to file /
+sheet / cell); a "Company analysis" skill (report template + challenge pass) that also uses `web.search` (category financial report / news)
++ `web.read`. Decision needed: bundle sandbox Python with numpy / pandas (PENDING P2 item 8 / D9).
+
+**W6. Local files safety (PLAN section 8).** Run `files/checks.py` validation + antivirus/AMSI scan on the first read of each local file
+version (`localfiles._run`), Mark-of-the-Web warning, skip OneDrive online-only placeholders (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS),
+refuse names with bidi control characters, per-chat read budget. Tests for each.
+
+**W7. Final steps.** Bump version to 0.1.14 (`pa_common/version.py`, `pyproject.toml`, `app/ui/package.json`, `src-tauri/tauri.conf.json`,
+`src-tauri/Cargo.toml`, mock `about`), full test run, Windows CI green, update HANDOFF.md, mark the PR ready, build the zip
+(`python scripts/make_zip.py`), then the independent security assessment (separate agent, genuine findings only, report
+`docs/SECURITY_AUDIT_<date>.md`, fixes with tests).
+
 ## Next session start here (2026-10-02)
 1. Install the NEW bundle `dist\PersonalAgent-0.1.10` (admin; docs/BUILD_AND_RELEASE.md "Installing a new bundle over a running install"; it has the voice, security, rename, notification and rail changes and a rebuilt pa-ui.exe) and run the real-window checks H11-H24 in TESTS.md; fix what they find. Ask the user how the last install attempt (libcrypto-3.dll in use) ended.
 2. Voice: add the speech model in the app (Settings > AI Model > Discover > frozenlab/qwen3-asr:1.7b > Add model; it tests itself) and test the real microphone (H17). Exa: user stores the key themselves (Secrets, used by web.search), provider exa, "Test web search" (H20).

@@ -1,6 +1,7 @@
 """Home widgets: catalogue, on/off + order, only enabled widgets are computed, data from the database, mail widgets from (faked) Outlook counts."""
 import base64
 
+import pytest
 
 from pa_gateway.agentdata import home_widgets as hw
 
@@ -51,6 +52,7 @@ def test_widgets_show_real_data(env_nocore):
     assert any("quarantine" in i["text"] for i in env_nocore.ui.call("home.widgets", {})["data"]["attention"]["items"])
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_mail_widgets_use_cached_outlook_counts(env_nocore, monkeypatch):
     import pa_gateway.connectors.outlook_local as mod
     monkeypatch.setattr(mod, "outlook_classic_installed", lambda: True)
@@ -76,6 +78,7 @@ def test_mail_widgets_use_cached_outlook_counts(env_nocore, monkeypatch):
     assert env_nocore.wait(lambda: len(calls) > n, 10)
 
 
+@pytest.mark.windows  # needs the Outlook worker (Windows)
 def test_outlook_errors_are_shown_gently(env_nocore, monkeypatch):
     import pa_gateway.connectors.outlook_local as mod
     monkeypatch.setattr(mod, "outlook_classic_installed", lambda: True)

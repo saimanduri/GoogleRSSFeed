@@ -70,3 +70,8 @@ pre-update snapshots). A copied data folder cannot be opened without the passwor
 
 ## Migration 5 (0.1.13): file_meta, memory_learn_state, memory_forgotten
 `file_meta` (one row per file: title, doc_type, summary, keywords_json, pii_json = KINDS of personal data only, status PENDING/ANALYSING/READY/FAILED, edited flag, model, note, memory_id); `memory_learn_state` (per chat: newest user message already looked at); `memory_forgotten` (SHA-256 of normalised text of memories the user deleted or rejected - automatic learning never recreates them).
+
+## Migration 6 (0.1.14): models.context_length, models.temperature
+Per-model context length (tokens) and temperature (Settings > AI Model > Adjust, RPC `llm.update`). NULL = use the defaults
+`llm.context_tokens` / `llm.temperature`. Ollama receives them through its native `/api/chat` (`options.num_ctx`,
+`options.temperature`); OpenAI-style servers receive the temperature only; the built-in runtime starts with `--ctx-size`.

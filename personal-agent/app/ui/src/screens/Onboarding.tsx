@@ -1,4 +1,5 @@
 // First-run wizard (spec 4.2): checks -> account -> PIN -> recovery key -> model -> connectors -> autonomy -> backup -> done.
+import { APP_LOGO } from "../brand";
 import { useEffect, useState } from "react";
 import { native, pickFile, pickSavePath, rpc } from "../api/gateway";
 import { errText, useApp } from "../app";
@@ -155,7 +156,7 @@ export function Onboarding() {
         {step === 7 && <BackupStep onNext={next} />}
         {step === 8 && (
           <div className="col center" style={{ textAlign: "center", padding: "10px 0" }}>
-            <div className="brand-logo logo-img" style={{ width: 72, height: 72, borderRadius: 18 }}><img src="/chirag-logo.png" alt="" /></div>
+            <div className="brand-logo logo-img" style={{ width: 72, height: 72, borderRadius: 18 }}><img src={APP_LOGO} alt="" /></div>
             <h1>You're all set</h1>
             <p className="muted" style={{ maxWidth: 480 }}>Everything is encrypted with your password and this PC's TPM. The agent can only act through the gateway, which checks every action against your rules. The red STOP ALL button is always one click away.</p>
             <Button kind="primary" onClick={refresh}>Open {assistantName.trim() || "ChiRAG Agent"}</Button>

@@ -43,7 +43,9 @@ def handler_params(fn) -> list[dict]:
 
 def ui_usages() -> dict[str, list[str]]:
     usages: dict[str, list[str]] = defaultdict(list)
-    for path in sorted((ROOT / "app" / "ui" / "src").rglob("*.ts*")):
+    src = ROOT / "app" / "ui" / "src"
+    # same order on every OS (Windows compares paths case-insensitively, Linux does not)
+    for path in sorted(src.rglob("*.ts*"), key=lambda p: p.relative_to(src).as_posix().lower()):
         if path.name == "mock.ts":
             continue
         for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):

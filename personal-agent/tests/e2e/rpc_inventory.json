@@ -199,7 +199,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:106"
+   "screens/Activity.tsx:164"
   ],
   "scenarios": [
    "activity.events"
@@ -226,7 +226,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:146"
+   "screens/Activity.tsx:204"
   ],
   "scenarios": [
    "activity.what_did_agent_do"
@@ -325,7 +325,7 @@
    }
   ],
   "ui_callers": [
-   "screens/SignIn.tsx:104"
+   "screens/SignIn.tsx:105"
   ],
   "scenarios": [
    "auth.forgot_password"
@@ -349,8 +349,8 @@
   "ui_callers": [
    "screens/Chat.tsx:213",
    "Shell.tsx:41",
-   "Shell.tsx:104",
-   "Shell.tsx:159"
+   "Shell.tsx:103",
+   "Shell.tsx:158"
   ],
   "scenarios": [
    "auth.lock"
@@ -372,7 +372,7 @@
    }
   ],
   "ui_callers": [
-   "screens/SignIn.tsx:33"
+   "screens/SignIn.tsx:34"
   ],
   "scenarios": [
    "auth.quick_unlock"
@@ -399,7 +399,7 @@
    }
   ],
   "ui_callers": [
-   "screens/SignIn.tsx:34"
+   "screens/SignIn.tsx:35"
   ],
   "scenarios": [
    "auth.sign_in_wrong",
@@ -453,8 +453,8 @@
    }
   ],
   "ui_callers": [
-   "app.tsx:228",
-   "screens/Onboarding.tsx:298"
+   "app.tsx:229",
+   "screens/Onboarding.tsx:299"
   ],
   "scenarios": [
    "auth.stepup_password",
@@ -477,8 +477,8 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:300",
-   "screens/settings/Misc.tsx:23"
+   "screens/Onboarding.tsx:301",
+   "screens/settings/Misc.tsx:25"
   ],
   "scenarios": [
    "backup.enable_schedule"
@@ -505,8 +505,8 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:29",
-   "screens/settings/Misc.tsx:33"
+   "screens/settings/Misc.tsx:31",
+   "screens/settings/Misc.tsx:35"
   ],
   "scenarios": [],
   "manual_reason": "destructive: replaces the signed-in vault; covered by tests/integration/test_files_backup_misc.py (restore to a new PC) and checklist F1"
@@ -531,7 +531,7 @@
    }
   ],
   "ui_callers": [
-   "screens/SignIn.tsx:146"
+   "screens/SignIn.tsx:147"
   ],
   "scenarios": [],
   "manual_reason": "needs an empty data folder (new PC); covered by test_files_backup_misc.py::test_backup_restore_new_pc and checklist F1"
@@ -556,7 +556,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:22"
+   "screens/settings/Misc.tsx:24"
   ],
   "scenarios": [
    "backup.run_now",
@@ -573,7 +573,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:10"
+   "screens/settings/Misc.tsx:12"
   ],
   "scenarios": [
    "backup.status"
@@ -600,7 +600,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:28"
+   "screens/settings/Misc.tsx:30"
   ],
   "scenarios": [
    "backup.verify"
@@ -834,8 +834,8 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Missions.tsx:84",
-   "screens/Onboarding.tsx:242",
+   "screens/Missions.tsx:82",
+   "screens/Onboarding.tsx:243",
    "screens/settings/ConnectorSettings.tsx:9"
   ],
   "scenarios": [
@@ -899,7 +899,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:252",
+   "screens/Onboarding.tsx:253",
    "screens/settings/ConnectorSettings.tsx:11"
   ],
   "scenarios": [
@@ -923,8 +923,8 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:97",
-   "screens/settings/Misc.tsx:101"
+   "screens/settings/Misc.tsx:106",
+   "screens/settings/Misc.tsx:110"
   ],
   "scenarios": [
    "diagnostics.bundle"
@@ -940,10 +940,26 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:85"
+   "screens/settings/Misc.tsx:93"
   ],
   "scenarios": [
    "diagnostics.health"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "diagnostics.resources",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [],
+  "ui_callers": [
+   "components/ResourceMeters.tsx:14"
+  ],
+  "scenarios": [
+   "diagnostics.resources"
   ],
   "manual_reason": null
  },
@@ -1369,9 +1385,9 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:163",
+   "screens/Activity.tsx:221",
    "screens/History.tsx:41",
-   "Shell.tsx:168"
+   "Shell.tsx:167"
   ],
   "scenarios": [
    "history.search"
@@ -1393,7 +1409,8 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:75"
+   "screens/Home.tsx:75",
+   "screens/Home.tsx:149"
   ],
   "scenarios": [
    "home.dismiss"
@@ -1417,7 +1434,7 @@
   "ui_callers": [
    "components/UsageMeter.tsx:9",
    "screens/Activity.tsx:14",
-   "screens/Home.tsx:88"
+   "screens/Home.tsx:168"
   ],
   "scenarios": [
    "home.summary"
@@ -1439,7 +1456,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:87"
+   "screens/Home.tsx:167"
   ],
   "scenarios": [
    "home.widgets"
@@ -1461,7 +1478,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Home.tsx:97"
+   "screens/Home.tsx:177"
   ],
   "scenarios": [
    "home.widgets_set"
@@ -1488,8 +1505,8 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:46",
-   "screens/SignIn.tsx:78",
+   "screens/settings/Misc.tsx:48",
+   "screens/SignIn.tsx:79",
    "Shell.tsx:62"
   ],
   "scenarios": [
@@ -1514,7 +1531,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:47"
+   "screens/settings/Misc.tsx:49"
   ],
   "scenarios": [
    "killswitch.release_needs_password",
@@ -1562,7 +1579,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:118"
+   "screens/settings/ModelSettings.tsx:158"
   ],
   "scenarios": [
    "llm.add_mock",
@@ -1649,7 +1666,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:143"
+   "screens/settings/ModelSettings.tsx:183"
   ],
   "scenarios": [
    "llm.discover_ollama"
@@ -1686,7 +1703,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:108"
+   "screens/settings/ModelSettings.tsx:148"
   ],
   "scenarios": [
    "llm.inspect_ollama"
@@ -1702,7 +1719,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:28"
+   "screens/settings/ModelSettings.tsx:29"
   ],
   "scenarios": [
    "llm.models_empty"
@@ -1724,7 +1741,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:57"
+   "screens/settings/ModelSettings.tsx:61"
   ],
   "scenarios": [
    "llm.remove"
@@ -1751,7 +1768,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:61"
+   "screens/settings/ModelSettings.tsx:65"
   ],
   "scenarios": [
    "llm.set_role"
@@ -1773,10 +1790,33 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/ModelSettings.tsx:41"
+   "screens/settings/ModelSettings.tsx:42"
   ],
   "scenarios": [
    "llm.test_mock"
+  ],
+  "manual_reason": null
+ },
+ {
+  "rpc": "llm.update",
+  "roles": [
+   "ui"
+  ],
+  "state": "unlocked",
+  "stepup": null,
+  "params": [
+   {
+    "name": "model_id",
+    "type": "str",
+    "required": true
+   }
+  ],
+  "ui_callers": [
+   "screens/settings/ModelSettings.tsx:104"
+  ],
+  "scenarios": [
+   "llm.update_params",
+   "llm.update_params_reset"
   ],
   "manual_reason": null
  },
@@ -2043,7 +2083,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:121"
+   "screens/settings/Misc.tsx:130"
   ],
   "scenarios": [
    "logs.export"
@@ -2073,7 +2113,7 @@
   "stepup": "security_settings",
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:122"
+   "screens/settings/Misc.tsx:131"
   ],
   "scenarios": [
    "logs.siem_not_configured"
@@ -2089,7 +2129,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:117"
+   "screens/settings/Misc.tsx:126"
   ],
   "scenarios": [
    "logs.status"
@@ -2105,8 +2145,8 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Activity.tsx:119",
-   "screens/settings/Misc.tsx:120"
+   "screens/Activity.tsx:177",
+   "screens/settings/Misc.tsx:129"
   ],
   "scenarios": [
    "logs.verify",
@@ -2156,6 +2196,7 @@
   ],
   "ui_callers": [
    "screens/Home.tsx:61",
+   "screens/Home.tsx:154",
    "screens/Memory.tsx:25",
    "screens/Memory.tsx:34"
   ],
@@ -2266,7 +2307,7 @@
   ],
   "ui_callers": [
    "screens/Approvals.tsx:28",
-   "screens/Missions.tsx:45"
+   "screens/Missions.tsx:43"
   ],
   "scenarios": [
    "missions.activate"
@@ -2288,7 +2329,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:102"
+   "screens/Missions.tsx:100"
   ],
   "scenarios": [
    "missions.create"
@@ -2310,7 +2351,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:67"
+   "screens/Missions.tsx:65"
   ],
   "scenarios": [
    "missions.describe"
@@ -2327,7 +2368,7 @@
   "params": [],
   "ui_callers": [
    "screens/Approvals.tsx:10",
-   "screens/Missions.tsx:16"
+   "screens/Missions.tsx:15"
   ],
   "scenarios": [
    "missions.list"
@@ -2354,7 +2395,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:92"
+   "screens/Missions.tsx:90"
   ],
   "scenarios": [
    "missions.parse_schedule"
@@ -2376,7 +2417,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:47"
+   "screens/Missions.tsx:45"
   ],
   "scenarios": [
    "missions.run_now"
@@ -2404,8 +2445,8 @@
   ],
   "ui_callers": [
    "screens/Approvals.tsx:30",
-   "screens/Missions.tsx:46",
-   "screens/Missions.tsx:49"
+   "screens/Missions.tsx:44",
+   "screens/Missions.tsx:47"
   ],
   "scenarios": [
    "missions.pause",
@@ -2434,7 +2475,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Missions.tsx:102"
+   "screens/Missions.tsx:100"
   ],
   "scenarios": [
    "missions.update"
@@ -2576,7 +2617,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:60"
+   "screens/settings/Misc.tsx:62"
   ],
   "scenarios": [
    "privacy.data_map"
@@ -2603,7 +2644,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:73"
+   "screens/settings/Misc.tsx:75"
   ],
   "scenarios": [
    "privacy.delete_wrong_confirm",
@@ -2631,7 +2672,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:68"
+   "screens/settings/Misc.tsx:70"
   ],
   "scenarios": [
    "privacy.export"
@@ -2808,7 +2849,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:61",
+   "screens/Activity.tsx:106",
    "screens/History.tsx:30"
   ],
   "scenarios": [
@@ -2836,7 +2877,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:96"
+   "screens/Activity.tsx:154"
   ],
   "scenarios": [
    "runs.replay"
@@ -2858,7 +2899,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Activity.tsx:75"
+   "screens/Activity.tsx:131"
   ],
   "scenarios": [
    "runs.transcript",
@@ -3301,10 +3342,10 @@
    "components/ThemePicker.tsx:29",
    "screens/Chat.tsx:219",
    "screens/Memory.tsx:41",
-   "screens/Onboarding.tsx:299",
+   "screens/Onboarding.tsx:300",
    "screens/settings/EmailMonitoring.tsx:14",
    "screens/settings/GenericGroup.tsx:18",
-   "screens/settings/Misc.tsx:184"
+   "screens/settings/Misc.tsx:209"
   ],
   "scenarios": [
    "settings.apply_theme",
@@ -3384,7 +3425,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:176"
+   "screens/settings/Misc.tsx:186"
   ],
   "scenarios": [
    "settings.history"
@@ -3406,7 +3447,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:265"
+   "screens/Onboarding.tsx:266"
   ],
   "scenarios": [
    "settings.profile_preview"
@@ -3422,7 +3463,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:176"
+   "screens/settings/Misc.tsx:187"
   ],
   "scenarios": [
    "settings.rules_plain"
@@ -3449,8 +3490,8 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:35",
-   "screens/SignIn.tsx:98"
+   "screens/Onboarding.tsx:36",
+   "screens/SignIn.tsx:99"
   ],
   "scenarios": [
    "setup.weak_password",
@@ -3483,7 +3524,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:40"
+   "screens/Onboarding.tsx:41"
   ],
   "scenarios": [
    "setup.trivial_pin",
@@ -3506,7 +3547,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:210"
+   "screens/Onboarding.tsx:211"
   ],
   "scenarios": [
    "setup.confirm_wrong",
@@ -3554,7 +3595,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:48"
+   "screens/Onboarding.tsx:49"
   ],
   "scenarios": [
    "setup.create"
@@ -3570,7 +3611,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Onboarding.tsx:32"
+   "screens/Onboarding.tsx:33"
   ],
   "scenarios": [
    "setup.preflight"
@@ -3592,7 +3633,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Onboarding.tsx:205"
+   "screens/Onboarding.tsx:206"
   ],
   "scenarios": [
    "setup.recovery_pdf"
@@ -3614,7 +3655,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:160"
+   "screens/settings/Misc.tsx:169"
   ],
   "scenarios": [
    "skills.activate"
@@ -3636,7 +3677,7 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:146"
+   "screens/settings/Misc.tsx:155"
   ],
   "scenarios": [
    "skills.import"
@@ -3652,7 +3693,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:135"
+   "screens/settings/Misc.tsx:144"
   ],
   "scenarios": [
    "skills.list"
@@ -3679,8 +3720,8 @@
    }
   ],
   "ui_callers": [
-   "screens/settings/Misc.tsx:158",
-   "screens/settings/Misc.tsx:159"
+   "screens/settings/Misc.tsx:167",
+   "screens/settings/Misc.tsx:168"
   ],
   "scenarios": [
    "skills.disable"
@@ -3787,7 +3828,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Tasks.tsx:23"
+   "screens/Activity.tsx:77"
   ],
   "scenarios": [
    "tasks.get_missing"
@@ -3814,7 +3855,7 @@
    }
   ],
   "ui_callers": [
-   "screens/Tasks.tsx:14"
+   "screens/Activity.tsx:107"
   ],
   "scenarios": [
    "tasks.list"
@@ -3835,9 +3876,7 @@
     "required": true
    }
   ],
-  "ui_callers": [
-   "screens/Tasks.tsx:30"
-  ],
+  "ui_callers": [],
   "scenarios": [
    "tasks.resume_invalid"
   ],
@@ -3857,9 +3896,7 @@
     "required": true
    }
   ],
-  "ui_callers": [
-   "screens/Tasks.tsx:29"
-  ],
+  "ui_callers": [],
   "scenarios": [
    "tasks.stop"
   ],
@@ -3874,8 +3911,8 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/Missions.tsx:89",
-   "screens/settings/Misc.tsx:135"
+   "screens/Missions.tsx:87",
+   "screens/settings/Misc.tsx:144"
   ],
   "scenarios": [
    "tools.catalog"
@@ -3941,7 +3978,7 @@
   "stepup": null,
   "params": [],
   "ui_callers": [
-   "screens/settings/Misc.tsx:110"
+   "screens/settings/Misc.tsx:119"
   ],
   "scenarios": [
    "updates.status"

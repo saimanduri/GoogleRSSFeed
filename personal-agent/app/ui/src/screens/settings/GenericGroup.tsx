@@ -21,21 +21,45 @@ export function GenericGroup({ schema, group, onChanged }: { schema: any; group:
       void refresh();
     } catch (e: any) { toast(errText(e), "danger"); }
   };
+  // settings of one `section` are shown together under its heading, in schema order; settings without one come first
+  const sections: [string, any[]][] = [];
+  for (const s of items) {
+    const name = s.section ?? "";
+    const found = sections.find(([n]) => n === name);
+    if (found) found[1].push(s); else sections.push([name, [s]]);
+  }
   return (
-    <Card>
-      {items.map((s: any) => (
-        <div key={s.key} className="setting-row">
-          <div>
-            <div style={{ fontWeight: 600 }}>{s.label} {s.floor && <Badge tone="info">floor-bound</Badge>} {s.stepup && <Badge>re-auth</Badge>}</div>
-            {s.help && <div className="small muted">{s.help}</div>}
-            {s.value !== s.default && JSON.stringify(s.value) !== JSON.stringify(s.default) && <div className="small faint">Default: {JSON.stringify(s.default)}</div>}
-          </div>
-          <Control s={s} onChange={(v) => change(s.key, v)} />
-        </div>
+    <div className="col settings-sections">
+      {sections.map(([name, rows]) => (
+        <Card key={name || "_"} title={name || undefined}>
+          {rows.map((s: any) => (
+            <div key={s.key} className="setting-row">
+              <div>
+                <div style={{ fontWeight: 600 }}>{s.label} {s.floor && <Badge tone="info">floor-bound</Badge>} {s.stepup && <Badge>re-auth</Badge>}</div>
+                {s.help && <div className="small muted">{s.help}</div>}
+                {s.value !== s.default && JSON.stringify(s.value) !== JSON.stringify(s.default) && <div className="small faint">Default: {readable(s, s.default)}</div>}
+              </div>
+              <Control s={s} onChange={(v) => change(s.key, v)} />
+            </div>
+          ))}
+        </Card>
       ))}
       {loosen && <LoosenDialog changes={loosen.changes} loosening={loosen.loosening} onClose={() => setLoosen(null)} onApplied={() => { toast("Changed (logged)", "warn"); onChanged(); void refresh(); }} />}
-    </Card>
+    </div>
   );
+}
+
+/** A setting value as the user reads it: option names instead of codes, lists joined, booleans as On/Off. */
+export function readable(s: any, v: any): string {
+  if (s?.type === "enum") return optionLabel(s, v);
+  if (typeof v === "boolean") return v ? "On" : "Off";
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "(none)";
+  return v === null || v === undefined || v === "" ? "(empty)" : String(v);
+}
+
+function optionLabel(s: any, o: string): string {
+  const i = (s.options ?? []).indexOf(o);
+  return (i >= 0 && s.option_labels?.[i]) || String(o).replace(/_/g, " ");
 }
 
 function Control({ s, onChange }: { s: any; onChange: (v: any) => void }) {
@@ -43,7 +67,7 @@ function Control({ s, onChange }: { s: any; onChange: (v: any) => void }) {
   if (s.type === "bool") return <div style={{ justifySelf: "end" }}><Toggle on={!!s.value} onChange={onChange} label={s.label} /></div>;
   if (s.type === "enum") return (
     <select className="input" value={s.value} onChange={(e) => onChange(e.target.value)}>
-      {s.options.map((o: string) => <option key={o} value={o}>{o.replace(/_/g, " ")}</option>)}
+      {s.options.map((o: string) => <option key={o} value={o}>{optionLabel(s, o)}</option>)}
     </select>
   );
   if (s.type === "list") return <ChipInput value={s.value ?? []} onChange={onChange} />;

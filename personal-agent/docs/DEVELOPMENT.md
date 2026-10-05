@@ -36,7 +36,9 @@ Browser-only UI work: `cd app/ui; npm run dev` → http://127.0.0.1:5173 uses `s
 ## Recipes
 **Add a setting** - `pa_gateway/settings_schema.py`: add `S(key, group, label, type, default, loosen, min, max,
 options, help, risk)`. Pick `loosen` carefully (which direction weakens security). Floor-bound enums get
-`tags=("floor",)`. Read it with `gw.settings.get(key)`. The Settings UI renders it automatically.
+`tags=("floor",)`. Read it with `gw.settings.get(key)`. The Settings UI renders it automatically; `section="..."`
+puts it under a sub-heading of its page and `option_labels=(...)` gives enum options readable names (same order as
+`options`). Then run `python scripts/gen_mock_schema.py` so the browser preview shows it (a test checks this).
 
 **Add a tool** - `policy/tools_registry.py`: pydantic args model + `ToolDef(name, version, connector, side_effect,
 risk, output_source, args, description, …)`. Implement `fn(args, ctx) -> ToolResult` (return the correct

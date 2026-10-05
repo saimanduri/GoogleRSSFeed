@@ -59,6 +59,37 @@ def endpoint_location(url: str) -> str:
         return "remote"
 
 
+CONTEXT_MIN, CONTEXT_MAX = 1024, 1_048_576
+
+
+def check_context_length(v: Any) -> int | None:
+    if v in (None, "") or v is False or (v == 0 and not isinstance(v, bool)):
+        return None
+    if isinstance(v, bool) or (isinstance(v, float) and not v.is_integer()):
+        raise PAError("context length must be a whole number of tokens", code="invalid_request")
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        raise PAError("context length must be a whole number of tokens", code="invalid_request") from None
+    if not CONTEXT_MIN <= n <= CONTEXT_MAX:
+        raise PAError(f"context length must be between {CONTEXT_MIN} and {CONTEXT_MAX} tokens", code="invalid_request")
+    return n
+
+
+def check_temperature(v: Any) -> float | None:
+    if v is None or v == "":
+        return None
+    if isinstance(v, bool):
+        raise PAError("temperature must be a number", code="invalid_request")
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        raise PAError("temperature must be a number", code="invalid_request") from None
+    if not 0.0 <= f <= 2.0 or f != f:
+        raise PAError("temperature must be between 0 and 2", code="invalid_request")
+    return round(f, 2)
+
+
 class LLMService:
     def __init__(self, gw):
         self.gw = gw
@@ -78,6 +109,7 @@ class LLMService:
                 "dev" if r["provider"] == "dev_mock" else endpoint_location(r["endpoint"] or ""))
             r["isolation"] = {"builtin": "Built-in (strong)", "loopback": "Reduced isolation",
                               "remote": "REMOTE - data leaves this PC", "dev": "Developer mock"}[r["location"]]
+            r["effective"] = self.effective_params(r)
         return rows
 
     def get_model(self, mid: str) -> dict[str, Any]:
@@ -109,12 +141,32 @@ class LLMService:
             "path": spec.get("path"), "sha256": spec.get("sha256"), "size_bytes": spec.get("size_bytes"),
             "source": spec.get("source"), "license": spec.get("license"), "quantization": spec.get("quantization"),
             "kind": kind, "api_key_secret_id": None, "tested": 1 if provider == "dev_mock" else 0,
+            "context_length": check_context_length(spec.get("context_length")), "temperature": check_temperature(spec.get("temperature")),
             "created_at": now_iso()})
         if spec.get("api_key"):
             self.gw.secrets.upsert_bound(f"llm:{mid}", f"API key for model {spec.get('name') or mid}", spec["api_key"], "api_key")
         self.gw.audit.write("model.added", "model", model_id=mid, provider=provider, kind=kind,
                             location=endpoint_location(endpoint) if endpoint else provider)
         return mid
+
+    def update_params(self, mid: str, context_length: Any, temperature: Any) -> dict[str, Any]:
+        """Context length (tokens) and temperature of ONE model; None = use the defaults in Settings > AI Model."""
+        m = self.get_model(mid)
+        changes = {"context_length": check_context_length(context_length), "temperature": check_temperature(temperature)}
+        self.gw.db.update("models", "id", mid, changes)
+        self.gw.audit.write("model.params_changed", "model", model_id=mid, context_length=changes["context_length"], temperature=changes["temperature"])
+        self.gw.emit("llm.models_changed", {"model_id": mid, "state": "updated"})
+        if m["provider"] == "builtin" and self.gw.runtime.proc is not None:
+            self.gw.runtime.stop()                 # the built-in server starts again with the new context size on next use
+        return self.effective_params(self.get_model(mid))
+
+    def effective_params(self, m: dict[str, Any]) -> dict[str, Any]:
+        """What a request to this model really uses."""
+        s = self.gw.settings
+        ctx = int(m.get("context_length") or s.get("llm.context_tokens"))
+        temp = m.get("temperature")
+        return {"context_length": ctx, "temperature": float(s.get("llm.temperature") if temp is None else temp),
+                "context_from": "model" if m.get("context_length") else "default", "temperature_from": "model" if temp is not None else "default"}
 
     def test_in_background(self, mid: str, make_default: bool = True) -> bool:
         """Run 'Test model' without blocking the window; afterwards (if it passed) make it the default for its role when
@@ -130,6 +182,8 @@ class LLMService:
             try:
                 passed = bool(self.test_model(mid).get("passed"))
                 state = "passed" if passed else "failed"
+                with self._lock:                      # done testing BEFORE it can show up as the default (no "default but still testing")
+                    self._testing.discard(mid)
                 if passed and make_default:
                     self._default_if_unset(mid)
             except Exception:  # noqa: BLE001
@@ -264,8 +318,10 @@ class LLMService:
         if task is not None:
             est = sum(len(str(x.get("content", ""))) for x in messages) // 4 + max_tokens
             gw.budgets.check(task, "tokens", est)
-        request = {"model": m["model_name"] or m["name"], "messages": messages, "temperature": float(gw.settings.get("llm.temperature")),
-                   "max_tokens": max_tokens, "stream": True}
+        eff = self.effective_params(m)
+        max_tokens = fit_answer_budget(messages, max_tokens, eff["context_length"])
+        request = {"model": m["model_name"] or m["name"], "messages": messages, "temperature": eff["temperature"],
+                   "max_tokens": max_tokens, "stream": True, "num_ctx": eff["context_length"]}
         if json_mode and m["provider"] in ("openai", "ollama", "builtin"):
             # The agent loop asks for the action shape itself: local runtimes then cannot emit another shape
             # (constrained decoding). If the server rejects the schema we fall back to plain JSON mode, then to none.
@@ -350,7 +406,7 @@ class LLMService:
         """Last resort for Ollama: /api/chat with a large context window, no thinking, optional JSON schema, not streamed."""
         url = m["endpoint"].rstrip("/").removesuffix("/v1") + "/api/chat"
         body: dict[str, Any] = {"model": request["model"], "messages": request["messages"], "stream": False, "think": False,
-                                "options": {"num_ctx": 16384, "num_predict": min(8192, int(request.get("max_tokens", 2048)) * 2),
+                                "options": {"num_ctx": max(16384, int(request.get("num_ctx") or 0)), "num_predict": min(8192, int(request.get("max_tokens", 2048)) * 2),
                                             "temperature": float(request.get("temperature", 0.2))}}
         if "response_format" in request and action_schema:
             body["format"] = ACTION_SCHEMA
@@ -381,9 +437,56 @@ class LLMService:
                 self.gw.emit("llm.delta", {"run_id": run_id, "delta": text, "done": True})
             return text, {}
         base, headers = self._endpoint(m)
+        if m["provider"] == "ollama":
+            return self._ollama_stream(m, request, run_id, headers, base.removesuffix("/v1") + "/api/chat")
+        request = {k: v for k, v in request.items() if k != "num_ctx"}     # OpenAI-style servers do not know it
         parts: list[str] = []
         usage: dict[str, Any] = {}
         return self._stream(m, request, run_id, headers, parts, usage, base + "/chat/completions", time.time())
+
+    def _ollama_stream(self, m: dict[str, Any], request: dict[str, Any], run_id: str | None, headers: dict[str, str], url: str) -> tuple[str, dict[str, Any]]:
+        """Ollama's own /api/chat, streamed. Unlike its OpenAI-compatible endpoint it applies the context window (num_ctx),
+        so long prompts are not silently cut to the server default (4096 tokens on recent versions)."""
+        body = ollama_body(request)
+        sent = len(json.dumps(body, ensure_ascii=False).encode())
+        purpose = f"model chat (ollama: {m['name']}, context {body['options']['num_ctx']})"
+        parts: list[str] = []
+        usage: dict[str, Any] = {}
+        t0 = time.time()
+        with self._client(m) as c:
+            try:
+                with c.stream("POST", url, json=body, headers=headers) as r:
+                    if r.status_code >= 400:
+                        self.gw.netlog.record("llm", "POST", url, r.status_code, purpose=purpose, bytes_out=sent, duration_ms=int((time.time() - t0) * 1000))
+                        detail = r.read().decode(errors="ignore")[:300]
+                        if "format" in body and r.status_code in (400, 422, 500):
+                            # an older Ollama or a model that cannot do structured output: once again without the constraint
+                            return self._ollama_stream(m, {k: v for k, v in request.items() if k != "response_format"}, run_id, headers, url)
+                        if r.status_code == 404 and "not found" in detail.lower():
+                            raise PAError(f"Ollama does not have the model '{body['model']}'. Pull it first (ollama pull {body['model']}).", code="model_error")
+                        raise PAError(f"model server returned {r.status_code}: {detail}", code="model_error")
+                    for line in r.iter_lines():
+                        delta, done, u = parse_ollama_line(line)
+                        if u:
+                            usage = u
+                        if delta:
+                            parts.append(delta)
+                            if run_id:
+                                self.gw.emit("llm.delta", {"run_id": run_id, "delta": delta})
+                        if done or self.gw.killswitch.active("stop_all"):
+                            break
+                    self.gw.netlog.record("llm", "POST", url, r.status_code, purpose=purpose, bytes_out=sent,
+                                          bytes_in=len("".join(parts).encode()), duration_ms=int((time.time() - t0) * 1000))
+            except httpx.HTTPError as e:
+                self.gw.netlog.record("llm", "POST", url, None, outcome="error", reason=type(e).__name__, bytes_out=sent, purpose=purpose,
+                                      duration_ms=int((time.time() - t0) * 1000))
+                raise PAError(f"cannot reach the model server: {e}", code="model_unreachable") from e
+        if run_id:
+            self.gw.emit("llm.delta", {"run_id": run_id, "delta": "", "done": True})
+        if not "".join(parts).strip():
+            raise PAError("the model returned an empty reply (a thinking model can use its whole answer budget on hidden reasoning; "
+                          "choose a non-thinking model or a larger limit)", code="model_empty")
+        return "".join(parts), usage
 
     def _stream(self, m, request, run_id, headers, parts, usage, url, t0):  # noqa: ANN001
         sent = len(json.dumps(request, ensure_ascii=False).encode())
@@ -669,6 +772,45 @@ class LLMService:
             r = c.get(base + "/v1/models" if not base.endswith("/v1") else base + "/models", headers=headers)
             r.raise_for_status()
             return [x["id"] for x in r.json().get("data", [])]
+
+
+def ollama_body(request: dict[str, Any]) -> dict[str, Any]:
+    """OpenAI-style request -> Ollama /api/chat body (context window, temperature, answer budget, thinking, JSON constraint)."""
+    body: dict[str, Any] = {"model": request["model"], "messages": request["messages"], "stream": True,
+                            "options": {"num_ctx": int(request.get("num_ctx") or 8192), "temperature": float(request.get("temperature", 0.2)),
+                                        "num_predict": int(request.get("max_tokens", 2048))}}
+    if request.get("reasoning_effort") == "none":
+        body["think"] = False
+    rf = request.get("response_format") or {}
+    if rf.get("type") == "json_schema":
+        body["format"] = rf["json_schema"]["schema"]
+    elif rf.get("type") == "json_object":
+        body["format"] = "json"
+    return body
+
+
+def parse_ollama_line(line: str) -> tuple[str, bool, dict[str, Any] | None]:
+    """One NDJSON line of /api/chat -> (text delta, done, usage when done). Hidden 'thinking' text is never shown."""
+    if not line or not line.strip():
+        return "", False, None
+    try:
+        obj = json.loads(line)
+    except ValueError:
+        return "", False, None
+    if obj.get("error"):
+        raise PAError(f"model server error: {str(obj['error'])[:200]}", code="model_error")
+    delta = (obj.get("message") or {}).get("content") or ""
+    done = bool(obj.get("done"))
+    usage = {"prompt_tokens": obj.get("prompt_eval_count", 0), "completion_tokens": obj.get("eval_count", 0),
+             "done_reason": obj.get("done_reason")} if done else None
+    return delta, done, usage
+
+
+def fit_answer_budget(messages: list[dict[str, Any]], max_tokens: int, context_length: int) -> int:
+    """Keep prompt + answer inside the model's context window (estimate: ~3.5 characters per token)."""
+    prompt = int(sum(len(str(x.get("content", ""))) for x in messages) / 3.5) + 64
+    room = context_length - prompt
+    return max(256, min(max_tokens, room))
 
 
 def _iter_sse(lines: Iterator[str]) -> Iterator[tuple[str, dict[str, Any] | None]]:

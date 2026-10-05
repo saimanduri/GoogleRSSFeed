@@ -38,6 +38,8 @@ jobs:
       - name: End-to-end selftest
         working-directory: app
         run: python -m pa_gateway --selftest
+      - name: End-to-end action catalogue (every RPC against a throwaway dev gateway over real named pipes)
+        run: python scripts/e2e_runner.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

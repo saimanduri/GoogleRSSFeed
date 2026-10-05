@@ -1039,6 +1039,15 @@ def llm_add(gw, p: P, c: ClientInfo) -> Any:
     return {"id": mid, "sha256": spec.get("sha256"), "testing": testing}
 
 
+@rpc("llm.update")
+def llm_update(gw, p: P, c: ClientInfo) -> Any:
+    """Context length (tokens) and temperature of one model; empty = the defaults in Settings > AI Model."""
+    def opt(name: str) -> Any:
+        v = p.d.get(name)
+        return None if v in (None, "") else v
+    return gw.llm.update_params(p.str("model_id", max_len=100), opt("context_length"), opt("temperature"))
+
+
 @rpc("llm.remove")
 def llm_remove(gw, p: P, c: ClientInfo) -> Any:
     gw.llm.remove_model(p.str("model_id", max_len=100))
@@ -1318,6 +1327,12 @@ def diagnostics_health(gw, p: P, c: ClientInfo) -> Any:
             "budget": gw.budgets.summary(), "log": gw.last_log_verify,
         },
     }
+
+
+@rpc("diagnostics.resources")
+def diagnostics_resources(gw, p: P, c: ClientInfo) -> Any:
+    """CPU / memory / GPU / storage of this app and the whole PC; 'critical' at 90 % or more (shown in red)."""
+    return gw.resources.snapshot()
 
 
 @rpc("diagnostics.bundle")

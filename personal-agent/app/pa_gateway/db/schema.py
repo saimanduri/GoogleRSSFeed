@@ -424,10 +424,16 @@ CREATE TABLE memory_forgotten (
 );
 """
 
+V6 = """
+ALTER TABLE models ADD COLUMN context_length INTEGER;
+ALTER TABLE models ADD COLUMN temperature REAL;
+"""
+
 MIGRATIONS: list[tuple[int, str]] = [
     (1, V1),
     (2, V2),
     (3, V3),
     (4, V4),
     (5, V5),
+    (6, V6),
 ]
